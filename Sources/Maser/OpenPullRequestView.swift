@@ -2,9 +2,11 @@ import AppKit
 import MaserCore
 import SwiftUI
 
-/// Prompts for a PR URL (prefilled from the clipboard when it holds one) and opens it for review.
-struct OpenPullRequestSheet: View {
-    @Environment(\.dismiss) private var dismiss
+/// Small window (⌘O from anywhere) that takes a PR URL, prefilled from the clipboard, and opens it for review.
+struct OpenPullRequestView: View {
+    static let windowID = "open-pull-request"
+
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openWindow) private var openWindow
     @State private var text = ""
     @State private var isLoading = false
@@ -23,7 +25,7 @@ struct OpenPullRequestSheet: View {
             HStack {
                 if isLoading { ProgressView().controlSize(.small) }
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
+                Button("Cancel", role: .cancel) { dismissWindow(id: Self.windowID) }
                     .keyboardShortcut(.cancelAction)
                 Button("Open", action: open)
                     .keyboardShortcut(.defaultAction)
@@ -32,6 +34,9 @@ struct OpenPullRequestSheet: View {
         }
         .padding()
         .onAppear {
+            // The window can be reused, so start fresh each time it opens.
+            text = ""
+            error = nil
             if let clip = NSPasteboard.general.string(forType: .string),
                let clipURL = URL(string: clip.trimmingCharacters(in: .whitespacesAndNewlines)),
                PullRequest.nameWithOwner(fromURL: clipURL) != nil {
@@ -55,7 +60,7 @@ struct OpenPullRequestSheet: View {
             do {
                 let pr = try await GitHubCLI().pullRequest(url: url)
                 openWindow(value: pr)
-                dismiss()
+                dismissWindow(id: Self.windowID)
             } catch {
                 self.error = error.localizedDescription
             }

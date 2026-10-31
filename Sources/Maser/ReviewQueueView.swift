@@ -13,7 +13,6 @@ struct ReviewQueueView: View {
     @State private var selection: Set<PullRequest.ID> = []
     @Environment(\.openURL) private var openURL
     @Environment(\.openWindow) private var openWindow
-    @State private var showOpenSheet = false
 
     /// PR URLs passed on the command line (`swift run Maser <url>…`) are opened once at launch.
     @MainActor private static var openedLaunchArguments = false
@@ -23,17 +22,15 @@ struct ReviewQueueView: View {
             .navigationTitle("Review Requests")
             .toolbar {
                 Button("Open Pull Request…", systemImage: "plus") {
-                    showOpenSheet = true
+                    openWindow(id: OpenPullRequestView.windowID)
                 }
-                .keyboardShortcut("o")
+                .help("Open Pull Request…", .openPullRequest)
                 Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await load() }
                 }
-                .keyboardShortcut("r")
+                .help("Refresh", .refresh)
             }
-            .sheet(isPresented: $showOpenSheet) {
-                OpenPullRequestSheet()
-            }
+            .focusedSceneValue(\.refreshAction, RefreshAction { Task { await load() } })
             .task { await openLaunchArguments() }
             .task { await load() }
     }

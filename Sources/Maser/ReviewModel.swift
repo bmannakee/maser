@@ -11,21 +11,60 @@ final class ReviewModel {
         case failed(String)
     }
 
+    enum Tab: String, CaseIterable, Identifiable {
+        case overview, files
+
+        var id: Self { self }
+        var title: String {
+            switch self {
+            case .overview: "Overview"
+            case .files: "Files"
+            }
+        }
+        var command: CommandID {
+            switch self {
+            case .overview: .showOverview
+            case .files: .showFiles
+            }
+        }
+    }
+
     /// A request to scroll the diff to a line; the token makes repeat requests for the same line distinct.
     struct ScrollRequest: Equatable {
+        let path: String
         let lineID: Int
         let token = UUID()
     }
 
     let pr: PullRequest
-    private(set) var state: LoadState = .loading
+    var tab: Tab = .overview
+    var showComments = true
+
+    // Overview
+    private(set) var overviewState: LoadState = .loading
+    private(set) var overview: PullRequestOverview?
+    /// Rendered once per load so the web view doesn't reload (and lose its scroll position) on every view update.
+    private(set) var conversationHTML = ""
+
+    // Files
+    private(set) var filesState: LoadState = .loading
     private(set) var tree: [FileNode] = []
+    private var filePaths: [String] = []
     private var filesByPath: [String: FileDiff] = [:]
     private var threadsByPath: [String: [ReviewThread]] = [:]
 
     var selectedPath: String?
     var collapsedDirectories: Set<String> = []
     var scrollRequest: ScrollRequest?
+    /// The comment thread selected in the comments pane; selecting one scrolls the diff to it.
+    var focusedThreadID: Int? {
+        didSet {
+            guard focusedThreadID != oldValue, let id = focusedThreadID,
+                  let thread = selectedThreads.first(where: { $0.id == id })
+            else { return }
+            reveal(thread)
+        }
+    }
 
     init(pr: PullRequest) {
         self.pr = pr
@@ -47,8 +86,28 @@ final class ReviewModel {
         })
     }
 
+    // MARK: Loading
+
     func load() async {
-        state = .loading
+        async let overview: Void = loadOverview()
+        async let files: Void = loadFiles()
+        _ = await (overview, files)
+    }
+
+    private func loadOverview() async {
+        if overview == nil { overviewState = .loading }
+        do {
+            let overview = try await GitHubCLI().overview(for: pr)
+            self.overview = overview
+            conversationHTML = ConversationHTML.render(overview)
+            overviewState = .loaded
+        } catch {
+            overviewState = .failed(error.localizedDescription)
+        }
+    }
+
+    private func loadFiles() async {
+        if filesByPath.isEmpty { filesState = .loading }
         do {
             let cli = try GitHubCLI()
             async let diffs = cli.fileDiffs(for: pr)
@@ -57,21 +116,71 @@ final class ReviewModel {
 
             filesByPath = Dictionary(files.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
             tree = FileTree.build(paths: files.map(\.path))
+            filePaths = FileTree.filePaths(in: tree)
             threadsByPath = Dictionary(grouping: ReviewThread.group(allComments), by: \.path)
             if selectedPath.map({ filesByPath[$0] == nil }) ?? true {
-                selectedPath = FileTree.firstFilePath(in: tree)
+                selectedPath = filePaths.first
             }
-            state = .loaded
+            filesState = .loaded
         } catch {
-            state = .failed(error.localizedDescription)
+            filesState = .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: Navigation
+
+    /// Selects a file, expanding any collapsed directories containing it.
+    func select(path: String) {
+        tab = .files
+        if selectedPath != path {
+            selectedPath = path
+            focusedThreadID = nil
+        }
+        collapsedDirectories = collapsedDirectories.filter { !path.hasPrefix($0 + "/") }
+    }
+
+    func selectAdjacentFile(offset: Int) {
+        guard !filePaths.isEmpty else { return }
+        let next: Int = if let current = selectedPath.flatMap(filePaths.firstIndex(of:)) {
+            min(max(current + offset, 0), filePaths.count - 1)
+        } else {
+            offset > 0 ? 0 : filePaths.count - 1
+        }
+        select(path: filePaths[next])
+    }
+
+    /// Moves to the next/previous current (non-outdated) comment thread, across files.
+    func focusAdjacentThread(offset: Int) {
+        let threads = filePaths.flatMap { threadsByPath[$0]?.filter { !$0.isOutdated } ?? [] }
+        guard !threads.isEmpty else { return }
+
+        let next: Int
+        if let id = focusedThreadID, let current = threads.firstIndex(where: { $0.id == id }) {
+            next = min(max(current + offset, 0), threads.count - 1)
+        } else {
+            // Start from the selected file: its first thread, or the nearest file in that direction.
+            let fileIndex = selectedPath.flatMap(filePaths.firstIndex(of:)) ?? -1
+            let position = { (thread: ReviewThread) in self.filePaths.firstIndex(of: thread.path) ?? 0 }
+            next = offset > 0
+                ? threads.firstIndex { position($0) >= fileIndex } ?? 0
+                : threads.lastIndex { position($0) <= fileIndex } ?? threads.count - 1
+        }
+
+        let thread = threads[next]
+        select(path: thread.path)
+        showComments = true
+        if focusedThreadID == thread.id {
+            reveal(thread)
+        } else {
+            focusedThreadID = thread.id
         }
     }
 
     /// Scrolls the diff to the line a thread is anchored to (no-op for outdated threads).
     func reveal(_ thread: ReviewThread) {
-        guard let file = selectedFile, let line = thread.line,
+        guard let file = filesByPath[thread.path], let line = thread.line,
               let id = file.lineID(side: thread.side, line: line)
         else { return }
-        scrollRequest = ScrollRequest(lineID: id)
+        scrollRequest = ScrollRequest(path: file.path, lineID: id)
     }
 }

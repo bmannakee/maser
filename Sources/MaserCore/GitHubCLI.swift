@@ -78,6 +78,21 @@ public struct GitHubCLI: Sendable {
         )
     }
 
+    /// Description, discussion, reviews, mergeability and CI status, in one GraphQL call.
+    @concurrent
+    public func overview(for pr: PullRequest) async throws -> PullRequestOverview {
+        let parts = pr.repository.nameWithOwner.split(separator: "/", maxSplits: 1)
+        let data = try await run([
+            "api", "graphql", "--hostname", pr.host,
+            // -f keeps owner/name as strings; -F makes number an Int.
+            "-f", "owner=\(parts[0])",
+            "-f", "name=\(parts[1])",
+            "-F", "number=\(pr.number)",
+            "-f", "query=\(PullRequestOverview.query)",
+        ])
+        return try PullRequestOverview.decode(from: data)
+    }
+
     /// The PR's full diff, split into files.
     @concurrent
     public func fileDiffs(for pr: PullRequest) async throws -> [FileDiff] {

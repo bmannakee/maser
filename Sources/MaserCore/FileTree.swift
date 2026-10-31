@@ -61,10 +61,11 @@ public enum FileTree {
 
     /// Path of the first file in display order.
     public static func firstFilePath(in nodes: [FileNode]) -> String? {
-        for node in nodes {
-            guard let children = node.children else { return node.id }
-            if let path = firstFilePath(in: children) { return path }
-        }
-        return nil
+        filePaths(in: nodes).first
+    }
+
+    /// All file paths in display order.
+    public static func filePaths(in nodes: [FileNode]) -> [String] {
+        nodes.flatMap { node in node.children.map(filePaths(in:)) ?? [node.id] }
     }
 }

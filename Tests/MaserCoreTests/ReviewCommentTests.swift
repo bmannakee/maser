@@ -46,6 +46,13 @@ struct LiveGitHubTests {
         #expect(!files.isEmpty)
         #expect(files.allSatisfy { !$0.path.isEmpty })
 
+        let overview = try await cli.overview(for: pr)
+        #expect(overview.number == 14858)
+        #expect(overview.state == .merged)
+        #expect(!overview.bodyHTML.isEmpty)
+        #expect(!overview.checks.isEmpty)
+        #expect(overview.reviewerStatuses.contains { $0.state == .approved })
+
         let threads = ReviewThread.group(try await cli.reviewComments(for: pr))
         #expect(!threads.isEmpty)
         // Every current thread should anchor to a line in its file's diff.

@@ -25,5 +25,13 @@ struct MaserApp: App {
             }
         }
         .defaultSize(width: 1500, height: 950)
+
+        Window("Open Pull Request", id: OpenPullRequestView.windowID) {
+            OpenPullRequestView()
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
+        .commands { MaserCommands() }
     }
 }

@@ -16,7 +16,24 @@ swift run Maser                                   # review queue
 swift run Maser https://github.com/owner/repo/pull/123   # open a PR directly
 ```
 
-The queue lists open PRs requesting your review; double-click one (or ⌘O to paste any PR URL) to open a review window: changed files on the left, diff in the middle, review comments on the right (⌥⌘0 toggles them). Clicking a comment thread scrolls the diff to its line.
+The queue lists open PRs requesting your review; double-click one (or ⌘O to paste any PR URL) to open a review window. Each window has tabs:
+
+- **Overview** — title, description, comments and reviews (rendered by GitHub), plus mergeability, review status, CI checks and labels.
+- **Files** — changed files, diff, and inline review comments. Selecting a comment thread scrolls the diff to its line.
+
+## Keyboard
+
+Every action is a menu command; shortcuts are defined in one place (`Sources/Maser/Keymap.swift`).
+
+| Action | Shortcut |
+| --- | --- |
+| Open pull request | ⌘O |
+| Refresh | ⌘R |
+| Open on GitHub | ⇧⌘O |
+| Overview / Files tab | ⌘1 / ⌘2 |
+| Show/hide comments | ⌥⌘0 |
+| Next / previous file | ⌥⌘↓ / ⌥⌘↑ |
+| Next / previous comment thread | ⌃⌘↓ / ⌃⌘↑ |
 
 ## Tests
 
