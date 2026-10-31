@@ -8,6 +8,9 @@ struct MaserApp: App {
         // When launched via `swift run` there is no app bundle; make it a regular foreground app.
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate()
+
+        ConfigStore.shared.start()
+        KeyRouter.shared.start()
     }
 
     var body: some Scene {
@@ -15,6 +18,7 @@ struct MaserApp: App {
             ReviewQueueView()
                 .frame(minWidth: 600, minHeight: 400)
         }
+        .commands { MaserCommands() }
 
         WindowGroup("Pull Request", for: PullRequest.self) { $pr in
             if let pr {
@@ -32,6 +36,9 @@ struct MaserApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.center)
 
-        .commands { MaserCommands() }
+        Window("Keyboard Shortcuts", id: KeybindingsView.windowID) {
+            KeybindingsView()
+        }
+        .defaultSize(width: 640, height: 480)
     }
 }

@@ -31,6 +31,12 @@ struct ReviewQueueView: View {
                 .help("Refresh", .refresh)
             }
             .focusedSceneValue(\.refreshAction, RefreshAction { Task { await load() } })
+            .commandHandler { command in
+                guard command == .refresh else { return false }
+                Task { await load() }
+                return true
+            }
+            .configProblemsBanner()
             .task { await openLaunchArguments() }
             .task { await load() }
     }

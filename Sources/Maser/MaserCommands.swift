@@ -1,4 +1,5 @@
 import AppKit
+import MaserCore
 import SwiftUI
 
 extension FocusedValues {
@@ -12,59 +13,53 @@ struct RefreshAction {
     let perform: @MainActor () -> Void
 }
 
-/// Menu bar commands. Shortcuts come from `Keymap`.
+/// Menu bar commands. Titles and shortcuts come from `CommandID` and the user's config.
 struct MaserCommands: Commands {
     @FocusedValue(\.reviewModel) private var model
     @FocusedValue(\.refreshAction) private var refresh
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            global(.openConfig)
+        }
+
         CommandGroup(after: .newItem) {
-            Button("Open Pull Request…") { openWindow(id: OpenPullRequestView.windowID) }
-                .keyboardShortcut(.openPullRequest)
+            global(.openPullRequest)
         }
 
         CommandGroup(before: .toolbar) {
             ForEach(ReviewModel.Tab.allCases) { tab in
-                Button(tab.title) { model?.tab = tab }
-                    .keyboardShortcut(tab.command)
-                    .disabled(model == nil)
+                review(tab.command)
             }
-            Button(model?.showComments == true ? "Hide Comments" : "Show Comments") {
-                model?.showComments.toggle()
-            }
-            .keyboardShortcut(.toggleComments)
-            .disabled(model?.tab != .files)
+            review(.toggleComments, title: model?.showComments == true ? "Hide Comments" : "Show Comments")
+                .disabled(model?.tab != .files)
             Divider()
         }
 
         CommandMenu("Review") {
-            Button("Refresh") { refresh?.perform() }
-                .keyboardShortcut(.refresh)
+            CommandButton(.refresh) { refresh?.perform() }
                 .disabled(refresh == nil)
-            Button("Open on GitHub") {
-                if let url = model?.pr.url { NSWorkspace.shared.open(url) }
-            }
-            .keyboardShortcut(.openOnGitHub)
-            .disabled(model == nil)
-
+            review(.openOnGitHub)
             Divider()
-
-            Button("Next File") { model?.selectAdjacentFile(offset: 1) }
-                .keyboardShortcut(.nextFile)
-                .disabled(model == nil)
-            Button("Previous File") { model?.selectAdjacentFile(offset: -1) }
-                .keyboardShortcut(.previousFile)
-                .disabled(model == nil)
-
+            review(.nextFile)
+            review(.previousFile)
             Divider()
-
-            Button("Next Comment Thread") { model?.focusAdjacentThread(offset: 1) }
-                .keyboardShortcut(.nextThread)
-                .disabled(model == nil)
-            Button("Previous Comment Thread") { model?.focusAdjacentThread(offset: -1) }
-                .keyboardShortcut(.previousThread)
-                .disabled(model == nil)
+            review(.nextThread)
+            review(.previousThread)
         }
+
+        CommandGroup(after: .help) {
+            global(.showKeybindings)
+        }
+    }
+
+    private func global(_ command: CommandID) -> some View {
+        CommandButton(command) { _ = GlobalCommands.perform(command, openWindow: openWindow) }
+    }
+
+    private func review(_ command: CommandID, title: String? = nil) -> some View {
+        CommandButton(command, title: title) { _ = model?.perform(command) }
+            .disabled(model == nil)
     }
 }

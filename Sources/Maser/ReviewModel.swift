@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import MaserCore
 import Observation
 
@@ -125,6 +125,32 @@ final class ReviewModel {
         } catch {
             filesState = .failed(error.localizedDescription)
         }
+    }
+
+    // MARK: Commands
+
+    /// Runs a window-level command (from the menu bar or a vim-style key). Returns false if it doesn't apply here.
+    @discardableResult
+    func perform(_ command: CommandID) -> Bool {
+        switch command {
+        case .showOverview: tab = .overview
+        case .showFiles: tab = .files
+        case .toggleComments:
+            if tab != .files {
+                tab = .files
+                showComments = true
+            } else {
+                showComments.toggle()
+            }
+        case .refresh: Task { await load() }
+        case .openOnGitHub: NSWorkspace.shared.open(pr.url)
+        case .nextFile: selectAdjacentFile(offset: 1)
+        case .previousFile: selectAdjacentFile(offset: -1)
+        case .nextThread: focusAdjacentThread(offset: 1)
+        case .previousThread: focusAdjacentThread(offset: -1)
+        case .openPullRequest, .openConfig, .showKeybindings: return false
+        }
+        return true
     }
 
     // MARK: Navigation

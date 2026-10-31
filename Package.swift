@@ -7,8 +7,14 @@ let package = Package(
     products: [
         .executable(name: "Maser", targets: ["Maser"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/dduan/TOMLDecoder", from: "0.4.5"),
+    ],
     targets: [
-        .target(name: "MaserCore"),
+        .target(
+            name: "MaserCore",
+            dependencies: [.product(name: "TOMLDecoder", package: "TOMLDecoder")]
+        ),
         .executableTarget(
             name: "Maser",
             dependencies: ["MaserCore"]

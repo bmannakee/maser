@@ -33,6 +33,7 @@ struct OpenPullRequestView: View {
             }
         }
         .padding()
+        .commandHandler { _ in false } // app-wide keys still work when the field isn't focused
         .onAppear {
             // The window can be reused, so start fresh each time it opens.
             text = ""

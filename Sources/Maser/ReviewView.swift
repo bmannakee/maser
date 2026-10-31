@@ -1,7 +1,7 @@
 import MaserCore
 import SwiftUI
 
-/// A PR review window. Tabs (toolbar, ⌘1/⌘2…) switch between whole-window views.
+/// A PR review window. Tabs (toolbar, ⌘1/⌘2, `g o`/`g f`) switch between whole-window views.
 struct ReviewView: View {
     @State private var model: ReviewModel
 
@@ -27,7 +27,9 @@ struct ReviewView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .help("Switch view (\(ReviewModel.Tab.allCases.compactMap { Keymap.display($0.command) }.joined(separator: ", ")))")
+                .help(ReviewModel.Tab.allCases.map { tab in
+                    ConfigStore.shared.bindingSummary(for: tab.command).map { "\(tab.title): \($0)" } ?? tab.title
+                }.joined(separator: "\n"))
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Refresh", systemImage: "arrow.clockwise") {
@@ -48,6 +50,8 @@ struct ReviewView: View {
         }
         .focusedSceneValue(\.reviewModel, model)
         .focusedSceneValue(\.refreshAction, RefreshAction { [model] in Task { await model.load() } })
+        .commandHandler { [model] in model.perform($0) }
+        .configProblemsBanner()
         .task { await model.load() }
     }
 }
