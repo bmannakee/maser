@@ -3,9 +3,12 @@ import Foundation
 public enum GitHubCLIError: Error, LocalizedError {
     case notInstalled
     case failed(status: Int32, stderr: String)
+    case invalidPullRequestURL(String)
 
     public var errorDescription: String? {
         switch self {
+        case let .invalidPullRequestURL(url):
+            "Not a pull request URL: \(url)"
         case .notInstalled:
             "The GitHub CLI (gh) was not found. Install it with `brew install gh` and run `gh auth login`."
         case let .failed(status, stderr):
@@ -15,6 +18,7 @@ public enum GitHubCLIError: Error, LocalizedError {
 }
 
 /// Talks to GitHub through the `gh` CLI, reusing whatever account it is logged in to.
+/// Credentials stay with `gh`; the app never sees a token.
 public struct GitHubCLI: Sendable {
     /// GUI apps don't inherit the shell PATH, so look in the usual install locations.
     static let searchPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
@@ -30,6 +34,7 @@ public struct GitHubCLI: Sendable {
     }
 
     /// Open PRs where the current user's review is requested.
+    @concurrent
     public func reviewRequests(limit: Int = 100) async throws -> [PullRequest] {
         let data = try await run([
             "search", "prs",
@@ -41,6 +46,61 @@ public struct GitHubCLI: Sendable {
         return try PullRequest.decodeList(from: data)
     }
 
+    /// Looks up a single PR from its web URL, e.g. `https://github.com/owner/repo/pull/123`.
+    @concurrent
+    public func pullRequest(url: URL) async throws -> PullRequest {
+        guard let nameWithOwner = PullRequest.nameWithOwner(fromURL: url) else {
+            throw GitHubCLIError.invalidPullRequestURL(url.absoluteString)
+        }
+        struct View: Decodable {
+            let number: Int
+            let title: String
+            let url: URL
+            let author: PullRequest.Author
+            let updatedAt: Date
+            let isDraft: Bool
+        }
+        let data = try await run([
+            "pr", "view", url.absoluteString,
+            "--json", "number,title,url,author,updatedAt,isDraft",
+        ])
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let view = try decoder.decode(View.self, from: data)
+        return PullRequest(
+            number: view.number,
+            title: view.title,
+            url: view.url,
+            repository: .init(name: String(nameWithOwner.split(separator: "/")[1]), nameWithOwner: nameWithOwner),
+            author: view.author,
+            updatedAt: view.updatedAt,
+            isDraft: view.isDraft
+        )
+    }
+
+    /// The PR's full diff, split into files.
+    @concurrent
+    public func fileDiffs(for pr: PullRequest) async throws -> [FileDiff] {
+        let data = try await run([
+            "pr", "diff", String(pr.number),
+            "--repo", "\(pr.host)/\(pr.repository.nameWithOwner)",
+            "--color", "never",
+        ])
+        return DiffParser.parse(String(decoding: data, as: UTF8.self))
+    }
+
+    /// All inline review comments on the PR (every page).
+    @concurrent
+    public func reviewComments(for pr: PullRequest) async throws -> [ReviewComment] {
+        let data = try await run([
+            "api", "--hostname", pr.host, "--paginate",
+            "repos/\(pr.repository.nameWithOwner)/pulls/\(pr.number)/comments?per_page=100",
+            "--jq", ReviewComment.jqFilter,
+        ])
+        return try ReviewComment.decodeLines(from: data)
+    }
+
+    @concurrent
     func run(_ arguments: [String]) async throws -> Data {
         let process = Process()
         process.executableURL = executable

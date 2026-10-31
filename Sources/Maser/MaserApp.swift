@@ -1,4 +1,5 @@
 import AppKit
+import MaserCore
 import SwiftUI
 
 @main
@@ -10,9 +11,19 @@ struct MaserApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Maser") {
+        WindowGroup("Review Requests", id: "queue") {
             ReviewQueueView()
                 .frame(minWidth: 600, minHeight: 400)
         }
+
+        WindowGroup("Pull Request", for: PullRequest.self) { $pr in
+            if let pr {
+                ReviewView(pr: pr)
+                    .frame(minWidth: 900, minHeight: 500)
+            } else {
+                ContentUnavailableView("No pull request", systemImage: "arrow.triangle.pull")
+            }
+        }
+        .defaultSize(width: 1500, height: 950)
     }
 }

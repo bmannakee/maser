@@ -10,18 +10,45 @@ struct ReviewQueueView: View {
     }
 
     @State private var state: LoadState = .loading
+    @State private var selection: Set<PullRequest.ID> = []
     @Environment(\.openURL) private var openURL
+    @Environment(\.openWindow) private var openWindow
+    @State private var showOpenSheet = false
+
+    /// PR URLs passed on the command line (`swift run Maser <url>…`) are opened once at launch.
+    @MainActor private static var openedLaunchArguments = false
 
     var body: some View {
         content
             .navigationTitle("Review Requests")
             .toolbar {
+                Button("Open Pull Request…", systemImage: "plus") {
+                    showOpenSheet = true
+                }
+                .keyboardShortcut("o")
                 Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await load() }
                 }
                 .keyboardShortcut("r")
             }
+            .sheet(isPresented: $showOpenSheet) {
+                OpenPullRequestSheet()
+            }
+            .task { await openLaunchArguments() }
             .task { await load() }
+    }
+
+    private func openLaunchArguments() async {
+        guard !Self.openedLaunchArguments else { return }
+        Self.openedLaunchArguments = true
+        let urls = CommandLine.arguments.dropFirst().compactMap(URL.init(string:))
+            .filter { PullRequest.nameWithOwner(fromURL: $0) != nil }
+        guard !urls.isEmpty, let cli = try? GitHubCLI() else { return }
+        for url in urls {
+            if let pr = try? await cli.pullRequest(url: url) {
+                openWindow(value: pr)
+            }
+        }
     }
 
     @ViewBuilder
@@ -34,11 +61,21 @@ struct ReviewQueueView: View {
         case let .loaded(prs) where prs.isEmpty:
             ContentUnavailableView("No reviews requested", systemImage: "checkmark.circle")
         case let .loaded(prs):
-            List(prs) { pr in
+            List(prs, selection: $selection) { pr in
                 PullRequestRow(pr: pr)
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 2) { openURL(pr.url) }
             }
+            .contextMenu(forSelectionType: PullRequest.ID.self) { ids in
+                Button("Review") { review(ids, in: prs) }
+                Button("Open on GitHub") { ids.forEach { openURL($0) } }
+            } primaryAction: { ids in
+                review(ids, in: prs) // double-click or Return
+            }
+        }
+    }
+
+    private func review(_ ids: Set<PullRequest.ID>, in prs: [PullRequest]) {
+        for pr in prs where ids.contains(pr.id) {
+            openWindow(value: pr)
         }
     }
 

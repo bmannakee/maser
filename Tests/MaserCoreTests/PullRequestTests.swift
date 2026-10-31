@@ -19,6 +19,13 @@ import Testing
     #expect(pr.url == URL(string: "https://github.com/tidymodels/broom/pull/351"))
 }
 
+@Test func nameWithOwnerFromURL() {
+    #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://github.com/cli/cli/pull/14858")!) == "cli/cli")
+    #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://ghe.example.com/team/app/pull/7/files")!) == "team/app")
+    #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://github.com/cli/cli/issues/1")!) == nil)
+    #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://github.com/cli")!) == nil)
+}
+
 @Test func decodesEmptyResult() throws {
     #expect(try PullRequest.decodeList(from: Data("[]".utf8)).isEmpty)
 }
