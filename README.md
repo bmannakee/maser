@@ -37,6 +37,10 @@ Every action is a command you can trigger two ways:
 | Show/hide comments | ⌥⌘0 | `i` |
 | Next / previous file | ⌥⌘↓ / ⌥⌘↑ | `j` / `k` |
 | Next / previous comment thread | ⌃⌘↓ / ⌃⌘↑ | `n` / `N` |
+| Scroll diff down / up a page | | `ctrl+f` or `space` / `ctrl+b` or `shift+space` |
+| Scroll diff down / up half a page | | `ctrl+d` / `ctrl+u` |
+| Scroll diff down / up a line | | `ctrl+e` / `ctrl+y` |
+| Top / bottom of diff | | `g g` / `G` |
 | Open config file | ⌘, | |
 | Keyboard shortcuts | ⌘/ | `?` |
 

@@ -36,6 +36,15 @@ final class ReviewModel {
         let token = UUID()
     }
 
+    /// A request to scroll the diff by some amount; the token makes repeat presses distinct.
+    struct DiffScroll: Equatable {
+        enum Motion: Equatable {
+            case lines(Int), halfPages(Int), pages(Int), top, bottom
+        }
+        let motion: Motion
+        let token = UUID()
+    }
+
     let pr: PullRequest
     var tab: Tab = .overview
     var showComments = true
@@ -56,6 +65,7 @@ final class ReviewModel {
     var selectedPath: String?
     var collapsedDirectories: Set<String> = []
     var scrollRequest: ScrollRequest?
+    var diffScroll: DiffScroll?
     /// The comment thread selected in the comments pane; selecting one scrolls the diff to it.
     var focusedThreadID: Int? {
         didSet {
@@ -148,8 +158,26 @@ final class ReviewModel {
         case .previousFile: selectAdjacentFile(offset: -1)
         case .nextThread: focusAdjacentThread(offset: 1)
         case .previousThread: focusAdjacentThread(offset: -1)
+        case .scrollDown: return scrollDiff(.lines(1))
+        case .scrollUp: return scrollDiff(.lines(-1))
+        case .halfPageDown: return scrollDiff(.halfPages(1))
+        case .halfPageUp: return scrollDiff(.halfPages(-1))
+        case .pageDown: return scrollDiff(.pages(1))
+        case .pageUp: return scrollDiff(.pages(-1))
+        case .scrollToTop: return scrollDiff(.top)
+        case .scrollToBottom: return scrollDiff(.bottom)
         case .openPullRequest, .openConfig, .showKeybindings: return false
         }
+        return true
+    }
+
+    /// Whether scroll commands apply (they scroll the diff, so only on the Files tab).
+    var canScrollDiff: Bool { tab == .files && selectedFile != nil }
+
+    /// Returns false outside the Files tab so the key falls through (e.g. space pages the Overview's web view).
+    private func scrollDiff(_ motion: DiffScroll.Motion) -> Bool {
+        guard canScrollDiff else { return false }
+        diffScroll = DiffScroll(motion: motion)
         return true
     }
 

@@ -47,6 +47,15 @@ struct MaserCommands: Commands {
             Divider()
             review(.nextThread)
             review(.previousThread)
+            Divider()
+            Menu("Scroll Diff") {
+                ForEach([CommandID.pageDown, .pageUp, .halfPageDown, .halfPageUp, .scrollDown, .scrollUp], id: \.self) {
+                    review($0).disabled(model?.canScrollDiff != true)
+                }
+                Divider()
+                review(.scrollToTop).disabled(model?.canScrollDiff != true)
+                review(.scrollToBottom).disabled(model?.canScrollDiff != true)
+            }
         }
 
         CommandGroup(after: .help) {

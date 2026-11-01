@@ -123,7 +123,12 @@ private struct DiffPane: View {
             ContentUnavailableView("Couldn't load pull request", systemImage: "exclamationmark.triangle", description: Text(message))
         case .loaded:
             if let file = model.selectedFile {
-                DiffView(file: file, commentedLineIDs: model.commentedLineIDs, scrollRequest: model.scrollRequest)
+                DiffView(
+                    file: file,
+                    commentedLineIDs: model.commentedLineIDs,
+                    scrollRequest: model.scrollRequest,
+                    diffScroll: model.diffScroll
+                )
                     .id(file.id) // fresh scroll position per file
             } else {
                 ContentUnavailableView("Select a file", systemImage: "doc.text")
@@ -136,6 +141,14 @@ private struct DiffView: View {
     let file: FileDiff
     let commentedLineIDs: Set<Int>
     let scrollRequest: ReviewModel.ScrollRequest?
+    let diffScroll: ReviewModel.DiffScroll?
+
+    @State private var position = ScrollPosition(edge: .top)
+    /// Updated on every scroll frame; kept out of view state so scrolling doesn't re-render the diff.
+    @State private var geometry = GeometryBox()
+
+    /// Height of one diff row: the monospaced font's line height plus the row's vertical padding.
+    private static let rowHeight = NSLayoutManager().defaultLineHeight(for: .monospacedSystemFont(ofSize: 12, weight: .regular)) + 2
 
     var body: some View {
         if file.isBinary {
@@ -157,6 +170,13 @@ private struct DiffView: View {
                     .font(.system(size: 12, design: .monospaced))
                     .textSelection(.enabled)
                 }
+                .scrollPosition($position)
+                .onScrollGeometryChange(for: ScrollGeometry.self, of: { $0 }) { _, new in
+                    geometry.value = new
+                }
+                .onChange(of: diffScroll) { _, request in
+                    if let request { scroll(request.motion) }
+                }
                 // Runs on appear too, so jumping to a thread in another file scrolls once it loads.
                 .task(id: scrollRequest) {
                     guard let request = scrollRequest, request.path == file.path else { return }
@@ -164,6 +184,38 @@ private struct DiffView: View {
                     withAnimation { proxy.scrollTo(request.lineID, anchor: .center) }
                 }
             }
+        }
+    }
+}
+
+extension DiffView {
+    final class GeometryBox {
+        var value: ScrollGeometry?
+    }
+
+    /// Vim-style motions. Jumps without animation, like vim, so repeated presses stay predictable.
+    private func scroll(_ motion: ReviewModel.DiffScroll.Motion) {
+        guard let geometry = geometry.value else { return }
+        let viewport = geometry.visibleRect.height
+        let delta: CGFloat
+        switch motion {
+        case .top: position.scrollTo(edge: .top); return
+        case .bottom: position.scrollTo(edge: .bottom); return
+        case let .lines(count): delta = CGFloat(count) * Self.rowHeight
+        case let .halfPages(count): delta = CGFloat(count) * viewport / 2
+        // Keep a couple of rows of overlap so you don't lose your place, as vim does.
+        case let .pages(count): delta = CGFloat(count) * max(viewport - 2 * Self.rowHeight, Self.rowHeight)
+        }
+
+        let minOffset = -geometry.contentInsets.top
+        let maxOffset = geometry.contentSize.height - geometry.containerSize.height + geometry.contentInsets.bottom
+        let target = geometry.contentOffset.y + delta
+        if target <= minOffset {
+            position.scrollTo(edge: .top)
+        } else if target >= maxOffset {
+            position.scrollTo(edge: .bottom)
+        } else {
+            position.scrollTo(y: target)
         }
     }
 }

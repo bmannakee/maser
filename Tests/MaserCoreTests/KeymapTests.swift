@@ -59,6 +59,16 @@ import Testing
         #expect(keymap.shadowingProblems().isEmpty)
     }
 
+    @Test func defaultScrollBindings() throws {
+        let keymap = Keymap.defaults
+        #expect(keymap.match(try KeyBindingParser.parseSequence("ctrl+d")) == .command(.halfPageDown))
+        #expect(keymap.match(try KeyBindingParser.parseSequence("ctrl+u")) == .command(.halfPageUp))
+        #expect(keymap.match(try KeyBindingParser.parseSequence("space")) == .command(.pageDown))
+        #expect(keymap.match(try KeyBindingParser.parseSequence("shift+space")) == .command(.pageUp))
+        #expect(keymap.match(try KeyBindingParser.parseSequence("g g")) == .command(.scrollToTop))
+        #expect(keymap.match(try KeyBindingParser.parseSequence("G")) == .command(.scrollToBottom))
+    }
+
     @Test func emptyConfigIsDefaults() throws {
         let result = try Keymap.load(toml: "")
         #expect(result.keymap == .defaults)
@@ -134,7 +144,7 @@ import Testing
         [keys.normal]
         refresh = "g"
         """)
-        #expect(result.problems.count == 2) // hides "g o" and "g f"
+        #expect(result.problems.count == 3) // hides "g o", "g f" and "g g"
         #expect(result.problems[0].contains("\"g\" (refresh) hides \"g f\" (show-files)"))
         #expect(result.keymap.match([KeyChord("g")]) == .command(.refresh))
     }
