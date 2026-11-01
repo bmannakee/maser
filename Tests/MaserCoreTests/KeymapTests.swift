@@ -51,7 +51,10 @@ import Testing
 @Suite struct KeymapTests {
     @Test func defaultsMatchSequences() {
         let keymap = Keymap.defaults
-        #expect(keymap.match([KeyChord("j")]) == .command(.nextFile))
+        #expect(keymap.match([KeyChord("j")]) == .command(.cursorDown))
+        #expect(keymap.match([KeyChord("]"), KeyChord("f")]) == .command(.nextFile))
+        #expect(keymap.match([KeyChord("[")]) == .prefix)
+        #expect(keymap.match([KeyChord(.escape)]) == .command(.cancel))
         #expect(keymap.match([KeyChord("g")]) == .prefix)
         #expect(keymap.match([KeyChord("g"), KeyChord("f")]) == .command(.showFiles))
         #expect(keymap.match([KeyChord("g"), KeyChord("x")]) == .none)
@@ -92,7 +95,7 @@ import Testing
         #expect(keymap.menu[.refresh] == nil)
         #expect(keymap.menu[.showFiles] == Keymap.defaults.menu[.showFiles]) // untouched
         #expect(keymap.match([KeyChord(.down)]) == .command(.nextFile))
-        #expect(keymap.match([KeyChord("k")]) == .none)
+        #expect(keymap.match([KeyChord("["), KeyChord("f")]) == .none)
         #expect(keymap.match([KeyChord("g"), KeyChord("g")]) == .command(.showFiles))
         #expect(keymap.match([KeyChord("g"), KeyChord("f")]) == .none) // replaced, not added
     }
@@ -107,7 +110,7 @@ import Testing
         #expect(keymap.menu[.refresh] == KeyChord("o", modifiers: .command))
         #expect(keymap.menu[.openPullRequest] == nil)
         #expect(keymap.match([KeyChord("j")]) == .command(.refresh))
-        #expect(keymap.normal[.nextFile] == nil)
+        #expect(keymap.normal[.cursorDown] == nil)
     }
 
     @Test func reportsProblemsButKeepsTheRest() throws {

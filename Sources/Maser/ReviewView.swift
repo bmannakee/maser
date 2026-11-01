@@ -32,6 +32,14 @@ struct ReviewView: View {
                 }.joined(separator: "\n"))
             }
             ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    model.isFinishingReview = true
+                } label: {
+                    let count = model.pendingCommentCount
+                    Label(count > 0 ? "Finish Review (\(count))" : "Review…", systemImage: "checkmark.bubble")
+                        .labelStyle(.titleAndIcon)
+                }
+                .help("Finish Review", .submitReview)
                 Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await model.load() }
                 }
@@ -52,6 +60,9 @@ struct ReviewView: View {
         .focusedSceneValue(\.refreshAction, RefreshAction { [model] in Task { await model.load() } })
         .commandHandler { [model] in model.perform($0) }
         .configProblemsBanner()
+        .sheet(isPresented: $model.isFinishingReview) {
+            FinishReviewView(model: model)
+        }
         .task { await model.load() }
     }
 }

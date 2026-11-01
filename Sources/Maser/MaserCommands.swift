@@ -42,6 +42,8 @@ struct MaserCommands: Commands {
                 .disabled(refresh == nil)
             review(.openOnGitHub)
             review(.comment)
+            review(.reply).disabled(model?.tab != .files)
+            review(.submitReview)
             Divider()
             review(.nextFile)
             review(.previousFile)

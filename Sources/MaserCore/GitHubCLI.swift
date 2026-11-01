@@ -115,17 +115,6 @@ public struct GitHubCLI: Sendable {
         return DiffParser.parse(String(decoding: data, as: UTF8.self))
     }
 
-    /// All inline review comments on the PR (every page).
-    @concurrent
-    public func reviewComments(for pr: PullRequest) async throws -> [ReviewComment] {
-        let data = try await run([
-            "api", "--hostname", pr.host, "--paginate",
-            "repos/\(pr.repository.nameWithOwner)/pulls/\(pr.number)/comments?per_page=100",
-            "--jq", ReviewComment.jqFilter,
-        ])
-        return try ReviewComment.decodeLines(from: data)
-    }
-
     @concurrent
     func run(_ arguments: [String]) async throws -> Data {
         let process = Process()

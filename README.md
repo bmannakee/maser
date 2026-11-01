@@ -21,6 +21,10 @@ The queue lists open PRs requesting your review; double-click one (or ⌘O to pa
 - **Overview** — title, description, comments and reviews (rendered by GitHub), plus mergeability, review status, CI checks and labels.
   Write a comment in the box at the bottom (`c` to jump there, ⌘↩ to post, Esc to leave it); **Quote reply** on any comment quotes it into your draft.
 - **Files** — changed files, diff, and inline review comments. Selecting a comment thread scrolls the diff to its line.
+  Move the line cursor with `j`/`k` (or click the line numbers), select a range with `V` (or shift-click), and press `c` to comment;
+  `R` replies to the selected thread. Line comments collect in a pending review, visible only to you, until you
+  **Finish Review** (`S`, toolbar) as Comment, Approve or Request changes. Replies join the pending review if you have one;
+  otherwise they post immediately (GitHub's rule).
 
 ## Keyboard
 
@@ -34,10 +38,15 @@ Every action is a command you can trigger two ways:
 | Open pull request | ⌘O | |
 | Refresh | ⌘R | `r` |
 | Open on GitHub | ⇧⌘O | `o` |
-| Comment on the PR | ⌥⌘C | `c` |
+| Comment (Overview: on the PR; Files: on the cursor line or selection) | ⌥⌘C | `c` |
+| Reply to the selected thread | | `R` |
+| Finish review | ⌥⌘R | `S` |
 | Overview / Files tab | ⌘1 / ⌘2 | `g o` / `g f` |
 | Show/hide comments | ⌥⌘0 | `i` |
-| Next / previous file | ⌥⌘↓ / ⌥⌘↑ | `j` / `k` |
+| Next / previous line (Files) | | `j` / `k` |
+| Select lines / cancel selection | | `V` / `esc` |
+| Next / previous hunk | | `] c` / `[ c` |
+| Next / previous file | ⌥⌘↓ / ⌥⌘↑ | `] f` / `[ f` |
 | Next / previous comment thread | ⌃⌘↓ / ⌃⌘↑ | `n` / `N` |
 | Scroll diff down / up a page | | `ctrl+f` or `space` / `ctrl+b` or `shift+space` |
 | Scroll diff down / up half a page | | `ctrl+d` / `ctrl+u` |
@@ -72,4 +81,5 @@ To debug bindings: `/usr/bin/log stream --predicate 'subsystem == "dev.maser"' -
 ```sh
 swift test
 MASER_LIVE_TESTS=1 swift test   # also hits GitHub via gh
+MASER_LIVE_WRITE_TESTS=1 swift test   # creates and deletes a pending review on bmannakee/maser#1
 ```
