@@ -1,19 +1,29 @@
+// The app's menu bar.
+//
+// `MaserCommands` builds the View, Review and Help menu items from `CommandID`s, so their titles and shortcuts follow the
+// user's config. Review commands go to the focused window's `ReviewModel` through focused values; app-wide ones go to
+// `GlobalCommands`.
+
 import AppKit
 import MaserCore
 import SwiftUI
 
 extension FocusedValues {
-    /// The review window that has focus, if any.
+    /// The model of the review window that has focus, if any.
     @Entry var reviewModel: ReviewModel?
     /// Reloads whatever the focused window shows.
     @Entry var refreshAction: RefreshAction?
 }
 
+/// A focused window's way to reload its content, published so the Refresh menu item can reach it.
 struct RefreshAction {
     let perform: @MainActor () -> Void
 }
 
-/// Menu bar commands. Titles and shortcuts come from `CommandID` and the user's config.
+/// The app's menu bar commands, with titles and shortcuts from `CommandID` and the user's config.
+///
+/// Review items are disabled when no review window has focus; Refresh works for any window that publishes a
+/// `RefreshAction`.
 struct MaserCommands: Commands {
     @FocusedValue(\.reviewModel) private var model
     @FocusedValue(\.refreshAction) private var refresh
@@ -66,10 +76,17 @@ struct MaserCommands: Commands {
         }
     }
 
+    /// A menu item for an app-wide command, always enabled.
     private func global(_ command: CommandID) -> some View {
         CommandButton(command) { _ = GlobalCommands.perform(command, openWindow: openWindow) }
     }
 
+    /// A menu item that sends a command to the focused review window, disabled when there isn't one.
+    ///
+    /// - Parameters:
+    ///   - command: The command to send to `ReviewModel.perform(_:)`.
+    ///   - title: A title to use instead of the command's own.
+    /// - Returns: The menu item.
     private func review(_ command: CommandID, title: String? = nil) -> some View {
         CommandButton(command, title: title) { _ = model?.perform(command) }
             .disabled(model == nil)

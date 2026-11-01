@@ -1,8 +1,17 @@
+// The Keybindings window and the config problems banner.
+//
+// `KeybindingsView` is a reference table of every command and its current bindings, with the names to use in
+// `config.toml`. `configProblemsBanner()` shows errors from that file at the top of a window; every main window uses
+// it.
+
 import MaserCore
 import SwiftUI
 
 /// Lists every command with its current menu and vim-style bindings.
+///
+/// Updates live as `config.toml` changes, and shows the config path with a button to open it.
 struct KeybindingsView: View {
+    /// The scene ID used to open this window.
     static let windowID = "keybindings"
 
     var body: some View {
@@ -42,6 +51,8 @@ struct KeybindingsView: View {
 
 extension View {
     /// Shows problems from `config.toml` above the view until dismissed or fixed.
+    ///
+    /// A dismissed banner comes back if the problems change.
     func configProblemsBanner() -> some View {
         safeAreaInset(edge: .top, spacing: 0) {
             ConfigProblemsBanner()
@@ -49,6 +60,7 @@ extension View {
     }
 }
 
+/// A yellow banner listing up to five config problems, with buttons to open the file or dismiss the banner.
 private struct ConfigProblemsBanner: View {
     var body: some View {
         let config = ConfigStore.shared

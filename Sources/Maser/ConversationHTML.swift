@@ -1,8 +1,20 @@
+// The HTML page for a PR's conversation.
+//
+// Builds the page the Overview tab shows in `HTMLView`: the description followed by each comment and review, styled to
+// look like github.com in light and dark mode. Bodies are GitHub's own rendered HTML; everything the app adds is escaped.
+
 import Foundation
 import MaserCore
 
 /// Renders a PR's description and discussion as one HTML page, using GitHub's own rendered bodies.
 enum ConversationHTML {
+    /// Builds the conversation page for a PR.
+    ///
+    /// Each item gets a "Quote reply" link (when it has a body) using `quoteScheme`, and a link to it on GitHub. The
+    /// description's item ID is `"description"`; timeline items use their own IDs.
+    ///
+    /// - Parameter overview: The PR whose description and timeline to show.
+    /// - Returns: A complete HTML document with its CSS inlined.
     static func render(_ overview: PullRequestOverview) -> String {
         var items = [
             article(
@@ -34,9 +46,21 @@ enum ConversationHTML {
             """
     }
 
-    /// Links with this scheme are handled by the app (see `HTMLView`) rather than opened in the browser.
+    /// The URL scheme of "Quote reply" links, which the app handles (see `HTMLView`) instead of the browser.
+    ///
+    /// A link's URL is `maser-quote:<item ID>`.
     static let quoteScheme = "maser-quote"
 
+    /// One conversation item as an `<article>`: a header with the actions, then the body if there is one.
+    ///
+    /// - Parameters:
+    ///   - id: The item ID that the "Quote reply" link carries.
+    ///   - quotable: Whether to show the "Quote reply" link.
+    ///   - header: Header HTML, already escaped.
+    ///   - bodyHTML: GitHub's rendered body, inserted as is. Empty gives a compact, header-only item.
+    ///   - url: The item on GitHub.
+    ///   - extraClass: An extra CSS class for the article.
+    /// - Returns: The article's HTML.
     private static func article(id: String, quotable: Bool, header: String, bodyHTML: String, url: URL, extraClass: String?)
         -> String
     {
@@ -52,6 +76,7 @@ enum ConversationHTML {
             """
     }
 
+    /// A colored pill naming a review's verdict.
     private static func badge(_ state: Review.State) -> String {
         switch state {
         case .approved: #"<span class="badge approved">Approved</span>"#
@@ -61,6 +86,7 @@ enum ConversationHTML {
         }
     }
 
+    /// The verb phrase for a review header, as in "alice approved".
     private static func verb(_ state: Review.State) -> String {
         switch state {
         case .approved: "approved"
@@ -70,12 +96,18 @@ enum ConversationHTML {
         }
     }
 
+    /// A `<time>` element showing a relative date ("2 days ago"), with the exact date and time as its tooltip.
+    ///
+    /// The relative text is fixed when the page is rendered.
     private static func time(_ date: Date) -> String {
         let relative = date.formatted(.relative(presentation: .named, unitsStyle: .wide))
         let absolute = date.formatted(date: .abbreviated, time: .shortened)
         return #"<time title="\#(escape(absolute))">\#(escape(relative))</time>"#
     }
 
+    /// Escapes text for HTML content and double-quoted attribute values.
+    ///
+    /// Single quotes are left alone, so the result isn't safe inside single-quoted attributes.
     static func escape(_ text: String) -> String {
         text.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
@@ -83,6 +115,7 @@ enum ConversationHTML {
             .replacingOccurrences(of: "\"", with: "&quot;")
     }
 
+    /// The page's stylesheet, modeled on github.com's, with colors for both light and dark mode.
     private static let css = """
         :root {
           color-scheme: light dark;

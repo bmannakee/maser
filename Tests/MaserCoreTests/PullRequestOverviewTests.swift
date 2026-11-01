@@ -1,10 +1,16 @@
+// Tests for decoding and deriving the PR overview: metadata, checks, the timeline and reviewer verdicts.
+//
+// Everything decodes from one realistic `gh api graphql` response. The suite also holds small tests for quoting
+// Markdown in a reply and for `FileTree.filePaths(in:)`.
+
 import Foundation
 import Testing
 
 @testable import MaserCore
 
+/// Tests for `PullRequestOverview` decoding and the values derived from it.
 @Suite struct PullRequestOverviewTests {
-    /// Trimmed `gh api graphql` response for PullRequestOverview.query.
+    /// A trimmed `gh api graphql` response for `PullRequestOverview.query`.
     static let response = """
         {"data":{"repository":{"pullRequest":{
           "number":7,"title":"Add thing","url":"https://github.com/o/r/pull/7","state":"OPEN","isDraft":false,
@@ -34,10 +40,12 @@ import Testing
         }}}}
         """
 
+    /// Decodes `response`.
     func decoded() throws -> PullRequestOverview {
         try PullRequestOverview.decode(from: Data(Self.response.utf8))
     }
 
+    /// Decodes PR metadata, including team reviewers by name, skipping null reviewers, and a deleted author as `ghost`.
     @Test func decodesMetadata() throws {
         let pr = try decoded()
         #expect(pr.number == 7)
@@ -55,11 +63,14 @@ import Testing
         #expect(pr.comments[1].body == "")  // body missing
     }
 
+    /// Quotes text line by line, normalizing CRLF, and puts a blank line between the quote and any existing text.
     @Test func quotingMarkdown() {
         #expect(Markdown.appendingQuote(of: "one\r\n\ntwo\n", to: "") == "> one\n>\n> two\n\n")
         #expect(Markdown.appendingQuote(of: "b", to: "my reply  \n") == "my reply\n\n> b\n\n")
     }
 
+    /// Maps check runs and legacy status contexts to one check type, sorted failures first, with the workflow name or
+    /// status description as the detail.
     @Test func checksMappedAndSortedByUrgency() throws {
         let pr = try decoded()
         #expect(pr.checksRollup == .failure)
@@ -70,6 +81,7 @@ import Testing
         #expect(pr.checks.first { $0.name == "build" }?.url == nil)  // empty detailsUrl
     }
 
+    /// Drops pending reviews, and leaves comment-only reviews with no body out of the date-ordered timeline.
     @Test func timelineSkipsPendingAndBodylessCommentReviews() throws {
         let pr = try decoded()
         #expect(pr.reviews.map(\.id) == ["R1", "R2", "R3", "R4"])  // pending R5 dropped
@@ -77,6 +89,7 @@ import Testing
         #expect(pr.timeline[2].kind == .review(.approved))
     }
 
+    /// Gives each reviewer their latest approval or change request, ignoring plain comments that come after it.
     @Test func reviewerStatusKeepsLatestVerdict() throws {
         let statuses = try decoded().reviewerStatuses
         // carol's later plain comment doesn't override her change request.
@@ -102,6 +115,7 @@ import Testing
         }
     }
 
+    /// Lists a tree's file paths in sidebar order: directories' contents before top-level files.
     @Test func filePathsInDisplayOrder() {
         let tree = FileTree.build(paths: ["z.txt", "src/b.swift", "src/a.swift"])
         #expect(FileTree.filePaths(in: tree) == ["src/a.swift", "src/b.swift", "z.txt"])

@@ -1,11 +1,20 @@
+// The "Finish your review" sheet.
+//
+// Shown from a review window when the user submits their review. It collects an optional summary and a verdict, then
+// publishes the pending review with its draft comments, or discards the pending review entirely.
+
 import MaserCore
 import SwiftUI
 
-/// Submits the pending review (or a review with just a verdict) — like github.com's "Finish your review".
+/// Submits the pending review (or a review with just a verdict), like github.com's "Finish your review".
+///
+/// The summary and verdict live on `ReviewModel`, so cancelling keeps them for next time. The model closes the sheet
+/// after a successful submit or discard; on failure it stays open and shows the error.
 struct FinishReviewView: View {
     @Bindable var model: ReviewModel
     @Environment(\.dismiss) private var dismiss
     @FocusState private var summaryFocused: Bool
+    /// Whether the "Discard your pending review?" confirmation is showing.
     @State private var confirmingDiscard = false
 
     var body: some View {
@@ -88,6 +97,7 @@ struct FinishReviewView: View {
         }
     }
 
+    /// The subtitle saying how many draft comments submitting will publish.
     private var pendingDescription: String {
         switch model.pendingCommentCount {
         case 0: "No draft comments. Submit a verdict or summary on its own."

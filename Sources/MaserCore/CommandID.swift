@@ -1,4 +1,11 @@
-/// Every user-invokable action. The raw value is the name used in `config.toml`.
+// The identifiers for every command a key binding or menu item can trigger.
+//
+// `CommandID` is the shared vocabulary between the keymap, the menu bar and the review window's command handler. Its
+// raw values are the names users write in `config.toml`, so renaming one breaks existing configs.
+
+/// Every user-invokable action.
+///
+/// The raw value is the name used in `config.toml`.
 public enum CommandID: String, CaseIterable, Sendable {
     case openPullRequest = "open-pull-request"
     case refresh = "refresh"
@@ -30,6 +37,7 @@ public enum CommandID: String, CaseIterable, Sendable {
     case openConfig = "open-config"
     case showKeybindings = "show-keybindings"
 
+    /// The command's name as shown in menus and the keyboard shortcuts list.
     public var title: String {
         switch self {
         case .openPullRequest: "Open Pull Request…"
@@ -66,5 +74,6 @@ public enum CommandID: String, CaseIterable, Sendable {
 }
 
 extension CommandID: Identifiable {
+    /// The command itself, so commands can drive SwiftUI lists directly.
     public var id: Self { self }
 }

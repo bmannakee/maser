@@ -1,8 +1,14 @@
+// The Files tab of a review window: the changed files, a file's diff, and its review comments.
+//
+// `FilesView` lays out the file tree, the diff with its vim-style line cursor, and the comments inspector, where line
+// comments and replies are written. The views hold little state of their own: they read from and act through the
+// window's `ReviewModel`.
+
 import AppKit
 import MaserCore
 import SwiftUI
 
-/// The Files tab: changed files | diff | comments (inspector).
+/// The Files tab: the changed-file tree, the selected file's diff, and its comments in an inspector.
 struct FilesView: View {
     @Bindable var model: ReviewModel
 
@@ -22,6 +28,7 @@ struct FilesView: View {
 
 // MARK: - File tree
 
+/// The changed files as a tree of collapsible directories, with the selected file highlighted.
 private struct FileTreeView: View {
     let model: ReviewModel
 
@@ -45,6 +52,7 @@ private struct FileTreeView: View {
     }
 }
 
+/// One node of the file tree: a directory that expands to its children, or a file row.
 private struct FileTreeNodeView: View {
     let node: FileNode
     let model: ReviewModel
@@ -63,6 +71,7 @@ private struct FileTreeNodeView: View {
         }
     }
 
+    /// Whether the directory is expanded, backed by the model's `collapsedDirectories`.
     private var isExpanded: Binding<Bool> {
         Binding {
             !model.collapsedDirectories.contains(node.id)
@@ -76,8 +85,10 @@ private struct FileTreeNodeView: View {
     }
 }
 
+/// A changed file in the tree: an icon for its status, its name, and its comment count.
 private struct FileRow: View {
     let name: String
+    /// The file's diff; nil shows it as modified with no details.
     let file: FileDiff?
     let commentCount: Int
 
@@ -91,6 +102,7 @@ private struct FileRow: View {
         .help(help)
     }
 
+    /// The SF Symbol for the file's status.
     private var icon: String {
         switch file?.status {
         case .added: "plus.square"
@@ -100,6 +112,7 @@ private struct FileRow: View {
         }
     }
 
+    /// The icon's color for the file's status.
     private var color: Color {
         switch file?.status {
         case .added: .green
@@ -109,6 +122,7 @@ private struct FileRow: View {
         }
     }
 
+    /// The tooltip: the full path, lines added and removed, and the old path of a renamed file.
     private var help: String {
         guard let file else { return name }
         var text = "\(file.path)\n+\(file.additions) −\(file.deletions)"
@@ -119,6 +133,7 @@ private struct FileRow: View {
 
 // MARK: - Diff
 
+/// The selected file's diff with the key hint bar, or a placeholder while loading, on failure, or with no file.
 private struct DiffPane: View {
     let model: ReviewModel
 
@@ -144,12 +159,18 @@ private struct DiffPane: View {
     }
 }
 
+/// One file's diff, with the line cursor, selection, and thread markers.
+///
+/// Carries out the model's scroll requests and reports which lines are visible so the cursor can follow scrolling.
 private struct DiffView: View {
     let model: ReviewModel
     let file: FileDiff
 
     @State private var position = ScrollPosition(edge: .top)
-    /// Updated on every scroll frame; kept out of view state so scrolling doesn't re-render the diff.
+    /// The latest scroll geometry, for sizing scroll motions.
+    ///
+    /// It changes on every scroll frame, so it lives in a reference box rather than view state, which would re-render
+    /// the diff each time.
     @State private var geometry = GeometryBox()
 
     /// Height of one diff row: the monospaced font's line height plus the row's vertical padding.
@@ -213,11 +234,17 @@ private struct DiffView: View {
 }
 
 extension DiffView {
+    /// A mutable holder for the diff's scroll geometry that SwiftUI doesn't observe.
     final class GeometryBox {
         var value: ScrollGeometry?
     }
 
-    /// Vim-style motions. Jumps without animation, like vim, so repeated presses stay predictable.
+    /// Scrolls the diff by a vim-style motion, clamped to the content.
+    ///
+    /// Jumps without animation, like vim, so repeated presses stay predictable. Does nothing until the scroll
+    /// geometry is known.
+    ///
+    /// - Parameter motion: How far to scroll.
     private func scroll(_ motion: ReviewModel.DiffScroll.Motion) {
         guard let geometry = geometry.value else { return }
         let viewport = geometry.visibleRect.height
@@ -244,6 +271,7 @@ extension DiffView {
     }
 }
 
+/// A hunk's `@@ … @@` header line in the diff.
 private struct HunkHeaderRow: View {
     let header: String
 
@@ -258,11 +286,13 @@ private struct HunkHeaderRow: View {
     }
 }
 
+/// One line of the diff: old and new line numbers, a gutter icon, the `+`/`-` sign, and the text.
 private struct DiffLineRow: View {
     let line: DiffLine
-    /// nil: no thread here; true: a thread with a draft comment.
+    /// Whether a current thread is on this line: nil for none, true if one has a draft comment, false otherwise.
     let marker: Bool?
     let isCursor: Bool
+    /// Whether the line is in the `V` selection or covered by the draft comment.
     let isHighlighted: Bool
     let model: ReviewModel
 
@@ -296,6 +326,7 @@ private struct DiffLineRow: View {
         }
     }
 
+    /// A thread marker, or on the cursor line without a thread, a button to comment on it.
     @ViewBuilder
     private var gutterIcon: some View {
         if let pending = marker {
@@ -314,15 +345,21 @@ private struct DiffLineRow: View {
         }
     }
 
+    /// The line's text, with the "No newline at end of file" marker set apart in italics.
     @ViewBuilder
     private var content: some View {
         if line.kind == .noNewlineMarker {
             Text(line.text).italic().foregroundStyle(.secondary)
         } else {
+            // A space keeps empty lines at full row height.
             Text(line.text.isEmpty ? " " : line.text)
         }
     }
 
+    /// Returns a line-number column, blank for a line that doesn't exist on that side.
+    ///
+    /// - Parameter number: The line number on one side of the diff.
+    /// - Returns: A fixed-width, right-aligned number, brighter on the cursor line.
     private func lineNumber(_ number: Int?) -> some View {
         Text(number.map(String.init) ?? "")
             .foregroundStyle(isCursor ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
@@ -330,6 +367,7 @@ private struct DiffLineRow: View {
             .padding(.trailing, 6)
     }
 
+    /// The unified-diff sign for the line's kind.
     private var sign: String {
         switch line.kind {
         case .addition: "+"
@@ -338,6 +376,7 @@ private struct DiffLineRow: View {
         }
     }
 
+    /// The row's tint: green for additions, red for deletions.
     private var background: Color {
         switch line.kind {
         case .addition: .green.opacity(0.15)
@@ -347,8 +386,11 @@ private struct DiffLineRow: View {
     }
 }
 
-/// The main Files-tab keys, as currently bound, so they're discoverable.
+/// A bar listing the main Files-tab keys as currently bound, so they're discoverable.
+///
+/// Shows each command's first vim-style binding and leaves out commands with none.
 private struct KeyHintBar: View {
+    /// The hints to show, in order: a label and the commands whose keys go before it.
     private static let hints: [(label: String, commands: [CommandID])] = [
         ("line", [.cursorDown, .cursorUp]),
         ("file", [.previousFile, .nextFile]),
@@ -389,6 +431,7 @@ private struct KeyHintBar: View {
 
 // MARK: - Comments
 
+/// The comments inspector: the inline draft's composer, if any, above the selected file's threads.
 private struct CommentsPane: View {
     @Bindable var model: ReviewModel
 
@@ -402,6 +445,7 @@ private struct CommentsPane: View {
         }
     }
 
+    /// The selected file's threads in a selectable list, or a hint on how to comment when there are none.
     @ViewBuilder
     private var threads: some View {
         let threads = model.selectedThreads
@@ -432,7 +476,9 @@ private struct CommentsPane: View {
     }
 }
 
-/// The draft line comment or reply. ⌘↩ adds it; Esc leaves the box (an empty draft then closes).
+/// The editor for the inline draft, a line comment or reply.
+///
+/// ⌘↩ posts it. Esc leaves the box, and leaving an empty draft closes it.
 private struct InlineComposer: View {
     @Bindable var model: ReviewModel
     @FocusState private var focused: Bool
@@ -503,6 +549,10 @@ private struct InlineComposer: View {
         }
     }
 
+    /// Returns the post button's title, which says whether the draft will join a pending review.
+    ///
+    /// - Parameter draft: The draft being written.
+    /// - Returns: "Start a review", "Add to review" or "Reply".
     private func primaryTitle(_ draft: ReviewModel.InlineDraft) -> String {
         switch draft.target {
         case .newThread: model.hasPendingReview ? "Add to review" : "Start a review"
@@ -512,6 +562,9 @@ private struct InlineComposer: View {
     }
 }
 
+/// One review thread: where it is, its status tags, and its comments, with buttons to reply and delete drafts.
+///
+/// Outdated and resolved threads are dimmed.
 private struct ThreadView: View {
     let thread: ReviewThread
     let model: ReviewModel
@@ -562,6 +615,7 @@ private struct ThreadView: View {
         .opacity(thread.isOutdated || thread.isResolved ? 0.6 : 1)
     }
 
+    /// The thread's place in the diff, such as "Line 12", "Old lines 3–7" or "Outdated · was line 9".
     private var location: String {
         guard let line = thread.line else {
             return thread.originalLine.map { "Outdated · was line \($0)" } ?? "Outdated"
@@ -571,12 +625,17 @@ private struct ThreadView: View {
         return "\(prefix) \(line)"
     }
 
+    /// Renders a comment's inline Markdown, keeping its line breaks.
+    ///
+    /// - Parameter body: The comment's Markdown source.
+    /// - Returns: The styled text, or the plain source if it doesn't parse.
     private func markdown(_ body: String) -> AttributedString {
         (try? AttributedString(markdown: body, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
             ?? AttributedString(body)
     }
 }
 
+/// A small outlined label, such as "Pending" or "Resolved".
 private struct Tag: View {
     let text: String
     let color: Color

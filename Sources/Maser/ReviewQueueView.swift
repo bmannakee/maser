@@ -1,11 +1,19 @@
+// The review queue: the app's main window.
+//
+// Lists the open PRs where the user's review is requested, newest activity first, and opens a review window for any of
+// them. It also opens PR URLs passed on the command line at launch.
+
 import MaserCore
 import SwiftUI
 
 /// Lists open PRs awaiting the user's review.
 struct ReviewQueueView: View {
+    /// The progress of fetching the review requests.
     private enum LoadState {
         case loading
+        /// The PRs, sorted most recently updated first.
         case loaded([PullRequest])
+        /// The error message to show.
         case failed(String)
     }
 
@@ -14,7 +22,7 @@ struct ReviewQueueView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.openWindow) private var openWindow
 
-    /// PR URLs passed on the command line (`swift run Maser <url>…`) are opened once at launch.
+    /// Whether launch arguments were already handled, so a second queue window doesn't reopen them.
     @MainActor private static var openedLaunchArguments = false
 
     var body: some View {
@@ -41,6 +49,9 @@ struct ReviewQueueView: View {
             .task { await load() }
     }
 
+    /// Opens a review window for each PR URL passed on the command line (`swift run Maser <url>…`), once per launch.
+    ///
+    /// Arguments that aren't PR URLs are ignored, and so are PRs that fail to load.
     private func openLaunchArguments() async {
         guard !Self.openedLaunchArguments else { return }
         Self.openedLaunchArguments = true
@@ -54,6 +65,7 @@ struct ReviewQueueView: View {
         }
     }
 
+    /// The list, or a progress, error or empty state.
     @ViewBuilder
     private var content: some View {
         switch state {
@@ -69,19 +81,26 @@ struct ReviewQueueView: View {
             }
             .contextMenu(forSelectionType: PullRequest.ID.self) { ids in
                 Button("Review") { review(ids, in: prs) }
+                // A PR's ID is its github.com URL.
                 Button("Open on GitHub") { ids.forEach { openURL($0) } }
             } primaryAction: { ids in
-                review(ids, in: prs)  // double-click or Return
+                review(ids, in: prs)  // Double-click or Return.
             }
         }
     }
 
+    /// Opens a review window for each selected PR.
+    ///
+    /// - Parameters:
+    ///   - ids: The selected PRs.
+    ///   - prs: The loaded PRs to look the IDs up in.
     private func review(_ ids: Set<PullRequest.ID>, in prs: [PullRequest]) {
         for pr in prs where ids.contains(pr.id) {
             openWindow(value: pr)
         }
     }
 
+    /// Fetches the PRs awaiting the user's review, showing the progress view meanwhile.
     private func load() async {
         state = .loading
         do {
@@ -93,6 +112,7 @@ struct ReviewQueueView: View {
     }
 }
 
+/// One PR in the queue: title, draft marker, and repository, number, author and last update.
 private struct PullRequestRow: View {
     let pr: PullRequest
 

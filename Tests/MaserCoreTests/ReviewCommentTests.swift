@@ -1,10 +1,17 @@
+// Tests for inline review threads, comment targets and the review-writing calls.
+//
+// The offline suites decode review threads and `ReviewContext` from fixtures and map diff selections to
+// `CommentTarget`s. Two opt-in suites run against GitHub through `gh`: one reads a real PR, and one creates and deletes
+// a pending review on a test PR.
+
 import Foundation
 import Testing
 
 @testable import MaserCore
 
+/// Tests for decoding review threads and the review context.
 @Suite struct ReviewThreadTests {
-    // Shape produced by `gh api graphql --paginate --jq ReviewThread.jqFilter`: one thread per line.
+    /// Output in the shape `gh api graphql --paginate --jq ReviewThread.jqFilter` produces: one thread per line.
     static let lines = """
         {"id":"T1","path":"a.txt","line":15,"startLine":null,"originalLine":15,"diffSide":"RIGHT","isOutdated":false,"isResolved":true,"comments":{"nodes":[{"id":"C1","author":{"login":"alice"},"body":"Root on line 15","createdAt":"2026-10-28T19:34:26Z","url":"https://github.com/o/r/pull/1#discussion_r1","state":"SUBMITTED"},{"id":"C2","author":{"login":"me"},"body":"Draft reply","createdAt":"2026-10-28T22:45:08Z","url":"https://github.com/o/r/pull/1#discussion_r2","state":"PENDING"}]}}
         {"id":"T2","path":"a.txt","line":null,"startLine":null,"originalLine":4,"diffSide":"LEFT","isOutdated":true,"isResolved":false,"comments":{"nodes":[{"id":"C3","author":null,"body":"Outdated","createdAt":"2026-10-27T10:00:00Z","url":"https://github.com/o/r/pull/1#discussion_r3","state":"SUBMITTED"}]}}
@@ -13,6 +20,8 @@ import Testing
 
         """
 
+    /// Decodes threads sorted by line with outdated ones last, drops empty threads, and tells draft threads from draft
+    /// replies.
     @Test func decodesThreads() throws {
         let threads = try ReviewThread.decodeLines(from: Data(Self.lines.utf8))
         #expect(threads.map(\.id) == ["T3", "T1", "T2"])  // by line, outdated last, empty dropped
@@ -33,6 +42,7 @@ import Testing
         #expect(try ReviewThread.decodeLines(from: Data()).isEmpty)
     }
 
+    /// Decodes the PR's node ID with and without a pending review.
     @Test func decodesReviewContext() throws {
         let json = #"{"data":{"repository":{"pullRequest":{"id":"PR_1","reviews":{"nodes":[{"id":"PRR_9"}]}}}}}"#
         #expect(try ReviewContext.decode(from: Data(json.utf8)) == ReviewContext(pullRequestID: "PR_1", pendingReviewID: "PRR_9"))
@@ -41,8 +51,9 @@ import Testing
     }
 }
 
+/// Tests for turning a diff selection into the line or range GitHub attaches a comment to.
 @Suite struct CommentTargetTests {
-    // Two hunks: ids 0 (header) 1-4, then 5 (header) 6-8 and a no-newline marker (9).
+    /// A file with two hunks: IDs 0 (header) and 1–4, then 5 (header), 6–8 and a no-newline marker (9).
     static let file = DiffParser.parse(
         """
         diff --git a/f.txt b/f.txt
@@ -61,10 +72,12 @@ import Testing
 
         """)[0]
 
+    /// Excludes hunk headers and no-newline markers.
     @Test func commentableLines() {
         #expect(Self.file.commentableLines.map(\.id) == [1, 2, 3, 4, 6, 7, 8])
     }
 
+    /// Targets the old side for a deletion and the new side otherwise, including when the anchor equals the cursor.
     @Test func singleLine() throws {
         let deletion = try #require(Self.file.commentTarget(anchor: nil, cursor: 2))
         #expect(deletion.side == .left && deletion.line == 2 && deletion.startLine == nil)
@@ -75,6 +88,7 @@ import Testing
         #expect(addition.description == "line 2")
     }
 
+    /// A range selected bottom-up from a deletion to a context line starts on the old side and ends on the new.
     @Test func rangeAcrossSides() throws {
         let target = try #require(Self.file.commentTarget(anchor: 4, cursor: 2))
         #expect(target.startSide == .left && target.startLine == 2)
@@ -90,9 +104,12 @@ import Testing
     }
 }
 
-/// Hits GitHub through `gh`. Run with `MASER_LIVE_TESTS=1 swift test`.
+/// Read-only tests against GitHub through `gh`, using a real merged PR in `cli/cli`.
+///
+/// Opt-in, since they need network access and a logged-in `gh`. Run with `MASER_LIVE_TESTS=1 swift test`.
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MASER_LIVE_TESTS"] != nil))
 struct LiveGitHubTests {
+    /// Loads the diff, overview and threads, and checks that every current thread maps to a line in the parsed diff.
     @Test func loadsRealPullRequest() async throws {
         let json = """
             [{"author":{"login":"BagToad"},"isDraft":false,"number":14858,
@@ -124,10 +141,15 @@ struct LiveGitHubTests {
     }
 }
 
-/// Writes to GitHub: creates a pending review (visible only to you) on the closed test PR
-/// bmannakee/maser#1, then deletes it. Run with `MASER_LIVE_WRITE_TESTS=1 swift test`.
+/// Tests that write to GitHub, on the closed test PR `bmannakee/maser#1`.
+///
+/// They create a pending review, visible only to you, then delete it. Run with `MASER_LIVE_WRITE_TESTS=1 swift test`.
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MASER_LIVE_WRITE_TESTS"] != nil))
 struct LiveReviewWriteTests {
+    /// Runs a pending review through its whole life, checking GitHub's state after each step.
+    ///
+    /// Starts a review, adds a range thread and a single-line thread, replies, deletes the reply and discards the
+    /// review. Any existing pending review is discarded first.
     @Test func pendingReviewRoundTrip() async throws {
         let cli = try GitHubCLI()
         let pr = try await cli.pullRequest(url: URL(string: "https://github.com/bmannakee/maser/pull/1")!)

@@ -1,7 +1,13 @@
+// Mapping diff lines and selections to the places GitHub lets you start a review thread.
+//
+// GitHub addresses an inline comment by path, side (`LEFT` for the old file, `RIGHT` for the new) and line number on that
+// side, plus a start side and line for a range. The extensions here translate the app's diff lines and cursor/anchor
+// selections into a `CommentTarget` in those terms, which `GitHubCLI.addReviewThread` sends to GitHub.
+
 import Foundation
 
 extension DiffLine {
-    /// The side of the diff a comment on this line attaches to (`nil`: can't be commented on).
+    /// The side of the diff a comment on this line attaches to; `nil` when the line can't be commented on.
     public var commentSide: DiffSide? {
         switch kind {
         case .deletion: .left
@@ -10,7 +16,10 @@ extension DiffLine {
         }
     }
 
-    /// The line number GitHub uses for a comment on this line, on `commentSide`.
+    /// The line number GitHub uses for a comment on this line, counted on `commentSide`.
+    ///
+    /// Deletions use the old file's line number; additions and context lines use the new file's. `nil` when the line
+    /// can't be commented on.
     public var commentLine: Int? {
         switch kind {
         case .deletion: oldLine
@@ -20,18 +29,22 @@ extension DiffLine {
     }
 }
 
-/// A line, or range of lines within one hunk, to start a review thread on — in GitHub's terms.
+/// A line, or range of lines within one hunk, to start a review thread on, in GitHub's terms.
 public struct CommentTarget: Hashable, Sendable {
+    /// The path of the file, relative to the repository root.
     public let path: String
+    /// The side of the diff `line` is on.
     public let side: DiffSide
+    /// The line to comment on: the last line, for a range.
     public let line: Int
-    /// Set for multi-line comments.
+    /// The side of the diff `startLine` is on; `nil` for a single-line comment.
     public let startSide: DiffSide?
+    /// The first line of a multi-line comment; `nil` for a single-line comment.
     public let startLine: Int?
-    /// The diff line IDs covered, for highlighting.
+    /// The IDs of the diff lines the comment covers, for highlighting.
     public let lineIDs: ClosedRange<Int>
 
-    /// e.g. "line 12", "old line 7", "lines 10–14".
+    /// A short label for the target, such as "line 12", "old line 7", "lines 10–14" or "lines old 2–3".
     public var description: String {
         func number(_ side: DiffSide, _ line: Int) -> String { side == .left ? "old \(line)" : "\(line)" }
         if let startLine, let startSide {
@@ -42,18 +55,28 @@ public struct CommentTarget: Hashable, Sendable {
 }
 
 extension FileDiff {
-    /// Lines that can carry a comment, in display order.
+    /// The lines that can carry a comment, in display order.
     public var commentableLines: [DiffLine] {
         hunks.flatMap { $0.lines.filter { $0.commentSide != nil } }
     }
 
-    /// The hunk containing a line.
+    /// Returns the hunk containing a line.
+    ///
+    /// - Parameter lineID: A `DiffLine.id`. Hunk header IDs aren't lines, so they match no hunk.
+    /// - Returns: The hunk, or `nil` if no hunk in this file has the line.
     public func hunk(containing lineID: Int) -> Hunk? {
         hunks.first { hunk in hunk.lines.contains { $0.id == lineID } }
     }
 
-    /// The selected line IDs from `anchor` (where a range selection started) to `cursor`.
-    /// GitHub requires a multi-line comment to stay within one hunk, so the range is clipped to the cursor's hunk.
+    /// Returns the selected line IDs from `anchor` to `cursor`.
+    ///
+    /// GitHub requires a multi-line comment to stay within one hunk, so the anchor is clamped to the commentable lines of
+    /// the cursor's hunk.
+    ///
+    /// - Parameters:
+    ///   - anchor: The line ID where a range selection started, or `nil` when there's no range selection.
+    ///   - cursor: The line ID of the cursor.
+    /// - Returns: The selected IDs, in order; just `cursor` when there's no anchor or the cursor isn't in a hunk.
     public func selectionRange(anchor: Int?, cursor: Int) -> ClosedRange<Int> {
         guard let anchor, anchor != cursor, let hunk = hunk(containing: cursor) else { return cursor...cursor }
         let ids = hunk.lines.filter { $0.commentSide != nil }.map(\.id)
@@ -62,7 +85,15 @@ extension FileDiff {
         return min(clipped, cursor)...max(clipped, cursor)
     }
 
-    /// What a new comment on the selection would attach to.
+    /// Returns what a new comment on the selection would attach to.
+    ///
+    /// The selection is clipped as in `selectionRange(anchor:cursor:)`, then trimmed to its first and last commentable
+    /// lines.
+    ///
+    /// - Parameters:
+    ///   - anchor: The line ID where a range selection started, or `nil` when there's no range selection.
+    ///   - cursor: The line ID of the cursor.
+    /// - Returns: The target, or `nil` when the selection has no commentable line.
     public func commentTarget(anchor: Int?, cursor: Int) -> CommentTarget? {
         let range = selectionRange(anchor: anchor, cursor: cursor)
         let lines = commentableLines.filter { range.contains($0.id) }

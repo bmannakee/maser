@@ -1,3 +1,5 @@
+// Tests for `PullRequest`: decoding the `gh search prs` list and reading the repository from a PR URL.
+
 import Foundation
 import Testing
 
@@ -20,6 +22,7 @@ import Testing
     #expect(pr.url == URL(string: "https://github.com/tidymodels/broom/pull/351"))
 }
 
+/// Reads `owner/repo` from PR URLs on any host, including ones with trailing components, and rejects non-PR URLs.
 @Test func nameWithOwnerFromURL() {
     #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://github.com/cli/cli/pull/14858")!) == "cli/cli")
     #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://ghe.example.com/team/app/pull/7/files")!) == "team/app")
