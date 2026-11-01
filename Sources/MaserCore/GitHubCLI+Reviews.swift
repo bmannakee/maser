@@ -19,7 +19,7 @@ extension GitHubCLI {
     public func reviewThreads(for pr: PullRequest) async throws -> [ReviewThread] {
         let data = try await graphQL(
             ReviewThread.query, host: pr.host, paginate: true, jq: ReviewThread.jqFilter,
-            strings: repoVariables(pr), ints: ["number": pr.number])
+            strings: try repoVariables(pr), ints: ["number": pr.number])
         return try ReviewThread.decodeLines(from: data)
     }
 
@@ -31,7 +31,8 @@ extension GitHubCLI {
     ///   a decoding error if the response isn't the expected JSON.
     @concurrent
     public func reviewContext(for pr: PullRequest) async throws -> ReviewContext {
-        let data = try await graphQL(ReviewContext.query, host: pr.host, strings: repoVariables(pr), ints: ["number": pr.number])
+        let data = try await graphQL(
+            ReviewContext.query, host: pr.host, strings: try repoVariables(pr), ints: ["number": pr.number])
         return try ReviewContext.decode(from: data)
     }
 
@@ -163,8 +164,11 @@ extension GitHubCLI {
     }
 
     /// Returns the `owner` and `name` GraphQL variables for the PR's repository.
-    private func repoVariables(_ pr: PullRequest) -> [String: String] {
+    ///
+    /// - Throws: `GitHubCLIError.invalidPullRequestURL` if the repository name isn't `owner/name`.
+    func repoVariables(_ pr: PullRequest) throws -> [String: String] {
         let parts = pr.repository.nameWithOwner.split(separator: "/", maxSplits: 1)
+        guard parts.count == 2 else { throw GitHubCLIError.invalidPullRequestURL(pr.url.absoluteString) }
         return ["owner": String(parts[0]), "name": String(parts[1])]
     }
 

@@ -245,6 +245,8 @@ final class ReviewModel {
     }
 
     /// Loads the PR's description and conversation, and renders the conversation's HTML.
+    ///
+    /// If a refresh fails while an overview is already showing, the last good one stays up.
     private func loadOverview() async {
         if overview == nil { overviewState = .loading }
         do {
@@ -253,7 +255,8 @@ final class ReviewModel {
             conversationHTML = ConversationHTML.render(overview)
             overviewState = .loaded
         } catch {
-            overviewState = .failed(error.localizedDescription)
+            // A transient failure (e.g. on the reload after posting) shouldn't blank the conversation.
+            if overview == nil { overviewState = .failed(error.localizedDescription) }
         }
     }
 
@@ -433,10 +436,12 @@ final class ReviewModel {
 
     /// Shows the comments pane with a draft for a target, and asks the pane to focus it.
     ///
-    /// Text already typed in the current draft is kept and retargeted.
+    /// Text already typed in the current draft is kept and retargeted. Does nothing while a draft is posting, so the
+    /// post's completion can't clobber a new draft.
     ///
     /// - Parameter target: What the draft will be posted as.
     private func openDraft(_ target: InlineDraft.Target) {
+        guard inlineDraft?.isPosting != true else { return }
         if var draft = inlineDraft, !draft.body.isEmpty {
             draft.target = target
             draft.error = nil
@@ -479,7 +484,8 @@ final class ReviewModel {
         } catch {
             inlineDraft?.isPosting = false
             inlineDraft?.error = error.localizedDescription
-            reviewContext = try? await GitHubCLI().reviewContext(for: pr)  // in case the pending review changed elsewhere
+            // The pending review may have changed elsewhere; refresh it, keeping what we had if that fails too.
+            if let context = try? await GitHubCLI().reviewContext(for: pr) { reviewContext = context }
             return
         }
         await reloadThreads()
@@ -516,6 +522,7 @@ final class ReviewModel {
     ///
     /// - Parameter comment: The draft comment to delete.
     func deletePendingComment(_ comment: ReviewComment) async {
+        reviewError = nil
         do {
             try await GitHubCLI().deleteReviewComment(on: pr, commentID: comment.id)
         } catch {
@@ -528,6 +535,13 @@ final class ReviewModel {
 
     /// Whether the viewer has a pending review on this PR, as of the last load.
     var hasPendingReview: Bool { reviewContext?.pendingReviewID != nil }
+
+    /// Whether submitting needs a summary: GitHub rejects a Comment or Request changes review with no body and no
+    /// draft comments.
+    var reviewNeedsSummary: Bool {
+        reviewEvent != .approve && pendingCommentCount == 0
+            && reviewSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     /// Submits the review with `reviewSummary` and `reviewEvent`, then closes the sheet and reloads everything.
     ///
@@ -547,7 +561,7 @@ final class ReviewModel {
             )
         } catch {
             reviewError = error.localizedDescription
-            reviewContext = try? await GitHubCLI().reviewContext(for: pr)
+            if let context = try? await GitHubCLI().reviewContext(for: pr) { reviewContext = context }
             return
         }
         isFinishingReview = false
@@ -563,9 +577,13 @@ final class ReviewModel {
 
     /// Deletes the viewer's pending review and its draft comments, then closes the sheet.
     ///
-    /// Does nothing without a pending review. On failure, sets `reviewError`.
+    /// Does nothing without a pending review or while a submit or discard is in progress. On failure, sets
+    /// `reviewError`.
     func discardReview() async {
-        guard let reviewID = reviewContext?.pendingReviewID else { return }
+        guard let reviewID = reviewContext?.pendingReviewID, !isSubmittingReview else { return }
+        isSubmittingReview = true
+        reviewError = nil
+        defer { isSubmittingReview = false }
         do {
             try await GitHubCLI().discardReview(on: pr, reviewID: reviewID)
         } catch {

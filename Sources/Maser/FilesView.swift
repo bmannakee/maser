@@ -495,6 +495,7 @@ private struct InlineComposer: View {
                     Text(draft.title).font(.headline)
                     Spacer()
                     Button("Discard", systemImage: "xmark") { model.discardInlineDraft() }
+                        .disabled(draft.isPosting)
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
                         .help("Discard this draft")
@@ -620,9 +621,9 @@ private struct ThreadView: View {
         guard let line = thread.line else {
             return thread.originalLine.map { "Outdated · was line \($0)" } ?? "Outdated"
         }
-        let prefix = thread.side == .left ? "Old line" : "Line"
-        if let start = thread.startLine, start != line { return "\(prefix)s \(start)–\(line)" }
-        return "\(prefix) \(line)"
+        let label = CommentTarget.describe(
+            side: thread.side, line: line, startSide: thread.startSide, startLine: thread.startLine)
+        return label.prefix(1).uppercased() + label.dropFirst()
     }
 
     /// Renders a comment's inline Markdown, keeping its line breaks.

@@ -167,6 +167,17 @@ import Testing
         #expect(keymap.match([KeyChord("x")]) == .command(.previousThread))
     }
 
+    /// A command whose every key fails to parse keeps its default keys rather than ending up with none.
+    @Test func invalidOnlyValueKeepsDefaults() throws {
+        let result = try Keymap.load(
+            toml: """
+                [keys.normal]
+                cursor-down = "ctrl+banana"
+                """)
+        #expect(result.problems.count == 1)
+        #expect(result.keymap.match([KeyChord("j")]) == .command(.cursorDown))
+    }
+
     /// Reports each sequence that a shorter binding makes unreachable, and keeps the shorter binding.
     @Test func reportsShadowedSequences() throws {
         let result = try Keymap.load(

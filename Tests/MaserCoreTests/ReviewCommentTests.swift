@@ -94,7 +94,9 @@ import Testing
         #expect(target.startSide == .left && target.startLine == 2)
         #expect(target.side == .right && target.line == 3)
         #expect(target.lineIDs == 2...4)
-        #expect(target.description == "lines old 2–3")
+        #expect(target.description == "old line 2 to line 3")
+        #expect(CommentTarget.describe(side: .right, line: 5, startSide: .right, startLine: 5) == "line 5")
+        #expect(CommentTarget.describe(side: .left, line: 5, startSide: nil, startLine: 3) == "old lines 3–5")
     }
 
     @Test func rangeIsClippedToTheCursorsHunk() {

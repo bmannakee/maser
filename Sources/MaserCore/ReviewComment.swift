@@ -39,6 +39,8 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
     public let originalLine: Int?
     /// The side of the diff `line` refers to.
     public let side: DiffSide
+    /// The side of the diff `startLine` is on, for a multi-line thread.
+    public let startSide: DiffSide?
     /// Whether the code under the thread has changed since it was written, or the thread no longer maps to a line.
     public let isOutdated: Bool
     /// Whether someone has marked the thread resolved.
@@ -74,6 +76,7 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
         path = thread.path
         line = thread.line
         startLine = thread.startLine
+        startSide = thread.startSide
         originalLine = thread.originalLine
         side = thread.side
         isOutdated = thread.isOutdated
@@ -94,7 +97,7 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
               reviewThreads(first: 100, after: $endCursor) {
                 pageInfo { hasNextPage endCursor }
                 nodes {
-                  id path line startLine originalLine diffSide isOutdated isResolved
+                  id path line startLine originalLine diffSide startDiffSide isOutdated isResolved
                   comments(first: 100) { nodes { id author { login } body createdAt url state } }
                 }
               }
@@ -145,6 +148,7 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
         startLine = raw.startLine
         originalLine = raw.originalLine
         side = DiffSide(rawValue: raw.diffSide) ?? .right
+        startSide = raw.startDiffSide.flatMap(DiffSide.init(rawValue:))
         isOutdated = raw.isOutdated || raw.line == nil
         isResolved = raw.isResolved
         self.comments = comments
@@ -171,6 +175,8 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
         let startLine: Int?
         let originalLine: Int?
         let diffSide: String
+        /// `nil` for single-line threads.
+        let startDiffSide: String?
         let isOutdated: Bool
         let isResolved: Bool
         let comments: Nodes

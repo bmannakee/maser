@@ -75,7 +75,12 @@ struct FinishReviewView: View {
                 }
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
-                .disabled(model.isSubmittingReview)
+                .disabled(model.isSubmittingReview || model.reviewNeedsSummary)
+            }
+            if model.reviewNeedsSummary {
+                Text("With no draft comments, \(model.reviewEvent.title) needs a summary.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
             Text("⌘↩ submits · Esc cancels").font(.caption).foregroundStyle(.secondary)
         }

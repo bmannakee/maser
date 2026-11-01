@@ -117,15 +117,8 @@ public struct GitHubCLI: Sendable {
     ///   a decoding error if the response isn't the expected JSON.
     @concurrent
     public func overview(for pr: PullRequest) async throws -> PullRequestOverview {
-        let parts = pr.repository.nameWithOwner.split(separator: "/", maxSplits: 1)
-        let data = try await run([
-            "api", "graphql", "--hostname", pr.host,
-            // -f keeps owner/name as strings; -F makes number an Int.
-            "-f", "owner=\(parts[0])",
-            "-f", "name=\(parts[1])",
-            "-F", "number=\(pr.number)",
-            "-f", "query=\(PullRequestOverview.query)",
-        ])
+        let data = try await graphQL(
+            PullRequestOverview.query, host: pr.host, strings: try repoVariables(pr), ints: ["number": pr.number])
         return try PullRequestOverview.decode(from: data)
     }
 

@@ -44,13 +44,28 @@ public struct CommentTarget: Hashable, Sendable {
     /// The IDs of the diff lines the comment covers, for highlighting.
     public let lineIDs: ClosedRange<Int>
 
-    /// A short label for the target, such as "line 12", "old line 7", "lines 10–14" or "lines old 2–3".
+    /// A short label for the target, such as "line 12", "old line 7", "lines 10–14" or "old line 2 to line 3".
     public var description: String {
-        func number(_ side: DiffSide, _ line: Int) -> String { side == .left ? "old \(line)" : "\(line)" }
-        if let startLine, let startSide {
-            return "lines \(number(startSide, startLine))–\(number(side, line))"
+        Self.describe(side: side, line: line, startSide: startSide, startLine: startLine)
+    }
+
+    /// Labels a line or range in GitHub's terms, as `description` does; shared with review threads.
+    ///
+    /// - Parameters:
+    ///   - side: The side of the diff `line` is on.
+    ///   - line: The single line, or the last line of a range.
+    ///   - startSide: The side `startLine` is on; `nil` means the same as `side`.
+    ///   - startLine: The first line of a range; `nil` or equal to `line` (as GitHub reports single-line threads)
+    ///     means a single line.
+    /// - Returns: For example "line 12", "old line 7", "lines 10–14", "old lines 3–5" or "old line 2 to line 3".
+    public static func describe(side: DiffSide, line: Int, startSide: DiffSide?, startLine: Int?) -> String {
+        func single(_ side: DiffSide, _ line: Int) -> String { side == .left ? "old line \(line)" : "line \(line)" }
+        let startSide = startSide ?? side
+        guard let startLine, startLine != line || startSide != side else { return single(side, line) }
+        if startSide == side {
+            return side == .left ? "old lines \(startLine)–\(line)" : "lines \(startLine)–\(line)"
         }
-        return side == .left ? "old line \(line)" : "line \(line)"
+        return "\(single(startSide, startLine)) to \(single(side, line))"
     }
 }
 

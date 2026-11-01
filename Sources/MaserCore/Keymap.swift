@@ -189,6 +189,7 @@ extension Keymap {
                 continue
             }
             var sequences: [[KeyChord]] = []
+            var hadInvalidValue = false
             for value in binding.values where !isUnbind(value) {
                 do {
                     let sequence = try KeyBindingParser.parseSequence(value)
@@ -205,8 +206,11 @@ extension Keymap {
                     sequences.append(sequence)
                 } catch {
                     problems.append("[keys.normal] \(name): \(error)")
+                    hadInvalidValue = true
                 }
             }
+            // A typo shouldn't leave the command with no keys at all; keep its defaults instead.
+            if sequences.isEmpty && hadInvalidValue { continue }
             normal[command] = sequences
         }
         for command in normal.keys {
