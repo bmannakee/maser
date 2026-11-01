@@ -52,8 +52,9 @@ import Testing
     @Test func defaultsMatchSequences() {
         let keymap = Keymap.defaults
         #expect(keymap.match([KeyChord("j")]) == .command(.cursorDown))
-        #expect(keymap.match([KeyChord("]"), KeyChord("f")]) == .command(.nextFile))
-        #expect(keymap.match([KeyChord("[")]) == .prefix)
+        #expect(keymap.match([KeyChord("]")]) == .command(.nextFile))
+        #expect(keymap.match([KeyChord("[")]) == .command(.previousFile))
+        #expect(keymap.match([KeyChord("}")]) == .command(.nextHunk))
         #expect(keymap.match([KeyChord(.escape)]) == .command(.cancel))
         #expect(keymap.match([KeyChord("g")]) == .prefix)
         #expect(keymap.match([KeyChord("g"), KeyChord("f")]) == .command(.showFiles))

@@ -45,8 +45,8 @@ Every action is a command you can trigger two ways:
 | Show/hide comments | ⌥⌘0 | `i` |
 | Next / previous line (Files) | | `j` / `k` |
 | Select lines / cancel selection | | `V` / `esc` |
-| Next / previous hunk | | `] c` / `[ c` |
-| Next / previous file | ⌥⌘↓ / ⌥⌘↑ | `] f` / `[ f` |
+| Next / previous hunk | | `}` / `{` |
+| Next / previous file | ⌥⌘↓ / ⌥⌘↑ | `]` / `[` |
 | Next / previous comment thread | ⌃⌘↓ / ⌃⌘↑ | `n` / `N` |
 | Scroll diff down / up a page | | `ctrl+f` or `space` / `ctrl+b` or `shift+space` |
 | Scroll diff down / up half a page | | `ctrl+d` / `ctrl+u` |

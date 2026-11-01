@@ -130,8 +130,12 @@ private struct DiffPane: View {
             ContentUnavailableView("Couldn't load pull request", systemImage: "exclamationmark.triangle", description: Text(message))
         case .loaded:
             if let file = model.selectedFile {
-                DiffView(model: model, file: file)
-                    .id(file.id) // fresh scroll position per file
+                VStack(spacing: 0) {
+                    DiffView(model: model, file: file)
+                        .id(file.id) // fresh scroll position per file
+                    Divider()
+                    KeyHintBar()
+                }
             } else {
                 ContentUnavailableView("Select a file", systemImage: "doc.text")
             }
@@ -336,6 +340,46 @@ private struct DiffLineRow: View {
         case .deletion: .red.opacity(0.15)
         case .context, .noNewlineMarker: .clear
         }
+    }
+}
+
+/// The main Files-tab keys, as currently bound, so they're discoverable.
+private struct KeyHintBar: View {
+    private static let hints: [(label: String, commands: [CommandID])] = [
+        ("line", [.cursorDown, .cursorUp]),
+        ("file", [.previousFile, .nextFile]),
+        ("hunk", [.previousHunk, .nextHunk]),
+        ("select", [.selectLines]),
+        ("comment", [.comment]),
+        ("reply", [.reply]),
+        ("finish review", [.submitReview]),
+        ("all keys", [.showKeybindings]),
+    ]
+
+    var body: some View {
+        let keymap = ConfigStore.shared.keymap
+        HStack(spacing: 14) {
+            ForEach(Self.hints, id: \.label) { hint in
+                let keys = hint.commands.compactMap { keymap.normal[$0]?.first.map(Keymap.format) }
+                if !keys.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(keys, id: \.self) { key in
+                            Text(key)
+                                .font(.caption.monospaced().weight(.medium))
+                                .padding(.horizontal, 4)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 3))
+                        }
+                        Text(hint.label)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
     }
 }
 
