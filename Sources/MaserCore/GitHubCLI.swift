@@ -26,9 +26,10 @@ public struct GitHubCLI: Sendable {
     let executable: URL
 
     public init() throws {
-        guard let path = Self.searchPaths
-            .map({ "\($0)/gh" })
-            .first(where: { FileManager.default.isExecutableFile(atPath: $0) })
+        guard
+            let path = Self.searchPaths
+                .map({ "\($0)/gh" })
+                .first(where: { FileManager.default.isExecutableFile(atPath: $0) })
         else { throw GitHubCLIError.notInstalled }
         executable = URL(fileURLWithPath: path)
     }

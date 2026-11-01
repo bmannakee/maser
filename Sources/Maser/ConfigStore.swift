@@ -20,7 +20,8 @@ final class ConfigStore {
 
     private init() {
         let xdg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"].flatMap { $0.isEmpty ? nil : $0 }
-        let base = xdg.map { URL(filePath: $0, directoryHint: .isDirectory) }
+        let base =
+            xdg.map { URL(filePath: $0, directoryHint: .isDirectory) }
             ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: ".config", directoryHint: .isDirectory)
         fileURL = base.appending(path: "maser/config.toml")
     }
@@ -53,7 +54,9 @@ final class ConfigStore {
             let result = try Keymap.load(toml: text)
             keymap = result.keymap
             setProblems(result.problems)
-            configLog.notice("Loaded \(self.displayPath, privacy: .public) with \(result.problems.count) problem(s): \(result.problems.joined(separator: " | "), privacy: .public)")
+            configLog.notice(
+                "Loaded \(self.displayPath, privacy: .public) with \(result.problems.count) problem(s): \(result.problems.joined(separator: " | "), privacy: .public)"
+            )
         } catch {
             // Keep the last good bindings while the file is mid-edit.
             let message = (error as? KeyBindingError)?.description ?? error.localizedDescription
@@ -73,7 +76,7 @@ final class ConfigStore {
                 setProblems(["Couldn't create \(displayPath): \(error.localizedDescription)"])
                 return
             }
-            watcher?.start() // pick up the newly created directory/file
+            watcher?.start()  // pick up the newly created directory/file
         }
         if NSWorkspace.shared.urlForApplication(toOpen: fileURL) != nil {
             NSWorkspace.shared.open(fileURL)
@@ -89,7 +92,8 @@ final class ConfigStore {
 
     /// e.g. "⌥⌘↓ or j" — every way to trigger a command.
     func bindingSummary(for command: CommandID) -> String? {
-        let all = [keymap.menu[command]?.symbols].compactMap(\.self)
+        let all =
+            [keymap.menu[command]?.symbols].compactMap(\.self)
             + (keymap.normal[command] ?? []).map(Keymap.format)
         return all.isEmpty ? nil : all.joined(separator: " or ")
     }
@@ -157,7 +161,7 @@ final class FileWatcher {
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled, let self else { return }
             onChange()
-            start() // files may have been replaced; watch the new ones
+            start()  // files may have been replaced; watch the new ones
         }
     }
 }

@@ -1,20 +1,21 @@
 import Foundation
-@testable import MaserCore
 import Testing
+
+@testable import MaserCore
 
 @Suite struct ReviewThreadTests {
     // Shape produced by `gh api graphql --paginate --jq ReviewThread.jqFilter`: one thread per line.
     static let lines = """
-    {"id":"T1","path":"a.txt","line":15,"startLine":null,"originalLine":15,"diffSide":"RIGHT","isOutdated":false,"isResolved":true,"comments":{"nodes":[{"id":"C1","author":{"login":"alice"},"body":"Root on line 15","createdAt":"2026-10-28T19:34:26Z","url":"https://github.com/o/r/pull/1#discussion_r1","state":"SUBMITTED"},{"id":"C2","author":{"login":"me"},"body":"Draft reply","createdAt":"2026-10-28T22:45:08Z","url":"https://github.com/o/r/pull/1#discussion_r2","state":"PENDING"}]}}
-    {"id":"T2","path":"a.txt","line":null,"startLine":null,"originalLine":4,"diffSide":"LEFT","isOutdated":true,"isResolved":false,"comments":{"nodes":[{"id":"C3","author":null,"body":"Outdated","createdAt":"2026-10-27T10:00:00Z","url":"https://github.com/o/r/pull/1#discussion_r3","state":"SUBMITTED"}]}}
-    {"id":"T3","path":"a.txt","line":5,"startLine":3,"originalLine":5,"diffSide":"LEFT","isOutdated":false,"isResolved":false,"comments":{"nodes":[{"id":"C4","author":{"login":"me"},"body":"Draft range","createdAt":"2026-10-29T10:00:00Z","url":null,"state":"PENDING"}]}}
-    {"id":"T4","path":"a.txt","line":9,"startLine":null,"originalLine":9,"diffSide":"RIGHT","isOutdated":false,"isResolved":false,"comments":{"nodes":[]}}
+        {"id":"T1","path":"a.txt","line":15,"startLine":null,"originalLine":15,"diffSide":"RIGHT","isOutdated":false,"isResolved":true,"comments":{"nodes":[{"id":"C1","author":{"login":"alice"},"body":"Root on line 15","createdAt":"2026-10-28T19:34:26Z","url":"https://github.com/o/r/pull/1#discussion_r1","state":"SUBMITTED"},{"id":"C2","author":{"login":"me"},"body":"Draft reply","createdAt":"2026-10-28T22:45:08Z","url":"https://github.com/o/r/pull/1#discussion_r2","state":"PENDING"}]}}
+        {"id":"T2","path":"a.txt","line":null,"startLine":null,"originalLine":4,"diffSide":"LEFT","isOutdated":true,"isResolved":false,"comments":{"nodes":[{"id":"C3","author":null,"body":"Outdated","createdAt":"2026-10-27T10:00:00Z","url":"https://github.com/o/r/pull/1#discussion_r3","state":"SUBMITTED"}]}}
+        {"id":"T3","path":"a.txt","line":5,"startLine":3,"originalLine":5,"diffSide":"LEFT","isOutdated":false,"isResolved":false,"comments":{"nodes":[{"id":"C4","author":{"login":"me"},"body":"Draft range","createdAt":"2026-10-29T10:00:00Z","url":null,"state":"PENDING"}]}}
+        {"id":"T4","path":"a.txt","line":9,"startLine":null,"originalLine":9,"diffSide":"RIGHT","isOutdated":false,"isResolved":false,"comments":{"nodes":[]}}
 
-    """
+        """
 
     @Test func decodesThreads() throws {
         let threads = try ReviewThread.decodeLines(from: Data(Self.lines.utf8))
-        #expect(threads.map(\.id) == ["T3", "T1", "T2"]) // by line, outdated last, empty dropped
+        #expect(threads.map(\.id) == ["T3", "T1", "T2"])  // by line, outdated last, empty dropped
         #expect(threads[0].side == .left)
         #expect(threads[0].startLine == 3)
         #expect(threads[0].isPending)
@@ -42,22 +43,23 @@ import Testing
 
 @Suite struct CommentTargetTests {
     // Two hunks: ids 0 (header) 1-4, then 5 (header) 6-8 and a no-newline marker (9).
-    static let file = DiffParser.parse("""
-    diff --git a/f.txt b/f.txt
-    --- a/f.txt
-    +++ b/f.txt
-    @@ -1,3 +1,3 @@
-     one
-    -two
-    +TWO
-     three
-    @@ -10,2 +10,2 @@
-     ten
-    -eleven
-    +ELEVEN
-    \\ No newline at end of file
+    static let file = DiffParser.parse(
+        """
+        diff --git a/f.txt b/f.txt
+        --- a/f.txt
+        +++ b/f.txt
+        @@ -1,3 +1,3 @@
+         one
+        -two
+        +TWO
+         three
+        @@ -10,2 +10,2 @@
+         ten
+        -eleven
+        +ELEVEN
+        \\ No newline at end of file
 
-    """)[0]
+        """)[0]
 
     @Test func commentableLines() {
         #expect(Self.file.commentableLines.map(\.id) == [1, 2, 3, 4, 6, 7, 8])
@@ -77,14 +79,14 @@ import Testing
         let target = try #require(Self.file.commentTarget(anchor: 4, cursor: 2))
         #expect(target.startSide == .left && target.startLine == 2)
         #expect(target.side == .right && target.line == 3)
-        #expect(target.lineIDs == 2 ... 4)
+        #expect(target.lineIDs == 2...4)
         #expect(target.description == "lines old 2–3")
     }
 
     @Test func rangeIsClippedToTheCursorsHunk() {
-        #expect(Self.file.selectionRange(anchor: 1, cursor: 7) == 6 ... 7)
-        #expect(Self.file.selectionRange(anchor: 8, cursor: 3) == 3 ... 4)
-        #expect(Self.file.selectionRange(anchor: nil, cursor: 3) == 3 ... 3)
+        #expect(Self.file.selectionRange(anchor: 1, cursor: 7) == 6...7)
+        #expect(Self.file.selectionRange(anchor: 8, cursor: 3) == 3...4)
+        #expect(Self.file.selectionRange(anchor: nil, cursor: 3) == 3...3)
     }
 }
 
@@ -93,10 +95,10 @@ import Testing
 struct LiveGitHubTests {
     @Test func loadsRealPullRequest() async throws {
         let json = """
-        [{"author":{"login":"BagToad"},"isDraft":false,"number":14858,
-          "repository":{"name":"cli","nameWithOwner":"cli/cli"},"title":"x",
-          "updatedAt":"2026-10-28T00:00:00Z","url":"https://github.com/cli/cli/pull/14858"}]
-        """
+            [{"author":{"login":"BagToad"},"isDraft":false,"number":14858,
+              "repository":{"name":"cli","nameWithOwner":"cli/cli"},"title":"x",
+              "updatedAt":"2026-10-28T00:00:00Z","url":"https://github.com/cli/cli/pull/14858"}]
+            """
         let pr = try #require(try PullRequest.decodeList(from: Data(json.utf8)).first)
         let cli = try GitHubCLI()
 
@@ -161,7 +163,7 @@ struct LiveReviewWriteTests {
         try await cli.discardReview(on: pr, reviewID: reviewID)
         // GitHub takes a few seconds to reflect the discard.
         var remaining = try await cli.reviewThreads(for: pr)
-        for _ in 0 ..< 10 where !remaining.isEmpty {
+        for _ in 0..<10 where !remaining.isEmpty {
             try await Task.sleep(for: .seconds(1))
             remaining = try await cli.reviewThreads(for: pr)
         }

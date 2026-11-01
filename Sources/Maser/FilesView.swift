@@ -127,12 +127,13 @@ private struct DiffPane: View {
         case .loading:
             ProgressView()
         case let .failed(message):
-            ContentUnavailableView("Couldn't load pull request", systemImage: "exclamationmark.triangle", description: Text(message))
+            ContentUnavailableView(
+                "Couldn't load pull request", systemImage: "exclamationmark.triangle", description: Text(message))
         case .loaded:
             if let file = model.selectedFile {
                 VStack(spacing: 0) {
                     DiffView(model: model, file: file)
-                        .id(file.id) // fresh scroll position per file
+                        .id(file.id)  // fresh scroll position per file
                     Divider()
                     KeyHintBar()
                 }
@@ -152,13 +153,16 @@ private struct DiffView: View {
     @State private var geometry = GeometryBox()
 
     /// Height of one diff row: the monospaced font's line height plus the row's vertical padding.
-    private static let rowHeight = NSLayoutManager().defaultLineHeight(for: .monospacedSystemFont(ofSize: 12, weight: .regular)) + 2
+    private static let rowHeight =
+        NSLayoutManager().defaultLineHeight(for: .monospacedSystemFont(ofSize: 12, weight: .regular)) + 2
 
     var body: some View {
         if file.isBinary {
             ContentUnavailableView("Binary file", systemImage: "doc.zipper", description: Text(file.path))
         } else if file.hunks.isEmpty {
-            ContentUnavailableView("No content changes", systemImage: "doc", description: Text(file.oldPath.map { "Renamed from \($0)" } ?? file.path))
+            ContentUnavailableView(
+                "No content changes", systemImage: "doc",
+                description: Text(file.oldPath.map { "Renamed from \($0)" } ?? file.path))
         } else {
             let markers = model.lineMarkers
             let highlighted = model.highlightedLineIDs
@@ -200,7 +204,7 @@ private struct DiffView: View {
                     await Task.yield()
                     switch request.placement {
                     case .center: proxy.scrollTo(request.lineID, anchor: .center)
-                    case .nearest: proxy.scrollTo(request.lineID) // just enough to bring it into view
+                    case .nearest: proxy.scrollTo(request.lineID)  // just enough to bring it into view
                     }
                 }
             }
@@ -435,7 +439,11 @@ private struct InlineComposer: View {
 
     var body: some View {
         if let draft = model.inlineDraft {
-            let text = Binding { model.inlineDraft?.body ?? "" } set: { model.inlineDraft?.body = $0 }
+            let text = Binding {
+                model.inlineDraft?.body ?? ""
+            } set: {
+                model.inlineDraft?.body = $0
+            }
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(draft.title).font(.headline)

@@ -55,11 +55,18 @@ public struct PullRequestOverview: Hashable, Sendable {
     /// they only wrap inline comments, which belong to the Files view.
     public var timeline: [TimelineItem] {
         let commentItems = comments.map {
-            TimelineItem(id: $0.id, kind: .comment, author: $0.author, body: $0.body, bodyHTML: $0.bodyHTML, date: $0.createdAt, url: $0.url)
+            TimelineItem(
+                id: $0.id, kind: .comment, author: $0.author, body: $0.body, bodyHTML: $0.bodyHTML, date: $0.createdAt,
+                url: $0.url)
         }
-        let reviewItems = reviews
+        let reviewItems =
+            reviews
             .filter { !($0.state == .commented && $0.bodyHTML.isEmpty) }
-            .map { TimelineItem(id: $0.id, kind: .review($0.state), author: $0.author, body: $0.body, bodyHTML: $0.bodyHTML, date: $0.submittedAt, url: $0.url) }
+            .map {
+                TimelineItem(
+                    id: $0.id, kind: .review($0.state), author: $0.author, body: $0.body, bodyHTML: $0.bodyHTML,
+                    date: $0.submittedAt, url: $0.url)
+            }
         return (commentItems + reviewItems).sorted { $0.date < $1.date }
     }
 
@@ -134,7 +141,7 @@ public enum CheckState: Int, Comparable, Hashable, Sendable {
         switch statusState {
         case "SUCCESS": self = .success
         case "FAILURE", "ERROR": self = .failure
-        default: self = .pending // PENDING, EXPECTED
+        default: self = .pending  // PENDING, EXPECTED
         }
     }
 
@@ -146,7 +153,7 @@ public enum CheckState: Int, Comparable, Hashable, Sendable {
         case "SKIPPED": self = .skipped
         case "CANCELLED": self = .cancelled
         case "NEUTRAL", "STALE": self = .neutral
-        default: self = .failure // FAILURE, TIMED_OUT, ACTION_REQUIRED, STARTUP_FAILURE
+        default: self = .failure  // FAILURE, TIMED_OUT, ACTION_REQUIRED, STARTUP_FAILURE
         }
     }
 }
@@ -164,27 +171,27 @@ public struct Check: Identifiable, Hashable, Sendable {
 
 extension PullRequestOverview {
     static let query = """
-    query($owner: String!, $name: String!, $number: Int!) {
-      repository(owner: $owner, name: $name) {
-        pullRequest(number: $number) {
-          number title url state isDraft createdAt
-          author { login }
-          baseRefName headRefName additions deletions changedFiles
-          body bodyHTML
-          mergeable mergeStateStatus reviewDecision
-          labels(first: 50) { nodes { name color } }
-          reviewRequests(first: 50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } }
-          comments(last: 100) { nodes { id author { login } body bodyHTML createdAt url } }
-          reviews(last: 100) { nodes { id author { login } state body bodyHTML submittedAt url } }
-          commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
-            __typename
-            ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { workflow { name } } } }
-            ... on StatusContext { context state targetUrl description }
-          } } } } } }
+        query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            pullRequest(number: $number) {
+              number title url state isDraft createdAt
+              author { login }
+              baseRefName headRefName additions deletions changedFiles
+              body bodyHTML
+              mergeable mergeStateStatus reviewDecision
+              labels(first: 50) { nodes { name color } }
+              reviewRequests(first: 50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } }
+              comments(last: 100) { nodes { id author { login } body bodyHTML createdAt url } }
+              reviews(last: 100) { nodes { id author { login } state body bodyHTML submittedAt url } }
+              commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
+                __typename
+                ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { workflow { name } } } }
+                ... on StatusContext { context state targetUrl description }
+              } } } } } }
+            }
+          }
         }
-      }
-    }
-    """
+        """
 
     struct NotFound: Error, LocalizedError {
         var errorDescription: String? { "Pull request not found." }
@@ -220,26 +227,30 @@ extension PullRequestOverview {
         labels = raw.labels.values.map { IssueLabel(name: $0.name, color: $0.color) }
         requestedReviewers = raw.reviewRequests.values.compactMap { $0.requestedReviewer?.login ?? $0.requestedReviewer?.name }
         comments = raw.comments.values.map {
-            IssueComment(id: $0.id, author: $0.author?.login ?? "ghost", body: $0.body ?? "", bodyHTML: $0.bodyHTML,
-                         createdAt: $0.createdAt, url: $0.url)
+            IssueComment(
+                id: $0.id, author: $0.author?.login ?? "ghost", body: $0.body ?? "", bodyHTML: $0.bodyHTML,
+                createdAt: $0.createdAt, url: $0.url)
         }
         reviews = raw.reviews.values.compactMap { review in
             // Pending reviews (the viewer's unsubmitted draft) have no submittedAt.
             guard let submittedAt = review.submittedAt, let state = Review.State(rawValue: review.state) else { return nil }
-            return Review(id: review.id, author: review.author?.login ?? "ghost", state: state,
-                          body: review.body ?? "", bodyHTML: review.bodyHTML, submittedAt: submittedAt, url: review.url)
+            return Review(
+                id: review.id, author: review.author?.login ?? "ghost", state: state,
+                body: review.body ?? "", bodyHTML: review.bodyHTML, submittedAt: submittedAt, url: review.url)
         }
 
         let rollup = raw.commits.values.first?.commit.statusCheckRollup
         checksRollup = rollup.map { CheckState(statusState: $0.state) }
         checks = (rollup?.contexts.values ?? []).enumerated().map { index, context in
             if context.typename == "StatusContext" {
-                Check(id: index, name: context.context ?? "status", detail: context.description,
-                      state: CheckState(statusState: context.state ?? ""), url: context.targetUrl.flatMap(URL.init(string:)))
+                Check(
+                    id: index, name: context.context ?? "status", detail: context.description,
+                    state: CheckState(statusState: context.state ?? ""), url: context.targetUrl.flatMap(URL.init(string:)))
             } else {
-                Check(id: index, name: context.name ?? "check", detail: context.checkSuite?.workflowRun?.workflow?.name,
-                      state: CheckState(status: context.status, conclusion: context.conclusion),
-                      url: context.detailsUrl.flatMap(URL.init(string:)))
+                Check(
+                    id: index, name: context.name ?? "check", detail: context.checkSuite?.workflowRun?.workflow?.name,
+                    state: CheckState(status: context.status, conclusion: context.conclusion),
+                    url: context.detailsUrl.flatMap(URL.init(string:)))
             }
         }
         .sorted { ($0.state, $0.name.lowercased()) < ($1.state, $1.name.lowercased()) }

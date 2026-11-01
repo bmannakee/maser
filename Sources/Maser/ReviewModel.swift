@@ -100,7 +100,7 @@ final class ReviewModel {
     var focusedThreadID: String? {
         didSet {
             guard focusedThreadID != oldValue, let id = focusedThreadID,
-                  let thread = selectedThreads.first(where: { $0.id == id })
+                let thread = selectedThreads.first(where: { $0.id == id })
             else { return }
             reveal(thread)
         }
@@ -200,7 +200,7 @@ final class ReviewModel {
                 selectedPath = filePaths.first
                 resetCursor()
             } else if let cursorLineID, !(selectedFile?.commentableLines.contains { $0.id == cursorLineID } ?? false) {
-                resetCursor() // the diff changed under the cursor
+                resetCursor()  // the diff changed under the cursor
             }
             filesState = .loaded
         } catch {
@@ -310,7 +310,7 @@ final class ReviewModel {
     @discardableResult
     func startComment() -> Bool {
         guard let file = selectedFile, let cursorLineID,
-              let target = file.commentTarget(anchor: selectionAnchor, cursor: cursorLineID)
+            let target = file.commentTarget(anchor: selectionAnchor, cursor: cursorLineID)
         else { return false }
         openDraft(.newThread(target))
         selectionAnchor = nil
@@ -320,7 +320,8 @@ final class ReviewModel {
     /// Opens a draft reply to the focused thread, or else a thread on the cursor line.
     @discardableResult
     func startReply(to thread: ReviewThread? = nil) -> Bool {
-        let thread = thread
+        let thread =
+            thread
             ?? selectedThreads.first { $0.id == focusedThreadID }
             ?? selectedThreads.first { thread in
                 thread.line.flatMap { selectedFile?.lineID(side: thread.side, line: $0) } == cursorLineID
@@ -370,7 +371,7 @@ final class ReviewModel {
         } catch {
             inlineDraft?.isPosting = false
             inlineDraft?.error = error.localizedDescription
-            reviewContext = try? await GitHubCLI().reviewContext(for: pr) // in case the pending review changed elsewhere
+            reviewContext = try? await GitHubCLI().reviewContext(for: pr)  // in case the pending review changed elsewhere
             return
         }
         await reloadThreads()
@@ -482,7 +483,8 @@ final class ReviewModel {
         let starts = file.hunks.compactMap { $0.lines.first { $0.commentSide != nil }?.id }
         guard !starts.isEmpty else { return false }
         let cursor = cursorLineID ?? -1
-        let target = offset > 0
+        let target =
+            offset > 0
             ? starts.first { $0 > cursor } ?? starts.last!
             : starts.last { $0 < (file.hunk(containing: cursor)?.lines.first?.id ?? cursor) } ?? starts.first!
         placeCursor(target, placement: .center)
@@ -549,11 +551,12 @@ final class ReviewModel {
 
     func selectAdjacentFile(offset: Int) {
         guard !filePaths.isEmpty else { return }
-        let next: Int = if let current = selectedPath.flatMap(filePaths.firstIndex(of:)) {
-            min(max(current + offset, 0), filePaths.count - 1)
-        } else {
-            offset > 0 ? 0 : filePaths.count - 1
-        }
+        let next: Int =
+            if let current = selectedPath.flatMap(filePaths.firstIndex(of:)) {
+                min(max(current + offset, 0), filePaths.count - 1)
+            } else {
+                offset > 0 ? 0 : filePaths.count - 1
+            }
         select(path: filePaths[next])
     }
 
@@ -569,7 +572,8 @@ final class ReviewModel {
             // Start from the selected file: its first thread, or the nearest file in that direction.
             let fileIndex = selectedPath.flatMap(filePaths.firstIndex(of:)) ?? -1
             let position = { (thread: ReviewThread) in self.filePaths.firstIndex(of: thread.path) ?? 0 }
-            next = offset > 0
+            next =
+                offset > 0
                 ? threads.firstIndex { position($0) >= fileIndex } ?? 0
                 : threads.lastIndex { position($0) <= fileIndex } ?? threads.count - 1
         }
@@ -587,7 +591,7 @@ final class ReviewModel {
     /// Scrolls the diff to the line a thread is anchored to and puts the cursor there (no-op for outdated threads).
     func reveal(_ thread: ReviewThread) {
         guard let file = filesByPath[thread.path], let line = thread.line,
-              let id = file.lineID(side: thread.side, line: line)
+            let id = file.lineID(side: thread.side, line: line)
         else { return }
         selectionAnchor = nil
         placeCursor(id, placement: .center)

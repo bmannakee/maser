@@ -71,7 +71,7 @@ struct ReviewQueueView: View {
                 Button("Review") { review(ids, in: prs) }
                 Button("Open on GitHub") { ids.forEach { openURL($0) } }
             } primaryAction: { ids in
-                review(ids, in: prs) // double-click or Return
+                review(ids, in: prs)  // double-click or Return
             }
         }
     }
@@ -104,9 +104,11 @@ private struct PullRequestRow: View {
                     Text("Draft").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Text("\(pr.repository.nameWithOwner) #\(pr.number) · \(pr.author.login) · updated \(pr.updatedAt, style: .relative) ago")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            Text(
+                "\(pr.repository.nameWithOwner) #\(pr.number) · \(pr.author.login) · updated \(pr.updatedAt, style: .relative) ago"
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }

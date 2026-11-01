@@ -41,16 +41,17 @@ final class KeyRouter {
         // Esc leaves a multi-line editor (e.g. the comment box) so vim keys work again.
         // Text views would otherwise treat it as "complete word".
         if let window = event.window, handlers.object(forKey: window) != nil,
-           let textView = window.firstResponder as? NSTextView, textView.isEditable, !textView.isFieldEditor,
-           KeyChord(event: event) == KeyChord(.escape) {
+            let textView = window.firstResponder as? NSTextView, textView.isEditable, !textView.isFieldEditor,
+            KeyChord(event: event) == KeyChord(.escape)
+        {
             pending = []
             window.makeFirstResponder(nil)
             return true
         }
 
         guard let window = event.window, let handler = handlers.object(forKey: window),
-              !Self.isTyping(in: window),
-              let chord = KeyChord(event: event), !chord.modifiers.contains(.command)
+            !Self.isTyping(in: window),
+            let chord = KeyChord(event: event), !chord.modifiers.contains(.command)
         else {
             pending = []
             return false
@@ -77,7 +78,9 @@ final class KeyRouter {
         case let .command(command):
             pending = []
             let handled = handler.perform(command)
-            keyLog.debug("\(Keymap.format(sequence), privacy: .public) → \(command.rawValue, privacy: .public) (\(handled ? "handled" : "not handled here", privacy: .public))")
+            keyLog.debug(
+                "\(Keymap.format(sequence), privacy: .public) → \(command.rawValue, privacy: .public) (\(handled ? "handled" : "not handled here", privacy: .public))"
+            )
             return handled
         case .prefix:
             pending = sequence
@@ -91,7 +94,7 @@ final class KeyRouter {
 
     private static func isTyping(in window: NSWindow) -> Bool {
         switch window.firstResponder {
-        case let textView as NSTextView: textView.isEditable // includes text fields' field editor
+        case let textView as NSTextView: textView.isEditable  // includes text fields' field editor
         case is NSTextField: true
         default: false
         }

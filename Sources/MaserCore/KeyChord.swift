@@ -71,26 +71,27 @@ public struct KeyChord: Hashable, Sendable, CustomStringConvertible {
     public var symbols: String {
         let names: [(Modifiers, String)] = [(.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘")]
         let prefix = names.filter { modifiers.contains($0.0) }.map(\.1).joined()
-        let key = switch key {
-        // Menus show letters in uppercase; a shifted letter gets an explicit ⇧.
-        case let .character(character) where character == " ": "Space"
-        case let .character(character) where character.isUppercase: "⇧" + String(character)
-        case let .character(character): String(character).uppercased()
-        case .named(.up): "↑"
-        case .named(.down): "↓"
-        case .named(.left): "←"
-        case .named(.right): "→"
-        case .named(.enter): "↩"
-        case .named(.tab): "⇥"
-        case .named(.space): "Space"
-        case .named(.escape): "⎋"
-        case .named(.backspace): "⌫"
-        case .named(.delete): "⌦"
-        case .named(.pageUp): "⇞"
-        case .named(.pageDown): "⇟"
-        case .named(.home): "↖"
-        case .named(.end): "↘"
-        }
+        let key =
+            switch key {
+            // Menus show letters in uppercase; a shifted letter gets an explicit ⇧.
+            case let .character(character) where character == " ": "Space"
+            case let .character(character) where character.isUppercase: "⇧" + String(character)
+            case let .character(character): String(character).uppercased()
+            case .named(.up): "↑"
+            case .named(.down): "↓"
+            case .named(.left): "←"
+            case .named(.right): "→"
+            case .named(.enter): "↩"
+            case .named(.tab): "⇥"
+            case .named(.space): "Space"
+            case .named(.escape): "⎋"
+            case .named(.backspace): "⌫"
+            case .named(.delete): "⌦"
+            case .named(.pageUp): "⇞"
+            case .named(.pageDown): "⇟"
+            case .named(.home): "↖"
+            case .named(.end): "↘"
+            }
         return prefix + key
     }
 }
@@ -145,7 +146,8 @@ public enum KeyBindingParser {
         if keyPart.count == 1 {
             let character = Character(keyPart)
             if modifiers.contains(.shift), !character.isLetter {
-                throw KeyBindingError(description: "\"\(token)\": write the shifted character itself (e.g. \"?\" rather than \"shift+/\")")
+                throw KeyBindingError(
+                    description: "\"\(token)\": write the shifted character itself (e.g. \"?\" rather than \"shift+/\")")
             }
             return KeyChord(character, modifiers: modifiers)
         }

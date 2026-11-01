@@ -33,14 +33,15 @@ struct OpenPullRequestView: View {
             }
         }
         .padding()
-        .commandHandler { _ in false } // app-wide keys still work when the field isn't focused
+        .commandHandler { _ in false }  // app-wide keys still work when the field isn't focused
         .onAppear {
             // The window can be reused, so start fresh each time it opens.
             text = ""
             error = nil
             if let clip = NSPasteboard.general.string(forType: .string),
-               let clipURL = URL(string: clip.trimmingCharacters(in: .whitespacesAndNewlines)),
-               PullRequest.nameWithOwner(fromURL: clipURL) != nil {
+                let clipURL = URL(string: clip.trimmingCharacters(in: .whitespacesAndNewlines)),
+                PullRequest.nameWithOwner(fromURL: clipURL) != nil
+            {
                 text = clipURL.absoluteString
             }
         }

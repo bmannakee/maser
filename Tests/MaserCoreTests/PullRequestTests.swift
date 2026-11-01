@@ -1,13 +1,14 @@
 import Foundation
-@testable import MaserCore
 import Testing
+
+@testable import MaserCore
 
 @Test func decodesGhSearchOutput() throws {
     let json = """
-    [{"author":{"id":"MDQ6VXNlcjIxODAxMTg=","is_bot":false,"login":"octocat","type":"User","url":"https://github.com/octocat"},
-      "isDraft":false,"number":351,"repository":{"name":"broom","nameWithOwner":"tidymodels/broom"},
-      "title":"Fix a thing","updatedAt":"2021-03-11T00:21:48Z","url":"https://github.com/tidymodels/broom/pull/351"}]
-    """
+        [{"author":{"id":"MDQ6VXNlcjIxODAxMTg=","is_bot":false,"login":"octocat","type":"User","url":"https://github.com/octocat"},
+          "isDraft":false,"number":351,"repository":{"name":"broom","nameWithOwner":"tidymodels/broom"},
+          "title":"Fix a thing","updatedAt":"2021-03-11T00:21:48Z","url":"https://github.com/tidymodels/broom/pull/351"}]
+        """
     let prs = try PullRequest.decodeList(from: Data(json.utf8))
 
     #expect(prs.count == 1)

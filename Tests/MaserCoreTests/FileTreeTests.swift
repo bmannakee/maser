@@ -1,5 +1,6 @@
-@testable import MaserCore
 import Testing
+
+@testable import MaserCore
 
 @Suite struct FileTreeTests {
     @Test func buildsSortedCompactedTree() {

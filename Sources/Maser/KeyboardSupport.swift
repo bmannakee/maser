@@ -18,22 +18,23 @@ extension KeyboardShortcut {
         case let .character(character):
             key = KeyEquivalent(character)
         case let .named(named):
-            key = switch named {
-            case .up: .upArrow
-            case .down: .downArrow
-            case .left: .leftArrow
-            case .right: .rightArrow
-            case .enter: .return
-            case .tab: .tab
-            case .space: .space
-            case .escape: .escape
-            case .backspace: .delete
-            case .delete: .deleteForward
-            case .pageUp: .pageUp
-            case .pageDown: .pageDown
-            case .home: .home
-            case .end: .end
-            }
+            key =
+                switch named {
+                case .up: .upArrow
+                case .down: .downArrow
+                case .left: .leftArrow
+                case .right: .rightArrow
+                case .enter: .return
+                case .tab: .tab
+                case .space: .space
+                case .escape: .escape
+                case .backspace: .delete
+                case .delete: .deleteForward
+                case .pageUp: .pageUp
+                case .pageDown: .pageDown
+                case .home: .home
+                case .end: .end
+                }
         }
         self.init(key, modifiers: modifiers)
     }
@@ -48,23 +49,24 @@ extension KeyChord {
         if flags.contains(.control) { modifiers.insert(.control) }
         if flags.contains(.option) { modifiers.insert(.option) }
 
-        let named: NamedKey? = switch event.keyCode {
-        case 123: .left
-        case 124: .right
-        case 125: .down
-        case 126: .up
-        case 36, 76: .enter
-        case 48: .tab
-        case 49: .space
-        case 53: .escape
-        case 51: .backspace
-        case 117: .delete
-        case 116: .pageUp
-        case 121: .pageDown
-        case 115: .home
-        case 119: .end
-        default: nil
-        }
+        let named: NamedKey? =
+            switch event.keyCode {
+            case 123: .left
+            case 124: .right
+            case 125: .down
+            case 126: .up
+            case 36, 76: .enter
+            case 48: .tab
+            case 49: .space
+            case 53: .escape
+            case 51: .backspace
+            case 117: .delete
+            case 116: .pageUp
+            case 121: .pageDown
+            case 115: .home
+            case 119: .end
+            default: nil
+            }
         if let named {
             if flags.contains(.shift) { modifiers.insert(.shift) }
             self.init(named, modifiers: modifiers)
@@ -133,11 +135,12 @@ private struct CommandHandlerModifier: ViewModifier {
     @Environment(\.openWindow) private var openWindow
 
     func body(content: Content) -> some View {
-        content.background(WindowReader { [perform, openWindow] window in
-            KeyRouter.shared.register(window) { command in
-                GlobalCommands.perform(command, openWindow: openWindow) || perform(command)
-            }
-        })
+        content.background(
+            WindowReader { [perform, openWindow] window in
+                KeyRouter.shared.register(window) { command in
+                    GlobalCommands.perform(command, openWindow: openWindow) || perform(command)
+                }
+            })
     }
 }
 

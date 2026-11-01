@@ -22,7 +22,8 @@ struct FinishReviewView: View {
                 .background(.background, in: RoundedRectangle(cornerRadius: 6))
                 .overlay {
                     RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(summaryFocused ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: summaryFocused ? 2 : 1)
+                        .strokeBorder(
+                            summaryFocused ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: summaryFocused ? 2 : 1)
                 }
                 .overlay(alignment: .topLeading) {
                     if model.reviewSummary.isEmpty {
@@ -76,7 +77,10 @@ struct FinishReviewView: View {
             "Discard your pending review?",
             isPresented: $confirmingDiscard
         ) {
-            Button("Discard \(model.pendingCommentCount) Draft Comment\(model.pendingCommentCount == 1 ? "" : "s")", role: .destructive) {
+            Button(
+                "Discard \(model.pendingCommentCount) Draft Comment\(model.pendingCommentCount == 1 ? "" : "s")",
+                role: .destructive
+            ) {
                 Task { await model.discardReview() }
             }
         } message: {

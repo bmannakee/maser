@@ -160,7 +160,7 @@ public enum DiffParser {
         let half = (rest.count - 1) / 2
         let a = rest.prefix(half), b = rest.suffix(half)
         guard rest[rest.index(rest.startIndex, offsetBy: half)] == " ",
-              b.hasPrefix("b/"), a.dropFirst(2) == b.dropFirst(2)
+            b.hasPrefix("b/"), a.dropFirst(2) == b.dropFirst(2)
         else { return nil }
         return String(a.dropFirst(2))
     }
@@ -184,7 +184,7 @@ struct HunkRange {
         guard let close = line.range(of: " @@", range: afterOpen..<line.endIndex) else { return nil }
         let parts = line[afterOpen..<close.lowerBound].split(separator: " ")
         guard parts.count == 2, parts[1].hasPrefix("+"),
-              let old = Self.pair(parts[0]), let new = Self.pair(parts[1].dropFirst())
+            let old = Self.pair(parts[0]), let new = Self.pair(parts[1].dropFirst())
         else { return nil }
         (oldStart, oldCount) = old
         (newStart, newCount) = new

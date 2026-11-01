@@ -94,7 +94,8 @@ private struct CommentComposer: View {
                     }
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
-                    .disabled(model.isPostingComment || model.commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        model.isPostingComment || model.commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .font(.callout)
             }

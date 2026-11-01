@@ -5,8 +5,9 @@ extension GitHubCLI {
     /// All inline review threads (every page), including the viewer's pending comments.
     @concurrent
     public func reviewThreads(for pr: PullRequest) async throws -> [ReviewThread] {
-        let data = try await graphQL(ReviewThread.query, host: pr.host, paginate: true, jq: ReviewThread.jqFilter,
-                                     strings: repoVariables(pr), ints: ["number": pr.number])
+        let data = try await graphQL(
+            ReviewThread.query, host: pr.host, paginate: true, jq: ReviewThread.jqFilter,
+            strings: repoVariables(pr), ints: ["number": pr.number])
         return try ReviewThread.decodeLines(from: data)
     }
 
@@ -20,7 +21,8 @@ extension GitHubCLI {
     /// Starts a pending review (visible only to the viewer until submitted); returns its ID.
     @concurrent
     public func startReview(on pr: PullRequest, pullRequestID: String) async throws -> String {
-        let data = try await graphQL("""
+        let data = try await graphQL(
+            """
             mutation($pr: ID!) { addPullRequestReview(input: {pullRequestId: $pr}) { pullRequestReview { id } } }
             """, host: pr.host, jq: ".data.addPullRequestReview.pullRequestReview.id", strings: ["pr": pullRequestID])
         return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -35,7 +37,8 @@ extension GitHubCLI {
             ints["startLine"] = startLine
             strings["startSide"] = startSide.rawValue
         }
-        _ = try await graphQL("""
+        _ = try await graphQL(
+            """
             mutation($review: ID!, $path: String!, $body: String!, $line: Int!, $side: DiffSide!, $startLine: Int, $startSide: DiffSide) {
               addPullRequestReviewThread(input: {
                 pullRequestReviewId: $review, path: $path, body: $body,
@@ -49,7 +52,8 @@ extension GitHubCLI {
     /// otherwise it's posted immediately.
     @concurrent
     public func reply(on pr: PullRequest, toThread threadID: String, body: String) async throws {
-        _ = try await graphQL("""
+        _ = try await graphQL(
+            """
             mutation($thread: ID!, $body: String!) {
               addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $thread, body: $body}) { comment { id } }
             }
@@ -63,14 +67,16 @@ extension GitHubCLI {
         if !body.isEmpty { strings["body"] = body }
         if let reviewID = context.pendingReviewID {
             strings["review"] = reviewID
-            _ = try await graphQL("""
+            _ = try await graphQL(
+                """
                 mutation($review: ID!, $event: PullRequestReviewEvent!, $body: String) {
                   submitPullRequestReview(input: {pullRequestReviewId: $review, event: $event, body: $body}) { pullRequestReview { id } }
                 }
                 """, host: pr.host, strings: strings)
         } else {
             strings["pr"] = context.pullRequestID
-            _ = try await graphQL("""
+            _ = try await graphQL(
+                """
                 mutation($pr: ID!, $event: PullRequestReviewEvent!, $body: String) {
                   addPullRequestReview(input: {pullRequestId: $pr, event: $event, body: $body}) { pullRequestReview { id } }
                 }
@@ -81,7 +87,8 @@ extension GitHubCLI {
     /// Deletes the pending review and all its comments.
     @concurrent
     public func discardReview(on pr: PullRequest, reviewID: String) async throws {
-        _ = try await graphQL("""
+        _ = try await graphQL(
+            """
             mutation($review: ID!) { deletePullRequestReview(input: {pullRequestReviewId: $review}) { pullRequestReview { id } } }
             """, host: pr.host, strings: ["review": reviewID])
     }
@@ -89,7 +96,8 @@ extension GitHubCLI {
     /// Deletes one comment (used for pending ones).
     @concurrent
     public func deleteReviewComment(on pr: PullRequest, commentID: String) async throws {
-        _ = try await graphQL("""
+        _ = try await graphQL(
+            """
             mutation($id: ID!) { deletePullRequestReviewComment(input: {id: $id}) { clientMutationId } }
             """, host: pr.host, strings: ["id": commentID])
     }

@@ -22,7 +22,7 @@ public struct Keymap: Sendable, Equatable {
         for (command, sequences) in self.normal.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
             for sequence in sequences {
                 normalLookup[sequence] = command
-                for length in 1 ..< max(sequence.count, 1) {
+                for length in 1..<max(sequence.count, 1) {
                     normalPrefixes.insert(Array(sequence.prefix(length)))
                 }
             }
@@ -123,11 +123,13 @@ extension Keymap {
                 continue
             }
             guard sequence.count == 1, let chord = sequence.first else {
-                problems.append("[keys] \(name) = \"\(value)\": menu shortcuts are a single chord; put sequences in [keys.normal]")
+                problems.append(
+                    "[keys] \(name) = \"\(value)\": menu shortcuts are a single chord; put sequences in [keys.normal]")
                 continue
             }
             guard !chord.modifiers.isDisjoint(with: [.command, .control, .option]) else {
-                problems.append("[keys] \(name) = \"\(value)\": menu shortcuts need cmd, ctrl or opt; put single keys in [keys.normal]")
+                problems.append(
+                    "[keys] \(name) = \"\(value)\": menu shortcuts need cmd, ctrl or opt; put single keys in [keys.normal]")
                 continue
             }
             if let other = userMenu[chord], other != command {
@@ -159,7 +161,8 @@ extension Keymap {
                         continue
                     }
                     if let other = userNormal[sequence], other != command {
-                        problems.append("[keys.normal] \"\(value)\" is bound to both \(other.rawValue) and \(name); using \(name)")
+                        problems.append(
+                            "[keys.normal] \"\(value)\" is bound to both \(other.rawValue) and \(name); using \(name)")
                         normal[other]?.removeAll { $0 == sequence }
                     }
                     userNormal[sequence] = command
@@ -183,10 +186,11 @@ extension Keymap {
     func shadowingProblems() -> [String] {
         normalLookup.keys.sorted { Self.format($0) < Self.format($1) }.compactMap { sequence in
             guard sequence.count > 1 else { return nil }
-            for length in 1 ..< sequence.count {
+            for length in 1..<sequence.count {
                 let prefix = Array(sequence.prefix(length))
                 if let shorter = normalLookup[prefix] {
-                    return "[keys.normal] \"\(Self.format(prefix))\" (\(shorter.rawValue)) hides \"\(Self.format(sequence))\" (\(normalLookup[sequence]!.rawValue))"
+                    return
+                        "[keys.normal] \"\(Self.format(prefix))\" (\(shorter.rawValue)) hides \"\(Self.format(sequence))\" (\(normalLookup[sequence]!.rawValue))"
                 }
             }
             return nil
@@ -203,14 +207,15 @@ extension Keymap {
     }
 
     private static func describe(_ error: DecodingError) -> String {
-        let (context, message): (DecodingError.Context?, String) = switch error {
-        case let .typeMismatch(type, context): (context, "expected \(type == String.self ? "a string" : "\(type)")")
-        case let .valueNotFound(_, context): (context, "missing value")
-        case let .keyNotFound(key, context): (context, "missing \"\(key.stringValue)\"")
-        case let .dataCorrupted(context):
-            (context, context.underlyingError.map { "\(context.debugDescription) (\($0))" } ?? context.debugDescription)
-        @unknown default: (nil, "\(error)")
-        }
+        let (context, message): (DecodingError.Context?, String) =
+            switch error {
+            case let .typeMismatch(type, context): (context, "expected \(type == String.self ? "a string" : "\(type)")")
+            case let .valueNotFound(_, context): (context, "missing value")
+            case let .keyNotFound(key, context): (context, "missing \"\(key.stringValue)\"")
+            case let .dataCorrupted(context):
+                (context, context.underlyingError.map { "\(context.debugDescription) (\($0))" } ?? context.debugDescription)
+            @unknown default: (nil, "\(error)")
+            }
         let path = context?.codingPath.map(\.stringValue).joined(separator: ".") ?? ""
         return path.isEmpty ? message : "\(path): \(message)"
     }
@@ -290,24 +295,24 @@ extension Keymap {
         }
 
         return """
-        # Maser config. Saved changes apply immediately.
-        # Uncomment a line to change a binding; anything left out keeps its default.
+            # Maser config. Saved changes apply immediately.
+            # Uncomment a line to change a binding; anything left out keeps its default.
 
-        # Menu-bar shortcuts. Each needs cmd, ctrl or opt, e.g. "cmd+opt+down".
-        # Use "none" to remove one.
-        [keys]
-        \(menuRows.joined(separator: "\n"))
+            # Menu-bar shortcuts. Each needs cmd, ctrl or opt, e.g. "cmd+opt+down".
+            # Use "none" to remove one.
+            [keys]
+            \(menuRows.joined(separator: "\n"))
 
-        # Vim-style keys, active whenever you're not typing in a text field.
-        #   Characters: "j", "J" (shift+j), "?", "]"
-        #   Named keys: \(KeyChord.NamedKey.allCases.map(\.rawValue).joined(separator: ", "))
-        #   Modifiers:  "ctrl+d", "opt+j", "shift+down"
-        #   Sequences:  "g g" (space-separated keystrokes)
-        #   Several:    next-file = ["j", "down"]
-        # A binding you set here takes those keys away from any other command.
-        [keys.normal]
-        \(normalRows.joined(separator: "\n"))
+            # Vim-style keys, active whenever you're not typing in a text field.
+            #   Characters: "j", "J" (shift+j), "?", "]"
+            #   Named keys: \(KeyChord.NamedKey.allCases.map(\.rawValue).joined(separator: ", "))
+            #   Modifiers:  "ctrl+d", "opt+j", "shift+down"
+            #   Sequences:  "g g" (space-separated keystrokes)
+            #   Several:    next-file = ["j", "down"]
+            # A binding you set here takes those keys away from any other command.
+            [keys.normal]
+            \(normalRows.joined(separator: "\n"))
 
-        """
+            """
     }
 }

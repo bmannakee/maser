@@ -1,5 +1,6 @@
-@testable import MaserCore
 import Testing
+
+@testable import MaserCore
 
 @Suite struct KeyBindingParserTests {
     @Test func characters() throws {
@@ -80,34 +81,37 @@ import Testing
     }
 
     @Test func overridesAndUnbinds() throws {
-        let result = try Keymap.load(toml: """
-        [keys]
-        next-file = "ctrl+opt+j"
-        refresh = "none"
+        let result = try Keymap.load(
+            toml: """
+                [keys]
+                next-file = "ctrl+opt+j"
+                refresh = "none"
 
-        [keys.normal]
-        next-file = ["j", "down"]
-        previous-file = "none"
-        show-files = "g g"
-        """)
+                [keys.normal]
+                next-file = ["j", "down"]
+                previous-file = "none"
+                show-files = "g g"
+                """)
         #expect(result.problems.isEmpty)
         let keymap = result.keymap
         #expect(keymap.menu[.nextFile] == KeyChord("j", modifiers: [.control, .option]))
         #expect(keymap.menu[.refresh] == nil)
-        #expect(keymap.menu[.showFiles] == Keymap.defaults.menu[.showFiles]) // untouched
+        #expect(keymap.menu[.showFiles] == Keymap.defaults.menu[.showFiles])  // untouched
         #expect(keymap.match([KeyChord(.down)]) == .command(.nextFile))
         #expect(keymap.match([KeyChord("["), KeyChord("f")]) == .none)
         #expect(keymap.match([KeyChord("g"), KeyChord("g")]) == .command(.showFiles))
-        #expect(keymap.match([KeyChord("g"), KeyChord("f")]) == .none) // replaced, not added
+        #expect(keymap.match([KeyChord("g"), KeyChord("f")]) == .none)  // replaced, not added
     }
 
     @Test func userBindingStealsKeysFromDefaults() throws {
-        let keymap = try Keymap.load(toml: """
-        [keys]
-        refresh = "cmd+o"
-        [keys.normal]
-        refresh = "j"
-        """).keymap
+        let keymap = try Keymap.load(
+            toml: """
+                [keys]
+                refresh = "cmd+o"
+                [keys.normal]
+                refresh = "j"
+                """
+        ).keymap
         #expect(keymap.menu[.refresh] == KeyChord("o", modifiers: .command))
         #expect(keymap.menu[.openPullRequest] == nil)
         #expect(keymap.match([KeyChord("j")]) == .command(.refresh))
@@ -115,19 +119,20 @@ import Testing
     }
 
     @Test func reportsProblemsButKeepsTheRest() throws {
-        let result = try Keymap.load(toml: """
-        [keys]
-        frobnicate = "cmd+f"
-        next-file = "j"
-        previous-file = "g g"
-        show-files = "cmd+3"
+        let result = try Keymap.load(
+            toml: """
+                [keys]
+                frobnicate = "cmd+f"
+                next-file = "j"
+                previous-file = "g g"
+                show-files = "cmd+3"
 
-        [keys.normal]
-        refresh = ["ctrl+banana", "R"]
-        open-on-github = "cmd+g"
-        next-thread = "x"
-        previous-thread = "x"
-        """)
+                [keys.normal]
+                refresh = ["ctrl+banana", "R"]
+                open-on-github = "cmd+g"
+                next-thread = "x"
+                previous-thread = "x"
+                """)
         let problems = result.problems.joined(separator: "\n")
         #expect(problems.contains("unknown command \"frobnicate\""))
         #expect(problems.contains("next-file = \"j\": menu shortcuts need cmd"))
@@ -144,11 +149,12 @@ import Testing
     }
 
     @Test func reportsShadowedSequences() throws {
-        let result = try Keymap.load(toml: """
-        [keys.normal]
-        refresh = "g"
-        """)
-        #expect(result.problems.count == 3) // hides "g o", "g f" and "g g"
+        let result = try Keymap.load(
+            toml: """
+                [keys.normal]
+                refresh = "g"
+                """)
+        #expect(result.problems.count == 3)  // hides "g o", "g f" and "g g"
         #expect(result.problems[0].contains("\"g\" (refresh) hides \"g f\" (show-files)"))
         #expect(result.keymap.match([KeyChord("g")]) == .command(.refresh))
     }

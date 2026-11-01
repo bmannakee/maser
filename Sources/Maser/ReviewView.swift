@@ -27,9 +27,10 @@ struct ReviewView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .help(ReviewModel.Tab.allCases.map { tab in
-                    ConfigStore.shared.bindingSummary(for: tab.command).map { "\(tab.title): \($0)" } ?? tab.title
-                }.joined(separator: "\n"))
+                .help(
+                    ReviewModel.Tab.allCases.map { tab in
+                        ConfigStore.shared.bindingSummary(for: tab.command).map { "\(tab.title): \($0)" } ?? tab.title
+                    }.joined(separator: "\n"))
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {

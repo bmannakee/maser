@@ -55,20 +55,20 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
     static let jqFilter = ".data.repository.pullRequest.reviewThreads.nodes[]"
 
     static let query = """
-    query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
-      repository(owner: $owner, name: $name) {
-        pullRequest(number: $number) {
-          reviewThreads(first: 100, after: $endCursor) {
-            pageInfo { hasNextPage endCursor }
-            nodes {
-              id path line startLine originalLine diffSide isOutdated isResolved
-              comments(first: 100) { nodes { id author { login } body createdAt url state } }
+        query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
+          repository(owner: $owner, name: $name) {
+            pullRequest(number: $number) {
+              reviewThreads(first: 100, after: $endCursor) {
+                pageInfo { hasNextPage endCursor }
+                nodes {
+                  id path line startLine originalLine diffSide isOutdated isResolved
+                  comments(first: 100) { nodes { id author { login } body createdAt url state } }
+                }
+              }
             }
           }
         }
-      }
-    }
-    """
+        """
 
     static func decodeLines(from data: Data) throws -> [ReviewThread] {
         let decoder = JSONDecoder()
@@ -134,12 +134,12 @@ public struct ReviewContext: Hashable, Sendable {
     public var pendingReviewID: String?
 
     static let query = """
-    query($owner: String!, $name: String!, $number: Int!) {
-      repository(owner: $owner, name: $name) {
-        pullRequest(number: $number) { id reviews(states: PENDING, first: 1) { nodes { id } } }
-      }
-    }
-    """
+        query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            pullRequest(number: $number) { id reviews(states: PENDING, first: 1) { nodes { id } } }
+          }
+        }
+        """
 
     static func decode(from data: Data) throws -> ReviewContext {
         struct Response: Decodable {
