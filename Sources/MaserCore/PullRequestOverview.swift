@@ -38,6 +38,8 @@ public struct PullRequestOverview: Hashable, Sendable {
     public let changedFiles: Int
     /// Description rendered to HTML by GitHub.
     public let bodyHTML: String
+    /// The description's Markdown source.
+    public let body: String
     public let mergeable: Mergeable
     public let mergeState: MergeState
     public let reviewDecision: ReviewDecision?
@@ -53,11 +55,11 @@ public struct PullRequestOverview: Hashable, Sendable {
     /// they only wrap inline comments, which belong to the Files view.
     public var timeline: [TimelineItem] {
         let commentItems = comments.map {
-            TimelineItem(id: $0.id, kind: .comment, author: $0.author, bodyHTML: $0.bodyHTML, date: $0.createdAt, url: $0.url)
+            TimelineItem(id: $0.id, kind: .comment, author: $0.author, body: $0.body, bodyHTML: $0.bodyHTML, date: $0.createdAt, url: $0.url)
         }
         let reviewItems = reviews
             .filter { !($0.state == .commented && $0.bodyHTML.isEmpty) }
-            .map { TimelineItem(id: $0.id, kind: .review($0.state), author: $0.author, bodyHTML: $0.bodyHTML, date: $0.submittedAt, url: $0.url) }
+            .map { TimelineItem(id: $0.id, kind: .review($0.state), author: $0.author, body: $0.body, bodyHTML: $0.bodyHTML, date: $0.submittedAt, url: $0.url) }
         return (commentItems + reviewItems).sorted { $0.date < $1.date }
     }
 
@@ -79,6 +81,7 @@ public struct PullRequestOverview: Hashable, Sendable {
 public struct IssueComment: Identifiable, Hashable, Sendable {
     public let id: String
     public let author: String
+    public let body: String
     public let bodyHTML: String
     public let createdAt: Date
     public let url: URL
@@ -93,6 +96,7 @@ public struct Review: Identifiable, Hashable, Sendable {
     public let id: String
     public let author: String
     public let state: State
+    public let body: String
     public let bodyHTML: String
     public let submittedAt: Date
     public let url: URL
@@ -112,6 +116,8 @@ public struct TimelineItem: Identifiable, Hashable, Sendable {
     public let id: String
     public let kind: Kind
     public let author: String
+    /// Markdown source, for quoting.
+    public let body: String
     public let bodyHTML: String
     public let date: Date
     public let url: URL
@@ -164,12 +170,12 @@ extension PullRequestOverview {
           number title url state isDraft createdAt
           author { login }
           baseRefName headRefName additions deletions changedFiles
-          bodyHTML
+          body bodyHTML
           mergeable mergeStateStatus reviewDecision
           labels(first: 50) { nodes { name color } }
           reviewRequests(first: 50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } }
-          comments(first: 100) { nodes { id author { login } bodyHTML createdAt url } }
-          reviews(first: 100) { nodes { id author { login } state bodyHTML submittedAt url } }
+          comments(last: 100) { nodes { id author { login } body bodyHTML createdAt url } }
+          reviews(last: 100) { nodes { id author { login } state body bodyHTML submittedAt url } }
           commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
             __typename
             ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { workflow { name } } } }
@@ -207,19 +213,21 @@ extension PullRequestOverview {
         deletions = raw.deletions
         changedFiles = raw.changedFiles
         bodyHTML = raw.bodyHTML
+        body = raw.body ?? ""
         mergeable = Mergeable(rawValue: raw.mergeable) ?? .unknown
         mergeState = MergeState(rawValue: raw.mergeStateStatus) ?? .unknown
         reviewDecision = raw.reviewDecision.flatMap(ReviewDecision.init(rawValue:))
         labels = raw.labels.values.map { IssueLabel(name: $0.name, color: $0.color) }
         requestedReviewers = raw.reviewRequests.values.compactMap { $0.requestedReviewer?.login ?? $0.requestedReviewer?.name }
         comments = raw.comments.values.map {
-            IssueComment(id: $0.id, author: $0.author?.login ?? "ghost", bodyHTML: $0.bodyHTML, createdAt: $0.createdAt, url: $0.url)
+            IssueComment(id: $0.id, author: $0.author?.login ?? "ghost", body: $0.body ?? "", bodyHTML: $0.bodyHTML,
+                         createdAt: $0.createdAt, url: $0.url)
         }
         reviews = raw.reviews.values.compactMap { review in
             // Pending reviews (the viewer's unsubmitted draft) have no submittedAt.
             guard let submittedAt = review.submittedAt, let state = Review.State(rawValue: review.state) else { return nil }
             return Review(id: review.id, author: review.author?.login ?? "ghost", state: state,
-                          bodyHTML: review.bodyHTML, submittedAt: submittedAt, url: review.url)
+                          body: review.body ?? "", bodyHTML: review.bodyHTML, submittedAt: submittedAt, url: review.url)
         }
 
         let rollup = raw.commits.values.first?.commit.statusCheckRollup
@@ -264,6 +272,7 @@ extension PullRequestOverview {
         let additions: Int
         let deletions: Int
         let changedFiles: Int
+        let body: String?
         let bodyHTML: String
         let mergeable: String
         let mergeStateStatus: String
@@ -285,6 +294,7 @@ extension PullRequestOverview {
     struct RawComment: Decodable {
         let id: String
         let author: Actor?
+        let body: String?
         let bodyHTML: String
         let createdAt: Date
         let url: URL
@@ -294,6 +304,7 @@ extension PullRequestOverview {
         let id: String
         let author: Actor?
         let state: String
+        let body: String?
         let bodyHTML: String
         let submittedAt: Date?
         let url: URL

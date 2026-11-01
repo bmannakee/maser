@@ -9,11 +9,11 @@ import Testing
       "number":7,"title":"Add thing","url":"https://github.com/o/r/pull/7","state":"OPEN","isDraft":false,
       "createdAt":"2026-10-20T10:00:00Z","author":{"login":"alice"},
       "baseRefName":"main","headRefName":"alice/thing","additions":10,"deletions":2,"changedFiles":3,
-      "bodyHTML":"<p>Hello</p>","mergeable":"MERGEABLE","mergeStateStatus":"BLOCKED","reviewDecision":"CHANGES_REQUESTED",
+      "body":"Hello","bodyHTML":"<p>Hello</p>","mergeable":"MERGEABLE","mergeStateStatus":"BLOCKED","reviewDecision":"CHANGES_REQUESTED",
       "labels":{"nodes":[{"name":"bug","color":"d73a4a"}]},
       "reviewRequests":{"nodes":[{"requestedReviewer":{"login":"erin"}},{"requestedReviewer":{"name":"core-team"}},{"requestedReviewer":null}]},
       "comments":{"nodes":[
-        {"id":"IC_1","author":{"login":"bob"},"bodyHTML":"<p>LGTM?</p>","createdAt":"2026-10-21T10:00:00Z","url":"https://github.com/o/r/pull/7#issuecomment-1"},
+        {"id":"IC_1","author":{"login":"bob"},"body":"LGTM?","bodyHTML":"<p>LGTM?</p>","createdAt":"2026-10-21T10:00:00Z","url":"https://github.com/o/r/pull/7#issuecomment-1"},
         {"id":"IC_2","author":null,"bodyHTML":"<p>deleted user</p>","createdAt":"2026-10-23T10:00:00Z","url":"https://github.com/o/r/pull/7#issuecomment-2"}
       ]},
       "reviews":{"nodes":[
@@ -49,6 +49,14 @@ import Testing
         #expect(pr.labels == [.init(name: "bug", color: "d73a4a")])
         #expect(pr.requestedReviewers == ["erin", "core-team"])
         #expect(pr.comments[1].author == "ghost")
+        #expect(pr.body == "Hello")
+        #expect(pr.comments[0].body == "LGTM?")
+        #expect(pr.comments[1].body == "") // body missing
+    }
+
+    @Test func quotingMarkdown() {
+        #expect(Markdown.appendingQuote(of: "one\r\n\ntwo\n", to: "") == "> one\n>\n> two\n\n")
+        #expect(Markdown.appendingQuote(of: "b", to: "my reply  \n") == "my reply\n\n> b\n\n")
     }
 
     @Test func checksMappedAndSortedByUrgency() throws {

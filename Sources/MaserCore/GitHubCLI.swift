@@ -93,6 +93,17 @@ public struct GitHubCLI: Sendable {
         return try PullRequestOverview.decode(from: data)
     }
 
+    /// Adds a comment to the PR's conversation. `body` is Markdown.
+    @concurrent
+    public func addComment(to pr: PullRequest, body: String) async throws {
+        _ = try await run([
+            "api", "--hostname", pr.host, "--method", "POST",
+            "repos/\(pr.repository.nameWithOwner)/issues/\(pr.number)/comments",
+            // -f sends the text as-is (-F would treat a leading "@" as a file to read).
+            "-f", "body=\(body)",
+        ])
+    }
+
     /// The PR's full diff, split into files.
     @concurrent
     public func fileDiffs(for pr: PullRequest) async throws -> [FileDiff] {

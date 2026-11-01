@@ -38,6 +38,16 @@ final class KeyRouter {
 
     /// Returns true if the event was used and shouldn't propagate.
     private func handle(_ event: NSEvent) -> Bool {
+        // Esc leaves a multi-line editor (e.g. the comment box) so vim keys work again.
+        // Text views would otherwise treat it as "complete word".
+        if let window = event.window, handlers.object(forKey: window) != nil,
+           let textView = window.firstResponder as? NSTextView, textView.isEditable, !textView.isFieldEditor,
+           KeyChord(event: event) == KeyChord(.escape) {
+            pending = []
+            window.makeFirstResponder(nil)
+            return true
+        }
+
         guard let window = event.window, let handler = handlers.object(forKey: window),
               !Self.isTyping(in: window),
               let chord = KeyChord(event: event), !chord.modifiers.contains(.command)

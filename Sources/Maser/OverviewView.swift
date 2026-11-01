@@ -20,7 +20,14 @@ struct OverviewView: View {
                             .padding(.horizontal, 20)
                             .padding(.vertical, 14)
                         Divider()
-                        HTMLView(html: model.conversationHTML, baseURL: overview.url)
+                        HTMLView(
+                            html: model.conversationHTML,
+                            baseURL: overview.url,
+                            scrollToEnd: model.conversationScrollToEnd,
+                            onQuote: { model.quoteReply(to: $0) }
+                        )
+                        Divider()
+                        CommentComposer(model: model)
                     }
                     Divider()
                     ScrollView {
@@ -30,6 +37,83 @@ struct OverviewView: View {
                     .frame(width: 300)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Comment composer
+
+/// A Markdown comment box under the conversation. Grows while you're writing; ⌘↩ posts, Esc leaves it.
+private struct CommentComposer: View {
+    @Bindable var model: ReviewModel
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        let expanded = focused || !model.commentDraft.isEmpty || model.commentError != nil
+        VStack(alignment: .leading, spacing: 8) {
+            TextEditor(text: $model.commentDraft)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 4)
+                .background(.background, in: RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(focused ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: focused ? 2 : 1)
+                }
+                .overlay(alignment: .topLeading) {
+                    if model.commentDraft.isEmpty {
+                        Text(placeholder)
+                            .foregroundStyle(.tertiary)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 9)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .frame(height: expanded ? 150 : 32)
+                .focused($focused)
+                .disabled(model.isPostingComment)
+
+            if expanded {
+                HStack(spacing: 10) {
+                    if let error = model.commentError {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                    } else {
+                        Text("Markdown · ⌘↩ to comment · Esc to stop typing")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if model.isPostingComment {
+                        ProgressView().controlSize(.small)
+                    }
+                    Button("Comment") {
+                        Task { await model.postComment() }
+                    }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.isPostingComment || model.commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .font(.callout)
+            }
+        }
+        .padding(12)
+        .animation(.snappy(duration: 0.15), value: expanded)
+        // Runs on appear too, so `c` from the Files tab focuses the box once the Overview shows.
+        .task(id: model.composerFocusRequest) {
+            guard model.composerFocusRequest else { return }
+            model.composerFocusRequest = false
+            focused = true
+        }
+    }
+
+    private var placeholder: String {
+        if let keys = ConfigStore.shared.bindingSummary(for: .comment) {
+            "Leave a comment (\(keys))"
+        } else {
+            "Leave a comment"
         }
     }
 }

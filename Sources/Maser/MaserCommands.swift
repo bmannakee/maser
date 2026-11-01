@@ -41,6 +41,7 @@ struct MaserCommands: Commands {
             CommandButton(.refresh) { refresh?.perform() }
                 .disabled(refresh == nil)
             review(.openOnGitHub)
+            review(.comment)
             Divider()
             review(.nextFile)
             review(.previousFile)

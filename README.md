@@ -19,6 +19,7 @@ swift run Maser https://github.com/owner/repo/pull/123   # open a PR directly
 The queue lists open PRs requesting your review; double-click one (or ⌘O to paste any PR URL) to open a review window. Each window has tabs:
 
 - **Overview** — title, description, comments and reviews (rendered by GitHub), plus mergeability, review status, CI checks and labels.
+  Write a comment in the box at the bottom (`c` to jump there, ⌘↩ to post, Esc to leave it); **Quote reply** on any comment quotes it into your draft.
 - **Files** — changed files, diff, and inline review comments. Selecting a comment thread scrolls the diff to its line.
 
 ## Keyboard
@@ -33,6 +34,7 @@ Every action is a command you can trigger two ways:
 | Open pull request | ⌘O | |
 | Refresh | ⌘R | `r` |
 | Open on GitHub | ⇧⌘O | `o` |
+| Comment on the PR | ⌥⌘C | `c` |
 | Overview / Files tab | ⌘1 / ⌘2 | `g o` / `g f` |
 | Show/hide comments | ⌥⌘0 | `i` |
 | Next / previous file | ⌥⌘↓ / ⌥⌘↑ | `j` / `k` |

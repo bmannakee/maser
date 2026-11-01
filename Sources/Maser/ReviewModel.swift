@@ -55,6 +55,15 @@ final class ReviewModel {
     /// Rendered once per load so the web view doesn't reload (and lose its scroll position) on every view update.
     private(set) var conversationHTML = ""
 
+    // Commenting on the conversation
+    var commentDraft = ""
+    private(set) var isPostingComment = false
+    private(set) var commentError: String?
+    /// Set to ask the Overview to focus the comment box; it clears this once it has.
+    var composerFocusRequest = false
+    /// Changes after a comment is posted, telling the conversation to scroll to it.
+    private(set) var conversationScrollToEnd: UUID?
+
     // Files
     private(set) var filesState: LoadState = .loading
     private(set) var tree: [FileNode] = []
@@ -158,6 +167,9 @@ final class ReviewModel {
         case .previousFile: selectAdjacentFile(offset: -1)
         case .nextThread: focusAdjacentThread(offset: 1)
         case .previousThread: focusAdjacentThread(offset: -1)
+        case .comment:
+            tab = .overview
+            composerFocusRequest = true
         case .scrollDown: return scrollDiff(.lines(1))
         case .scrollUp: return scrollDiff(.lines(-1))
         case .halfPageDown: return scrollDiff(.halfPages(1))
@@ -169,6 +181,37 @@ final class ReviewModel {
         case .openPullRequest, .openConfig, .showKeybindings: return false
         }
         return true
+    }
+
+    // MARK: Commenting
+
+    /// Posts the draft to the PR's conversation, then reloads it and scrolls to the new comment.
+    /// On failure the draft is kept and the error shown.
+    func postComment() async {
+        let body = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty, !isPostingComment else { return }
+        isPostingComment = true
+        commentError = nil
+        defer { isPostingComment = false }
+        do {
+            try await GitHubCLI().addComment(to: pr, body: body)
+        } catch {
+            commentError = error.localizedDescription
+            return
+        }
+        commentDraft = ""
+        await loadOverview()
+        conversationScrollToEnd = UUID()
+    }
+
+    /// Appends a Markdown quote of a conversation item ("description" or a comment/review ID) to the draft.
+    func quoteReply(to itemID: String) {
+        guard let overview else { return }
+        let source = itemID == "description" ? overview.body : overview.timeline.first { $0.id == itemID }?.body
+        guard let source, !source.isEmpty else { return }
+        commentDraft = Markdown.appendingQuote(of: source, to: commentDraft)
+        tab = .overview
+        composerFocusRequest = true
     }
 
     /// Whether scroll commands apply (they scroll the diff, so only on the Files tab).

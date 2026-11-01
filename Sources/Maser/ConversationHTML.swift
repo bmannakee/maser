@@ -5,6 +5,8 @@ import MaserCore
 enum ConversationHTML {
     static func render(_ overview: PullRequestOverview) -> String {
         var items = [article(
+            id: "description",
+            quotable: !overview.body.isEmpty,
             header: "<b>\(escape(overview.author))</b> opened \(time(overview.createdAt))",
             bodyHTML: overview.bodyHTML.isEmpty ? #"<p class="empty">No description provided.</p>"# : overview.bodyHTML,
             url: overview.url,
@@ -18,7 +20,8 @@ enum ConversationHTML {
             case let .review(state):
                 header = "\(badge(state)) <b>\(escape(item.author))</b> \(verb(state)) \(time(item.date))"
             }
-            items.append(article(header: header, bodyHTML: item.bodyHTML, url: item.url, extraClass: nil))
+            items.append(article(id: item.id, quotable: !item.body.isEmpty, header: header,
+                                 bodyHTML: item.bodyHTML, url: item.url, extraClass: nil))
         }
         return """
         <!DOCTYPE html>
@@ -27,12 +30,16 @@ enum ConversationHTML {
         """
     }
 
-    private static func article(header: String, bodyHTML: String, url: URL, extraClass: String?) -> String {
+    /// Links with this scheme are handled by the app (see `HTMLView`) rather than opened in the browser.
+    static let quoteScheme = "maser-quote"
+
+    private static func article(id: String, quotable: Bool, header: String, bodyHTML: String, url: URL, extraClass: String?) -> String {
         let classes = ["item", extraClass, bodyHTML.isEmpty ? "compact" : nil].compactMap(\.self).joined(separator: " ")
         let body = bodyHTML.isEmpty ? "" : #"<div class="markdown-body">\#(bodyHTML)</div>"#
+        let quote = quotable ? #"<a href="\#(quoteScheme):\#(escape(id))" title="Quote this in your comment">Quote reply</a>"# : ""
         return """
         <article class="\(classes)">
-        <header>\(header)<a class="permalink" href="\(escape(url.absoluteString))" title="Open on GitHub">↗</a></header>
+        <header>\(header)<span class="actions">\(quote)<a href="\(escape(url.absoluteString))" title="Open on GitHub">↗</a></span></header>
         \(body)
         </article>
         """
@@ -87,7 +94,9 @@ enum ConversationHTML {
       padding: 7px 12px; border-bottom: 1px solid var(--border); }
     .item.compact > header { border-bottom: none; }
     .item > header b { color: var(--fg); }
-    .permalink { margin-left: auto; text-decoration: none; color: var(--muted); }
+    .actions { margin-left: auto; display: flex; gap: 12px; }
+    .actions a { text-decoration: none; color: var(--muted); }
+    .actions a:hover { color: var(--link); }
     .badge { font-size: 11px; font-weight: 600; color: white; border-radius: 999px; padding: 1px 8px; margin-right: 4px; }
     .badge.approved { background: var(--green); }
     .badge.changes { background: var(--red); }
