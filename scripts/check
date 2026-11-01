@@ -1,0 +1,15 @@
+#!/bin/sh
+# Pre-commit check: formatting and doc-comment lint, build, and unit tests.
+#
+# Fails on the first problem. Live GitHub tests are opt-in; see AGENTS.md.
+set -eu
+cd "$(dirname "$0")/.."
+
+echo "==> swift format lint"
+swift format lint --strict --recursive Sources Tests Package.swift
+
+echo "==> swift build"
+swift build
+
+echo "==> swift test"
+swift test
