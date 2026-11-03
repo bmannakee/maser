@@ -171,11 +171,11 @@ private struct DiffView: View {
     let file: FileDiff
 
     @State private var position = ScrollPosition(edge: .top)
-    /// The latest scroll geometry, for sizing scroll motions.
+    /// The latest scroll geometry and visible rows.
     ///
-    /// It changes on every scroll frame, so it lives in a reference box rather than view state, which would re-render
+    /// They change on every scroll frame, so they live in a reference box rather than view state, which would re-render
     /// the diff each time.
-    @State private var geometry = GeometryBox()
+    @State private var scrollState = ScrollState()
 
     /// Height of one diff row: the monospaced font's line height plus the row's vertical padding.
     private static let rowHeight =
@@ -192,58 +192,82 @@ private struct DiffView: View {
             let markers = model.lineMarkers
             let highlighted = model.highlightedLineIDs
             let cursor = model.cursorLineID
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(file.hunks) { hunk in
-                            // The whole file reads as one continuous text, so the hunk headers are left out.
-                            if !file.isFullFile {
-                                HunkHeaderRow(header: hunk.header)
-                            }
-                            ForEach(hunk.lines) { line in
-                                DiffLineRow(
-                                    line: line,
-                                    marker: markers[line.id],
-                                    isCursor: line.id == cursor,
-                                    isHighlighted: highlighted?.contains(line.id) ?? false,
-                                    model: model
-                                )
-                                .id(line.id)
-                            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(file.hunks) { hunk in
+                        // The whole file reads as one continuous text, so the hunk headers are left out.
+                        if !file.isFullFile {
+                            HunkHeaderRow(header: hunk.header)
+                        }
+                        ForEach(hunk.lines) { line in
+                            DiffLineRow(
+                                line: line,
+                                marker: markers[line.id],
+                                isCursor: line.id == cursor,
+                                isHighlighted: highlighted?.contains(line.id) ?? false,
+                                model: model
+                            )
+                            // Moving the cursor changes two rows; this keeps the rest from redrawing.
+                            .equatable()
+                            .id(line.id)
                         }
                     }
-                    .scrollTargetLayout()
-                    .font(.system(size: 12, design: .monospaced))
-                    .textSelection(.enabled)
                 }
-                .scrollPosition($position)
-                .onScrollGeometryChange(for: ScrollGeometry.self, of: { $0 }) { _, new in
-                    geometry.value = new
+                .scrollTargetLayout()
+                .font(.system(size: 12, design: .monospaced))
+                .textSelection(.enabled)
+            }
+            .scrollPosition($position)
+            .onScrollGeometryChange(for: ScrollGeometry.self, of: { $0 }) { _, new in
+                scrollState.geometry = new
+            }
+            .onScrollTargetVisibilityChange(idType: Int.self, threshold: 0.9) { ids in
+                scrollState.visibleIDs = Set(ids)
+                model.diffVisibilityChanged(ids)
+            }
+            .onChange(of: model.diffScroll) { _, request in
+                if let request { scroll(request.motion) }
+            }
+            // Handled right away rather than in the task below: holding j or k sends one of these per key repeat.
+            .onChange(of: model.scrollRequest) { _, request in
+                guard let request, request.path == file.path, request.placement == .nearest else { return }
+                bringIntoView(request.lineID)
+            }
+            // Runs on appear too, so jumping to a thread in another file scrolls once it loads.
+            .task(id: model.scrollRequest) {
+                guard let request = model.scrollRequest, request.path == file.path, request.placement == .center else {
+                    return
                 }
-                .onScrollTargetVisibilityChange(idType: Int.self, threshold: 0.9) { ids in
-                    model.diffVisibilityChanged(ids)
-                }
-                .onChange(of: model.diffScroll) { _, request in
-                    if let request { scroll(request.motion) }
-                }
-                // Runs on appear too, so jumping to a thread in another file scrolls once it loads.
-                .task(id: model.scrollRequest) {
-                    guard let request = model.scrollRequest, request.path == file.path else { return }
-                    await Task.yield()
-                    switch request.placement {
-                    case .center: proxy.scrollTo(request.lineID, anchor: .center)
-                    case .nearest: proxy.scrollTo(request.lineID)  // just enough to bring it into view
-                    }
-                }
+                await Task.yield()
+                position.scrollTo(id: request.lineID, anchor: .center)
             }
         }
     }
 }
 
 extension DiffView {
-    /// A mutable holder for the diff's scroll geometry that SwiftUI doesn't observe.
-    final class GeometryBox {
-        var value: ScrollGeometry?
+    /// The diff's latest scroll geometry and visible rows, held where SwiftUI doesn't observe them.
+    final class ScrollState {
+        /// The latest scroll geometry, for sizing scroll motions.
+        var geometry: ScrollGeometry?
+        /// The IDs of the rows at least 90% in view, as last reported.
+        var visibleIDs: Set<Int> = []
+    }
+
+    /// Scrolls just far enough to show a line, and not at all if it's already in view.
+    ///
+    /// The line comes in at the edge it's nearest to, so holding j or k scrolls the diff a row at a time.
+    ///
+    /// - Parameter lineID: The ID of the line to show.
+    private func bringIntoView(_ lineID: Int) {
+        let visible = scrollState.visibleIDs
+        guard !visible.contains(lineID) else { return }
+        // IDs increase down the diff, so comparing them says which way the line is.
+        guard let first = visible.min(), let last = visible.max() else {
+            position.scrollTo(id: lineID, anchor: .center)
+            return
+        }
+        position.scrollTo(id: lineID, anchor: lineID > last ? .bottom : (lineID < first ? .top : .center))
     }
 
     /// Scrolls the diff by a vim-style motion, clamped to the content.
@@ -253,7 +277,7 @@ extension DiffView {
     ///
     /// - Parameter motion: How far to scroll.
     private func scroll(_ motion: ReviewModel.DiffScroll.Motion) {
-        guard let geometry = geometry.value else { return }
+        guard let geometry = scrollState.geometry else { return }
         let viewport = geometry.visibleRect.height
         let delta: CGFloat
         switch motion {
@@ -317,7 +341,7 @@ private struct HunkHeaderRow: View {
 }
 
 /// One line of the diff: old and new line numbers, a gutter icon, the `+`/`-` sign, and the text.
-private struct DiffLineRow: View {
+private struct DiffLineRow: View, Equatable {
     let line: DiffLine
     /// Whether a current thread is on this line: nil for none, true if one has a draft comment, false otherwise.
     let marker: Bool?
@@ -325,6 +349,12 @@ private struct DiffLineRow: View {
     /// Whether the line is in the `V` selection or covered by the draft comment.
     let isHighlighted: Bool
     let model: ReviewModel
+
+    /// Whether two rows draw the same: the same line and state, in the same window.
+    nonisolated static func == (lhs: DiffLineRow, rhs: DiffLineRow) -> Bool {
+        lhs.line == rhs.line && lhs.marker == rhs.marker && lhs.isCursor == rhs.isCursor
+            && lhs.isHighlighted == rhs.isHighlighted && lhs.model === rhs.model
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
