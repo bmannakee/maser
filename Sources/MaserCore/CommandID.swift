@@ -1,4 +1,11 @@
-/// Every user-invokable action. The raw value is the name used in `config.toml`.
+// The identifiers for every command a key binding or menu item can trigger.
+//
+// `CommandID` is the shared vocabulary between the keymap, the menu bar and the review window's command handler. Its
+// raw values are the names users write in `config.toml`, so renaming one breaks existing configs.
+
+/// Every user-invokable action.
+///
+/// The raw value is the name used in `config.toml`.
 public enum CommandID: String, CaseIterable, Sendable {
     case openPullRequest = "open-pull-request"
     case refresh = "refresh"
@@ -10,7 +17,15 @@ public enum CommandID: String, CaseIterable, Sendable {
     case previousFile = "previous-file"
     case nextThread = "next-thread"
     case previousThread = "previous-thread"
+    case cursorDown = "cursor-down"
+    case cursorUp = "cursor-up"
+    case nextHunk = "next-hunk"
+    case previousHunk = "previous-hunk"
+    case selectLines = "select-lines"
+    case cancel = "cancel"
     case comment = "comment"
+    case reply = "reply"
+    case submitReview = "submit-review"
     case scrollDown = "scroll-down"
     case scrollUp = "scroll-up"
     case halfPageDown = "half-page-down"
@@ -22,6 +37,7 @@ public enum CommandID: String, CaseIterable, Sendable {
     case openConfig = "open-config"
     case showKeybindings = "show-keybindings"
 
+    /// The command's name as shown in menus and the keyboard shortcuts list.
     public var title: String {
         switch self {
         case .openPullRequest: "Open Pull Request…"
@@ -34,7 +50,15 @@ public enum CommandID: String, CaseIterable, Sendable {
         case .previousFile: "Previous File"
         case .nextThread: "Next Comment Thread"
         case .previousThread: "Previous Comment Thread"
+        case .cursorDown: "Next Line"
+        case .cursorUp: "Previous Line"
+        case .nextHunk: "Next Hunk"
+        case .previousHunk: "Previous Hunk"
+        case .selectLines: "Select Lines"
+        case .cancel: "Cancel Selection"
         case .comment: "Comment…"
+        case .reply: "Reply to Thread…"
+        case .submitReview: "Finish Review…"
         case .scrollDown: "Scroll Down a Line"
         case .scrollUp: "Scroll Up a Line"
         case .halfPageDown: "Scroll Down Half a Page"
@@ -50,5 +74,6 @@ public enum CommandID: String, CaseIterable, Sendable {
 }
 
 extension CommandID: Identifiable {
+    /// The command itself, so commands can drive SwiftUI lists directly.
     public var id: Self { self }
 }

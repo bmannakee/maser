@@ -1,13 +1,16 @@
+// Tests for `PullRequest`: decoding the `gh search prs` list and reading the repository from a PR URL.
+
 import Foundation
-@testable import MaserCore
 import Testing
+
+@testable import MaserCore
 
 @Test func decodesGhSearchOutput() throws {
     let json = """
-    [{"author":{"id":"MDQ6VXNlcjIxODAxMTg=","is_bot":false,"login":"octocat","type":"User","url":"https://github.com/octocat"},
-      "isDraft":false,"number":351,"repository":{"name":"broom","nameWithOwner":"tidymodels/broom"},
-      "title":"Fix a thing","updatedAt":"2021-03-11T00:21:48Z","url":"https://github.com/tidymodels/broom/pull/351"}]
-    """
+        [{"author":{"id":"MDQ6VXNlcjIxODAxMTg=","is_bot":false,"login":"octocat","type":"User","url":"https://github.com/octocat"},
+          "isDraft":false,"number":351,"repository":{"name":"broom","nameWithOwner":"tidymodels/broom"},
+          "title":"Fix a thing","updatedAt":"2021-03-11T00:21:48Z","url":"https://github.com/tidymodels/broom/pull/351"}]
+        """
     let prs = try PullRequest.decodeList(from: Data(json.utf8))
 
     #expect(prs.count == 1)
@@ -19,6 +22,7 @@ import Testing
     #expect(pr.url == URL(string: "https://github.com/tidymodels/broom/pull/351"))
 }
 
+/// Reads `owner/repo` from PR URLs on any host, including ones with trailing components, and rejects non-PR URLs.
 @Test func nameWithOwnerFromURL() {
     #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://github.com/cli/cli/pull/14858")!) == "cli/cli")
     #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://ghe.example.com/team/app/pull/7/files")!) == "team/app")

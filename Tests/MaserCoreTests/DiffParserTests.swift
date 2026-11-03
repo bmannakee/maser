@@ -1,21 +1,30 @@
-@testable import MaserCore
+// Tests for `DiffParser`, which turns `gh pr diff` output into `FileDiff`s.
+//
+// Covers line numbering on both sides, multiple files and hunks, file statuses (added, deleted, renamed, binary),
+// "No newline" markers, hunk headers and paths in `diff --git` headers.
+
 import Testing
 
+@testable import MaserCore
+
+/// Tests for parsing unified diffs into files, hunks and numbered lines.
 @Suite struct DiffParserTests {
+    /// Numbers old and new lines through a hunk, treats a deleted `--- …` line as content rather than a file header, and
+    /// maps side and line number back to a line ID.
     @Test func modifiedFileLineNumbers() throws {
         let diff = """
-        diff --git a/src/app.swift b/src/app.swift
-        index 111..222 100644
-        --- a/src/app.swift
-        +++ b/src/app.swift
-        @@ -10,4 +10,4 @@ struct App {
-         let a = 1
-        -let b = 2
-        +let b = 3
-        +let c = 4
-         let d = 5
-        --- deleted line that looks like a file header
-        """
+            diff --git a/src/app.swift b/src/app.swift
+            index 111..222 100644
+            --- a/src/app.swift
+            +++ b/src/app.swift
+            @@ -10,4 +10,4 @@ struct App {
+             let a = 1
+            -let b = 2
+            +let b = 3
+            +let c = 4
+             let d = 5
+            --- deleted line that looks like a file header
+            """
         let files = DiffParser.parse(diff)
         #expect(files.count == 1)
         let file = try #require(files.first)
@@ -36,25 +45,26 @@ import Testing
         #expect(file.lineID(side: .right, line: 99) == nil)
     }
 
+    /// Splits files and hunks, restarts numbering at each hunk header, and gives every hunk and line a unique ID.
     @Test func multipleFilesAndHunks() {
         let diff = """
-        diff --git a/a.txt b/a.txt
-        --- a/a.txt
-        +++ b/a.txt
-        @@ -1 +1 @@
-        -old
-        +new
-        @@ -20,2 +20,2 @@
-         same
-        -x
-        +y
-        diff --git a/b.txt b/b.txt
-        --- a/b.txt
-        +++ b/b.txt
-        @@ -5,0 +6,1 @@
-        +inserted
+            diff --git a/a.txt b/a.txt
+            --- a/a.txt
+            +++ b/a.txt
+            @@ -1 +1 @@
+            -old
+            +new
+            @@ -20,2 +20,2 @@
+             same
+            -x
+            +y
+            diff --git a/b.txt b/b.txt
+            --- a/b.txt
+            +++ b/b.txt
+            @@ -5,0 +6,1 @@
+            +inserted
 
-        """
+            """
         let files = DiffParser.parse(diff)
         #expect(files.map(\.path) == ["a.txt", "b.txt"])
         #expect(files[0].hunks.count == 2)
@@ -67,30 +77,31 @@ import Testing
         #expect(Set(allIDs).count == allIDs.count)
     }
 
+    /// Detects each file status; a pure rename has no hunks and a binary file counts as modified.
     @Test func addedDeletedRenamedBinary() {
         let diff = """
-        diff --git a/new.txt b/new.txt
-        new file mode 100644
-        index 0000000..e69de29
-        --- /dev/null
-        +++ b/new.txt
-        @@ -0,0 +1,2 @@
-        +one
-        +two
-        diff --git a/gone.txt b/gone.txt
-        deleted file mode 100644
-        --- a/gone.txt
-        +++ /dev/null
-        @@ -1 +0,0 @@
-        -bye
-        diff --git a/old/name.txt b/new/name.txt
-        similarity index 100%
-        rename from old/name.txt
-        rename to new/name.txt
-        diff --git a/logo.png b/logo.png
-        index 1..2 100644
-        Binary files a/logo.png and b/logo.png differ
-        """
+            diff --git a/new.txt b/new.txt
+            new file mode 100644
+            index 0000000..e69de29
+            --- /dev/null
+            +++ b/new.txt
+            @@ -0,0 +1,2 @@
+            +one
+            +two
+            diff --git a/gone.txt b/gone.txt
+            deleted file mode 100644
+            --- a/gone.txt
+            +++ /dev/null
+            @@ -1 +0,0 @@
+            -bye
+            diff --git a/old/name.txt b/new/name.txt
+            similarity index 100%
+            rename from old/name.txt
+            rename to new/name.txt
+            diff --git a/logo.png b/logo.png
+            index 1..2 100644
+            Binary files a/logo.png and b/logo.png differ
+            """
         let files = DiffParser.parse(diff)
         #expect(files.map(\.path) == ["new.txt", "gone.txt", "new/name.txt", "logo.png"])
         #expect(files.map(\.status) == [.added, .deleted, .renamed, .modified])
@@ -101,28 +112,31 @@ import Testing
         #expect(files[3].isBinary)
     }
 
+    /// Keeps `\ No newline at end of file` as its own line kind, without the leading backslash.
     @Test func noNewlineMarker() {
         let diff = """
-        diff --git a/f b/f
-        --- a/f
-        +++ b/f
-        @@ -1 +1 @@
-        -a
-        \\ No newline at end of file
-        +b
-        \\ No newline at end of file
-        """
+            diff --git a/f b/f
+            --- a/f
+            +++ b/f
+            @@ -1 +1 @@
+            -a
+            \\ No newline at end of file
+            +b
+            \\ No newline at end of file
+            """
         let lines = DiffParser.parse(diff)[0].hunks[0].lines
         #expect(lines.map(\.kind) == [.deletion, .noNewlineMarker, .addition, .noNewlineMarker])
         #expect(lines[1].text == "No newline at end of file")
     }
 
+    /// Parses a hunk header, defaulting an omitted count to 1, and rejects a malformed one.
     @Test func hunkRange() throws {
         let range = try #require(HunkRange("@@ -3,7 +4 @@ func x() @@ y"))
         #expect((range.oldStart, range.oldCount, range.newStart, range.newCount) == (3, 7, 4, 1))
         #expect(HunkRange("@@ garbage @@") == nil)
     }
 
+    /// Reads a path containing spaces from a `diff --git` header, and gives up when the two paths differ.
     @Test func gitHeaderPath() {
         #expect(DiffParser.pathFromGitHeader("diff --git a/with space.txt b/with space.txt") == "with space.txt")
         #expect(DiffParser.pathFromGitHeader("diff --git a/x b/y") == nil)

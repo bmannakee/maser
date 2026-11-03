@@ -5,10 +5,10 @@ let package = Package(
     name: "Maser",
     platforms: [.macOS(.v27)],
     products: [
-        .executable(name: "Maser", targets: ["Maser"]),
+        .executable(name: "Maser", targets: ["Maser"])
     ],
     dependencies: [
-        .package(url: "https://github.com/dduan/TOMLDecoder", from: "0.4.5"),
+        .package(url: "https://github.com/dduan/TOMLDecoder", from: "0.4.5")
     ],
     targets: [
         .target(

@@ -1,7 +1,13 @@
-@testable import MaserCore
+// Tests for `FileTree`, the directory tree shown in the file sidebar.
+
 import Testing
 
+@testable import MaserCore
+
+/// Tests for building the sidebar's file tree from changed paths.
 @Suite struct FileTreeTests {
+    /// Sorts directories before files, collapses single-child directory chains, and finds the first file in display
+    /// order.
     @Test func buildsSortedCompactedTree() {
         let tree = FileTree.build(paths: [
             "README.md",
@@ -11,7 +17,6 @@ import Testing
             "a/b/c/deep.txt",
         ])
 
-        // Directories first, then files; `a/b/c` collapses into one node.
         #expect(tree.map(\.name) == ["a/b/c", "Sources", "README.md"])
         #expect(tree[0].id == "a/b/c")
         #expect(tree[0].children?.map(\.id) == ["a/b/c/deep.txt"])

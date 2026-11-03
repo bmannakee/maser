@@ -1,3 +1,8 @@
+// The Overview tab of a review window.
+//
+// Shows the PR's title and branches, its conversation (rendered by `ConversationHTML` into an `HTMLView`), a box for
+// posting a new comment, and a sidebar with merge status, reviews, checks and labels.
+
 import MaserCore
 import SwiftUI
 
@@ -43,7 +48,10 @@ struct OverviewView: View {
 
 // MARK: - Comment composer
 
-/// A Markdown comment box under the conversation. Grows while you're writing; ⌘↩ posts, Esc leaves it.
+/// A Markdown comment box under the conversation.
+///
+/// Grows while it's focused or has a draft or error; ⌘↩ posts, Esc leaves it. Focuses itself when the model asks
+/// (`composerFocusRequest`), as the `comment` command and "Quote reply" do.
 private struct CommentComposer: View {
     @Bindable var model: ReviewModel
     @FocusState private var focused: Bool
@@ -94,14 +102,16 @@ private struct CommentComposer: View {
                     }
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
-                    .disabled(model.isPostingComment || model.commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        model.isPostingComment || model.commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .font(.callout)
             }
         }
         .padding(12)
         .animation(.snappy(duration: 0.15), value: expanded)
-        // Runs on appear too, so `c` from the Files tab focuses the box once the Overview shows.
+        // Runs on appear too, so a request made before the box was showing (say, while the overview was still loading)
+        // focuses it once it appears.
         .task(id: model.composerFocusRequest) {
             guard model.composerFocusRequest else { return }
             model.composerFocusRequest = false
@@ -109,6 +119,7 @@ private struct CommentComposer: View {
         }
     }
 
+    /// The empty-box prompt, including the keys that focus it.
     private var placeholder: String {
         if let keys = ConfigStore.shared.bindingSummary(for: .comment) {
             "Leave a comment (\(keys))"
@@ -120,6 +131,7 @@ private struct CommentComposer: View {
 
 // MARK: - Header
 
+/// The PR's title, state, branches and diff size.
 private struct OverviewHeader: View {
     let overview: PullRequestOverview
 
@@ -145,6 +157,7 @@ private struct OverviewHeader: View {
     }
 }
 
+/// A branch name in monospace on a tinted background, truncated in the middle when long.
 private struct RefName: View {
     let name: String
 
@@ -159,6 +172,7 @@ private struct RefName: View {
     }
 }
 
+/// A colored capsule with the PR's state, like github.com's: Open, Draft, Merged or Closed.
 private struct StatePill: View {
     let overview: PullRequestOverview
 
@@ -198,6 +212,7 @@ private struct StatePill: View {
 
 // MARK: - Sidebar
 
+/// The sidebar's merge status, reviews, checks and labels.
 private struct StatusSidebar: View {
     let overview: PullRequestOverview
 
@@ -249,6 +264,9 @@ private struct StatusSidebar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// How the merge status reads in the sidebar.
+    ///
+    /// A conflict reported by `mergeable` wins over whatever `mergeState` says.
     private var merge: (title: String, icon: String, color: Color) {
         switch overview.state {
         case .merged: return ("Merged", "arrow.triangle.merge", .purple)
@@ -269,6 +287,7 @@ private struct StatusSidebar: View {
         }
     }
 
+    /// Counts of checks by outcome, worst first, such as "1 failed, 2 pending, 10 passed".
     private var checksSummary: String {
         let counts = Dictionary(grouping: overview.checks, by: \.state).mapValues(\.count)
         let parts: [(CheckState, String)] = [
@@ -278,6 +297,7 @@ private struct StatusSidebar: View {
         return parts.compactMap { state, word in counts[state].map { "\($0) \(word)" } }.joined(separator: ", ")
     }
 
+    /// The title, SF Symbol and color for the PR's overall review decision.
     private static func describe(_ decision: PullRequestOverview.ReviewDecision) -> (String, String, Color) {
         switch decision {
         case .approved: ("Approved", "checkmark.circle.fill", .green)
@@ -286,6 +306,7 @@ private struct StatusSidebar: View {
         }
     }
 
+    /// The title, SF Symbol and color for one reviewer's latest verdict.
     private static func describe(_ state: Review.State) -> (String, String, Color) {
         switch state {
         case .approved: ("Approved", "checkmark.circle.fill", .green)
@@ -296,10 +317,12 @@ private struct StatusSidebar: View {
     }
 }
 
+/// A titled group in the sidebar.
 private struct SidebarSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
 
+    /// Creates a section with a headline title above its content.
     init(_ title: String, @ViewBuilder content: () -> Content) {
         self.title = title
         self.content = content()
@@ -313,11 +336,13 @@ private struct SidebarSection<Content: View>: View {
     }
 }
 
+/// A sidebar line: text with a tinted SF Symbol.
 private struct StatusRow: View {
     let title: String
     let systemImage: String
     let color: Color
 
+    /// Creates a row showing `title` next to the `systemImage` symbol tinted `color`.
     init(_ title: String, systemImage: String, color: Color) {
         self.title = title
         self.systemImage = systemImage
@@ -333,6 +358,7 @@ private struct StatusRow: View {
     }
 }
 
+/// One CI check with its status icon and detail; links to the check's page when it has one.
 private struct CheckRow: View {
     let check: Check
 
@@ -378,7 +404,9 @@ private struct CheckRow: View {
 }
 
 private extension Color {
-    /// `"d73a4a"` → color; gray if malformed.
+    /// A color from a six-digit hex string without `#`, such as GitHub's label color `"d73a4a"`.
+    ///
+    /// Malformed strings give gray.
     init(hex: String) {
         guard hex.count == 6, let value = UInt32(hex, radix: 16) else {
             self = .gray

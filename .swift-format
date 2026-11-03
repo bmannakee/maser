@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "indentation": { "spaces": 4 },
+  "lineLength": 130,
+  "maximumBlankLines": 1,
+  "respectsExistingLineBreaks": true,
+  "lineBreakBeforeEachArgument": false,
+  "multiElementCollectionTrailingCommas": true,
+  "rules": {
+    "AllPublicDeclarationsHaveDocumentation": true,
+    "BeginDocumentationCommentWithOneLineSummary": true,
+    "ValidateDocumentationComments": true,
+    "NoBlockComments": true,
+    "OrderedImports": true,
+    "UseTripleSlashForDocumentationComments": true
+  }
+}

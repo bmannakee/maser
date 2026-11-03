@@ -1,8 +1,17 @@
+// Glue between config key bindings and SwiftUI/AppKit.
+//
+// Converts `KeyChord`s to and from SwiftUI shortcuts and AppKit key events, and provides the view helpers that wire a
+// command's configured bindings into menus, tooltips and `KeyRouter`: `keyboardShortcut(_:)`, `help(_:_:)`,
+// `commandHandler(_:)` and `CommandButton`. Commands that act the same in every window live in `GlobalCommands`.
+
 import AppKit
 import MaserCore
 import SwiftUI
 
 extension KeyboardShortcut {
+    /// The SwiftUI shortcut for a config chord.
+    ///
+    /// An uppercase character becomes its lowercase key plus ⇧, since that's how SwiftUI expects shifted letters.
     init(_ chord: KeyChord) {
         var modifiers: EventModifiers = []
         if chord.modifiers.contains(.command) { modifiers.insert(.command) }
@@ -18,22 +27,23 @@ extension KeyboardShortcut {
         case let .character(character):
             key = KeyEquivalent(character)
         case let .named(named):
-            key = switch named {
-            case .up: .upArrow
-            case .down: .downArrow
-            case .left: .leftArrow
-            case .right: .rightArrow
-            case .enter: .return
-            case .tab: .tab
-            case .space: .space
-            case .escape: .escape
-            case .backspace: .delete
-            case .delete: .deleteForward
-            case .pageUp: .pageUp
-            case .pageDown: .pageDown
-            case .home: .home
-            case .end: .end
-            }
+            key =
+                switch named {
+                case .up: .upArrow
+                case .down: .downArrow
+                case .left: .leftArrow
+                case .right: .rightArrow
+                case .enter: .return
+                case .tab: .tab
+                case .space: .space
+                case .escape: .escape
+                case .backspace: .delete
+                case .delete: .deleteForward
+                case .pageUp: .pageUp
+                case .pageDown: .pageDown
+                case .home: .home
+                case .end: .end
+                }
         }
         self.init(key, modifiers: modifiers)
     }
@@ -41,6 +51,11 @@ extension KeyboardShortcut {
 
 extension KeyChord {
     /// The chord a key-down event represents, in the same form config bindings use.
+    ///
+    /// Named keys (arrows, Return, Tab and so on) record ⇧ as a modifier. Character keys don't: their character already
+    /// reflects shift (`J`, `?`). Returns `nil` for keys that produce no single character, such as dead keys.
+    ///
+    /// - Parameter event: A key-down event.
     init?(event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         var modifiers: Modifiers = []
@@ -48,23 +63,25 @@ extension KeyChord {
         if flags.contains(.control) { modifiers.insert(.control) }
         if flags.contains(.option) { modifiers.insert(.option) }
 
-        let named: NamedKey? = switch event.keyCode {
-        case 123: .left
-        case 124: .right
-        case 125: .down
-        case 126: .up
-        case 36, 76: .enter
-        case 48: .tab
-        case 49: .space
-        case 53: .escape
-        case 51: .backspace
-        case 117: .delete
-        case 116: .pageUp
-        case 121: .pageDown
-        case 115: .home
-        case 119: .end
-        default: nil
-        }
+        // Virtual key codes from Carbon's `kVK_*` constants; 76 is the keypad Enter.
+        let named: NamedKey? =
+            switch event.keyCode {
+            case 123: .left
+            case 124: .right
+            case 125: .down
+            case 126: .up
+            case 36, 76: .enter
+            case 48: .tab
+            case 49: .space
+            case 53: .escape
+            case 51: .backspace
+            case 117: .delete
+            case 116: .pageUp
+            case 121: .pageDown
+            case 115: .home
+            case 119: .end
+            default: nil
+            }
         if let named {
             if flags.contains(.shift) { modifiers.insert(.shift) }
             self.init(named, modifiers: modifiers)
@@ -79,18 +96,28 @@ extension KeyChord {
 }
 
 extension View {
-    /// Menu shortcut for a command, from the current config.
+    /// Gives the view the command's menu shortcut from the current config, or none if it has no menu binding.
     func keyboardShortcut(_ command: CommandID) -> some View {
         keyboardShortcut(ConfigStore.shared.keymap.menu[command].map(KeyboardShortcut.init))
     }
 
-    /// Tooltip listing the command's current bindings, e.g. "Next File (⌥⌘↓ or j)".
+    /// Adds a tooltip that lists the command's current bindings after the text, such as "Next File (⌥⌘↓ or j)".
+    ///
+    /// - Parameters:
+    ///   - text: The tooltip text; shown alone if the command is unbound.
+    ///   - command: The command whose bindings to list.
+    /// - Returns: The view with the tooltip.
     func help(_ text: String, _ command: CommandID) -> some View {
         help(ConfigStore.shared.bindingSummary(for: command).map { "\(text) (\($0))" } ?? text)
     }
 
     /// Lets the window this view is in run commands from vim-style keys (see `KeyRouter`).
-    /// App-wide commands (open PR, open config, shortcuts) are handled for every window.
+    ///
+    /// The app-wide commands in `GlobalCommands` (open PR, open config, show keybindings) are tried first, so they work
+    /// in every window that uses this, even with a handler that returns `false` for everything.
+    ///
+    /// - Parameter perform: Runs a window-specific command and returns `true` if it handled it.
+    /// - Returns: The view, with its window registered with `KeyRouter`.
     func commandHandler(_ perform: @escaping @MainActor (CommandID) -> Bool) -> some View {
         modifier(CommandHandlerModifier(perform: perform))
     }
@@ -99,9 +126,16 @@ extension View {
 /// A menu button whose title and shortcut come from the command.
 struct CommandButton: View {
     let command: CommandID
+    /// Overrides `command.title`, for titles that change with state such as "Hide Comments".
     var title: String?
     let action: () -> Void
 
+    /// Creates a button for a command.
+    ///
+    /// - Parameters:
+    ///   - command: Supplies the default title and the configured menu shortcut.
+    ///   - title: A title to use instead of the command's own.
+    ///   - action: Runs when the button or its shortcut is triggered.
     init(_ command: CommandID, title: String? = nil, action: @escaping () -> Void) {
         self.command = command
         self.title = title
@@ -117,6 +151,12 @@ struct CommandButton: View {
 /// Commands that work the same from any window.
 @MainActor
 enum GlobalCommands {
+    /// Runs the command if it's one of the app-wide ones.
+    ///
+    /// - Parameters:
+    ///   - command: The command to run.
+    ///   - openWindow: Opens the Open Pull Request and Keybindings windows.
+    /// - Returns: `true` if the command was app-wide and ran; `false` to let the window handle it.
     static func perform(_ command: CommandID, openWindow: OpenWindowAction) -> Bool {
         switch command {
         case .openPullRequest: openWindow(id: OpenPullRequestView.windowID)
@@ -128,20 +168,25 @@ enum GlobalCommands {
     }
 }
 
+/// Registers the hosting window with `KeyRouter`, trying `GlobalCommands` before the view's own handler.
 private struct CommandHandlerModifier: ViewModifier {
     let perform: @MainActor (CommandID) -> Bool
     @Environment(\.openWindow) private var openWindow
 
+    // Re-registers on every update, so the router always calls the latest closure.
     func body(content: Content) -> some View {
-        content.background(WindowReader { [perform, openWindow] window in
-            KeyRouter.shared.register(window) { command in
-                GlobalCommands.perform(command, openWindow: openWindow) || perform(command)
-            }
-        })
+        content.background(
+            WindowReader { [perform, openWindow] window in
+                KeyRouter.shared.register(window) { command in
+                    GlobalCommands.perform(command, openWindow: openWindow) || perform(command)
+                }
+            })
     }
 }
 
-/// Reports the NSWindow hosting a SwiftUI view.
+/// Reports the `NSWindow` hosting a SwiftUI view.
+///
+/// Calls `onWindow` when the view joins a window and again on every SwiftUI update, so callers should expect repeats.
 private struct WindowReader: NSViewRepresentable {
     let onWindow: @MainActor (NSWindow) -> Void
 
@@ -154,9 +199,11 @@ private struct WindowReader: NSViewRepresentable {
         if let window = view.window { onWindow(window) }
     }
 
+    /// An empty view that reports its window when it's added to one.
     final class ReaderView: NSView {
         var onWindow: @MainActor (NSWindow) -> Void
 
+        /// Creates a zero-size view that calls `onWindow` once it has a window.
         init(onWindow: @escaping @MainActor (NSWindow) -> Void) {
             self.onWindow = onWindow
             super.init(frame: .zero)
