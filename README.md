@@ -1,6 +1,6 @@
 # maser
 
-A native macOS app for reviewing GitHub pull requests.
+A native macOS app for reviewing GitHub pull requests (test edit for full-file diffs).
 
 Maser talks to GitHub through the [`gh` CLI](https://cli.github.com), so it uses whatever account `gh` is logged in to and never stores credentials itself.
 
