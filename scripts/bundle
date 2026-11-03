@@ -1,0 +1,47 @@
+#!/bin/sh
+# Builds Maser.app: a release build wrapped in an app bundle and signed for this Mac.
+#
+# Usage: scripts/bundle [destination directory]   (default: .build)
+#
+# The bundle is signed ad hoc ("-"), which needs no developer account. An app built and signed on the Mac that runs it
+# isn't quarantined, so Gatekeeper doesn't ask about it. Copying it to another Mac needs a Developer ID signature and
+# notarization instead.
+set -eu
+cd "$(dirname "$0")/.."
+
+destination="${1:-.build}"
+app="$destination/Maser.app"
+version="$(git describe --tags --always 2>/dev/null || echo 0)"
+
+echo "==> swift build -c release"
+swift build -c release
+binary="$(swift build -c release --show-bin-path)/Maser"
+
+echo "==> $app"
+rm -rf "$app"
+mkdir -p "$app/Contents/MacOS"
+cp "$binary" "$app/Contents/MacOS/Maser"
+cat > "$app/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>dev.maser.Maser</string>
+    <key>CFBundleName</key><string>Maser</string>
+    <key>CFBundleDisplayName</key><string>Maser</string>
+    <key>CFBundleExecutable</key><string>Maser</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>$version</string>
+    <key>CFBundleVersion</key><string>$version</string>
+    <key>LSMinimumSystemVersion</key><string>26.0</string>
+    <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSSupportsAutomaticTermination</key><false/>
+</dict>
+</plist>
+PLIST
+
+echo "==> codesign (ad hoc)"
+codesign --force --sign - --timestamp=none "$app"
+codesign --verify --strict "$app"
+echo "Built $app. Run it with: open \"$app\""

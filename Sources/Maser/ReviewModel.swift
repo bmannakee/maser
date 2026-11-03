@@ -1,8 +1,8 @@
 // The state and actions behind one pull request review window.
 //
 // `ReviewModel` loads the PR's overview, changed files, review threads and pending review through `GitHubCLI`, and owns
-// everything the window's views share: the current tab, the selected file, the vim-style line cursor and `V` selection,
-// comment drafts, and scroll requests. Window commands (menu items and vim-style keys) arrive through `perform(_:)`.
+// everything the window's views share: the current tab, the selected file and whether it shows in full, the vim-style
+// line cursor and `V` selection, comment drafts, and scroll requests. Window commands (menu items and vim-style keys) arrive through `perform(_:)`.
 
 import AppKit
 import MaserCore
@@ -105,7 +105,8 @@ final class ReviewModel {
     private(set) var overview: PullRequestOverview?
     /// The conversation as HTML for the Overview's web view.
     ///
-    /// It's rendered once per load so the web view doesn't reload, and lose its scroll position, on every view update.
+    /// It's rendered once per load, and again when `refreshConversationTimes()` finds its relative times out of date,
+    /// so the web view doesn't reload on every view update.
     private(set) var conversationHTML = ""
 
     // Commenting on the conversation
@@ -128,6 +129,22 @@ final class ReviewModel {
     private var filesByPath: [String: FileDiff] = [:]
     /// All review threads, current and outdated, grouped by file path.
     private var threadsByPath: [String: [ReviewThread]] = [:]
+
+    // Whole-file view
+    /// Whether files show in full unless toggled one by one; starts from the config's `[diff] view`.
+    private(set) var showsFullFiles: Bool
+    /// Files toggled away from `showsFullFiles`, by path: true to show in full, false for just the hunks.
+    private var fullFileOverrides: [String: Bool] = [:]
+    /// Whole-file versions of the changed files, by path, built for the current diff.
+    private var fullFiles: [String: FileDiff] = [:]
+    /// File contents fetched from GitHub, keyed by `"commit:path"`, kept across refreshes.
+    private var headTexts: [String: String] = [:]
+    /// Paths whose contents are being fetched.
+    private(set) var loadingFullFiles: Set<String> = []
+    /// Why a file couldn't be shown in full, by path.
+    private(set) var fullFileErrors: [String: String] = [:]
+    /// A short note about the last key that couldn't do anything, shown under the diff until the cursor moves.
+    private(set) var diffNotice: String?
 
     /// The path of the file shown in the Files tab.
     var selectedPath: String?
@@ -181,10 +198,11 @@ final class ReviewModel {
     /// - Parameter pr: The pull request to review.
     init(pr: PullRequest) {
         self.pr = pr
+        showsFullFiles = ConfigStore.shared.settings.diffView == .full
     }
 
-    /// The diff of the selected file, once loaded.
-    var selectedFile: FileDiff? { selectedPath.flatMap { filesByPath[$0] } }
+    /// The selected file as the Files tab shows it: its hunks, or the whole file.
+    var selectedFile: FileDiff? { selectedPath.flatMap(displayedFile(at:)) }
     /// All review threads on the selected file, including outdated ones.
     var selectedThreads: [ReviewThread] { selectedPath.flatMap { threadsByPath[$0] } ?? [] }
 
@@ -193,6 +211,16 @@ final class ReviewModel {
     /// - Parameter path: The file's path in the PR's head.
     /// - Returns: The file's diff, or nil if the path isn't one of the PR's changed files.
     func file(at path: String) -> FileDiff? { filesByPath[path] }
+
+    /// Returns a changed file as the Files tab shows it.
+    ///
+    /// - Parameter path: The file's path in the PR's head.
+    /// - Returns: The whole file if it's set to show in full and has loaded, otherwise its hunks; nil if the path isn't
+    ///   one of the PR's changed files.
+    private func displayedFile(at path: String) -> FileDiff? {
+        if wantsFullFile(path), let full = fullFiles[path] { return full }
+        return filesByPath[path]
+    }
     /// Returns the number of review comments on a file, counting every comment in every thread.
     ///
     /// - Parameter path: The file's path in the PR's head.
@@ -226,8 +254,8 @@ final class ReviewModel {
         if let selectionAnchor, let cursorLineID, let file = selectedFile {
             return file.selectionRange(anchor: selectionAnchor, cursor: cursorLineID)
         }
-        if case let .newThread(target) = inlineDraft?.target, target.path == selectedPath {
-            return target.lineIDs
+        if case let .newThread(target) = inlineDraft?.target, target.path == selectedPath, let file = selectedFile {
+            return file.lineIDs(for: target)
         }
         return nil
     }
@@ -262,26 +290,30 @@ final class ReviewModel {
 
     /// Loads the changed files' diffs, the review threads and the review context.
     ///
-    /// Selects the first file if the selected one is gone, and resets the cursor if its line is gone.
+    /// Selects the first file if the selected one is gone. Otherwise the cursor stays on the same line, or the nearest
+    /// one if the diff changed under it.
     private func loadFiles() async {
         if filesByPath.isEmpty { filesState = .loading }
         do {
-            let cli = try GitHubCLI()
+            let cli = GitHubCLI()
             async let diffs = cli.fileDiffs(for: pr)
             async let threads = cli.reviewThreads(for: pr)
             async let context = cli.reviewContext(for: pr)
             let (files, allThreads, reviewContext) = try await (diffs, threads, context)
 
-            filesByPath = Dictionary(files.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
-            tree = FileTree.build(paths: files.map(\.path))
-            filePaths = FileTree.filePaths(in: tree)
-            threadsByPath = Dictionary(grouping: allThreads, by: \.path)
-            self.reviewContext = reviewContext
+            preservingCursor {
+                filesByPath = Dictionary(files.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
+                tree = FileTree.build(paths: files.map(\.path))
+                filePaths = FileTree.filePaths(in: tree)
+                threadsByPath = Dictionary(grouping: allThreads, by: \.path)
+                self.reviewContext = reviewContext
+                // The diff may have changed, so rebuild the whole-file views; contents already fetched are reused.
+                fullFiles = [:]
+                fullFileErrors = [:]
+                prepareFullFile()
+            }
             if selectedPath.map({ filesByPath[$0] == nil }) ?? true {
-                selectedPath = filePaths.first
-                resetCursor()
-            } else if let cursorLineID, !(selectedFile?.commentableLines.contains { $0.id == cursorLineID } ?? false) {
-                resetCursor()  // the diff changed under the cursor
+                showFile(filePaths.first)
             }
             filesState = .loaded
         } catch {
@@ -293,7 +325,7 @@ final class ReviewModel {
     ///
     /// Failures are ignored and keep the current values.
     private func reloadThreads() async {
-        guard let cli = try? GitHubCLI() else { return }
+        let cli = GitHubCLI()
         async let threads = cli.reviewThreads(for: pr)
         async let context = cli.reviewContext(for: pr)
         if let threads = try? await threads {
@@ -332,6 +364,9 @@ final class ReviewModel {
         case .cursorUp: return inFiles { moveCursor(by: -1) }
         case .nextHunk: return inFiles { moveToHunk(offset: 1) }
         case .previousHunk: return inFiles { moveToHunk(offset: -1) }
+        case .toggleFullFile: return inFiles { toggleFullFile() }
+        case .expandAllFiles: return inFiles { setAllFilesFull(true) }
+        case .collapseAllFiles: return inFiles { setAllFilesFull(false) }
         case .selectLines: return inFiles { toggleSelection() }
         case .cancel: return cancel()
         case .comment:
@@ -386,6 +421,15 @@ final class ReviewModel {
         conversationScrollToEnd = UUID()
     }
 
+    /// Re-renders the conversation if its relative times ("5 minutes ago") have changed since it was rendered.
+    ///
+    /// The Overview calls this every minute while it's showing.
+    func refreshConversationTimes() {
+        guard let overview else { return }
+        let html = ConversationHTML.render(overview)
+        if html != conversationHTML { conversationHTML = html }
+    }
+
     /// Appends a Markdown quote of a conversation item to `commentDraft`, then focuses the comment box.
     ///
     /// Does nothing if the item isn't found or has no text.
@@ -404,12 +448,18 @@ final class ReviewModel {
 
     /// Opens a draft comment on the cursor line or the `V` selection, and ends the selection.
     ///
+    /// On a line filled in from the whole file, which GitHub won't take comments on, it explains that in `diffNotice`
+    /// instead.
+    ///
     /// - Returns: False if there's no cursor line to comment on.
     @discardableResult
     func startComment() -> Bool {
-        guard let file = selectedFile, let cursorLineID,
-            let target = file.commentTarget(anchor: selectionAnchor, cursor: cursorLineID)
-        else { return false }
+        guard let file = selectedFile, let cursorLineID else { return false }
+        guard let target = file.commentTarget(anchor: selectionAnchor, cursor: cursorLineID) else {
+            guard file.line(withID: cursorLineID)?.isExpansion == true else { return false }
+            diffNotice = "GitHub only takes comments on lines in the diff, not the rest of the file."
+            return true
+        }
         openDraft(.newThread(target))
         selectionAnchor = nil
         return true
@@ -472,7 +522,7 @@ final class ReviewModel {
         inlineDraft = draft
 
         do {
-            let cli = try GitHubCLI()
+            let cli = GitHubCLI()
             switch draft.target {
             case let .newThread(target):
                 let reviewID = try await pendingReviewID(cli)
@@ -553,7 +603,7 @@ final class ReviewModel {
         reviewError = nil
         defer { isSubmittingReview = false }
         do {
-            let cli = try GitHubCLI()
+            let cli = GitHubCLI()
             let context = try await currentReviewContext(cli)
             try await cli.submitReview(
                 on: pr, context: context, event: reviewEvent,
@@ -620,22 +670,24 @@ final class ReviewModel {
     private func placeCursor(_ lineID: Int, placement: ScrollRequest.Placement) {
         guard let path = selectedPath else { return }
         cursorLineID = lineID
+        diffNotice = nil
         holdCursorUntil = .now + 0.5
         scrollRequest = ScrollRequest(path: path, lineID: lineID, placement: placement)
     }
 
-    /// Puts the cursor on the selected file's first commentable line and ends any selection.
+    /// Puts the cursor on the selected file's first line and ends any selection.
     private func resetCursor() {
-        cursorLineID = selectedFile?.commentableLines.first?.id
+        cursorLineID = selectedFile?.cursorLines.first?.id
         selectionAnchor = nil
+        diffNotice = nil
     }
 
-    /// Moves the cursor by some number of commentable lines, stopping at the first and last.
+    /// Moves the cursor by some number of lines, stopping at the first and last.
     ///
     /// - Parameter offset: How many lines to move; negative moves up.
-    /// - Returns: False if the file has no commentable lines.
+    /// - Returns: False if the file has no lines.
     private func moveCursor(by offset: Int) -> Bool {
-        guard let lines = selectedFile?.commentableLines, !lines.isEmpty else { return false }
+        guard let lines = selectedFile?.cursorLines, !lines.isEmpty else { return false }
         let current = cursorLineID.flatMap { id in lines.firstIndex { $0.id == id } }
         let next = current.map { min(max($0 + offset, 0), lines.count - 1) } ?? 0
         placeCursor(lines[next].id, placement: .nearest)
@@ -694,8 +746,8 @@ final class ReviewModel {
     /// - Parameter visibleIDs: The IDs of the diff lines now on screen.
     func diffVisibilityChanged(_ visibleIDs: [Int]) {
         guard Date.now > holdCursorUntil, let file = selectedFile, let cursorLineID else { return }
-        let commentable = Set(file.commentableLines.map(\.id))
-        let visible = visibleIDs.filter(commentable.contains).sorted()
+        let stops = Set(file.cursorLines.map(\.id))
+        let visible = visibleIDs.filter(stops.contains).sorted()
         guard let first = visible.first, let last = visible.last, !visible.contains(cursorLineID) else { return }
         self.cursorLineID = cursorLineID < first ? first : last
     }
@@ -710,7 +762,7 @@ final class ReviewModel {
     /// - Parameter motion: How far to scroll.
     /// - Returns: False outside the Files tab, so the key falls through (for example, space pages the Overview).
     private func scrollDiff(_ motion: DiffScroll.Motion) -> Bool {
-        guard canScrollDiff, let lines = selectedFile?.commentableLines else { return false }
+        guard canScrollDiff, let lines = selectedFile?.cursorLines else { return false }
         switch motion {
         case .top: if let first = lines.first { placeCursor(first.id, placement: .nearest) }
         case .bottom: if let last = lines.last { placeCursor(last.id, placement: .nearest) }
@@ -730,11 +782,22 @@ final class ReviewModel {
     func select(path: String) {
         tab = .files
         if selectedPath != path {
-            selectedPath = path
+            showFile(path)
             focusedThreadID = nil
-            resetCursor()
         }
         collapsedDirectories = collapsedDirectories.filter { !path.hasPrefix($0 + "/") }
+    }
+
+    /// Makes a file the selected one, with the cursor on its first line.
+    ///
+    /// - Parameter path: The file's path, or nil for no selection.
+    private func showFile(_ path: String?) {
+        selectedPath = path
+        // The old cursor's ID means nothing in the new file, so drop it before building the file's view.
+        cursorLineID = nil
+        selectionAnchor = nil
+        prepareFullFile()
+        resetCursor()
     }
 
     /// Selects a file before or after the selected one, in file-tree order, stopping at the first and last.
@@ -792,10 +855,133 @@ final class ReviewModel {
     ///
     /// - Parameter thread: The thread to show.
     func reveal(_ thread: ReviewThread) {
-        guard let file = filesByPath[thread.path], let line = thread.line,
+        guard let file = displayedFile(at: thread.path), let line = thread.line,
             let id = file.lineID(side: thread.side, line: line)
         else { return }
         selectionAnchor = nil
         placeCursor(id, placement: .center)
+    }
+
+    // MARK: Whole-file view
+
+    /// Returns whether a file is set to show in full: its own toggle, or else `showsFullFiles`.
+    ///
+    /// - Parameter path: The file's path in the PR's head.
+    /// - Returns: True to show the whole file, false for just the hunks.
+    func wantsFullFile(_ path: String) -> Bool {
+        fullFileOverrides[path] ?? showsFullFiles
+    }
+
+    /// A status line for the selected file's whole-file view: loading, or why it couldn't be shown.
+    var fullFileStatus: String? {
+        guard let path = selectedPath, wantsFullFile(path), fullFiles[path] == nil else { return nil }
+        if loadingFullFiles.contains(path) { return "Loading the full file…" }
+        return fullFileErrors[path]
+    }
+
+    /// Switches the selected file between its hunks and the whole file, keeping the cursor on the same line.
+    ///
+    /// - Returns: False if no file is selected.
+    private func toggleFullFile() -> Bool {
+        guard let path = selectedPath else { return false }
+        let full = !wantsFullFile(path)
+        preservingCursor {
+            fullFileOverrides[path] = full == showsFullFiles ? nil : full
+            prepareFullFile()
+        }
+        return true
+    }
+
+    /// Shows every file in full, or every file as hunks, clearing the per-file toggles.
+    ///
+    /// - Parameter full: Whether files should show in full.
+    /// - Returns: Always true; the command applies whenever the Files tab is showing.
+    private func setAllFilesFull(_ full: Bool) -> Bool {
+        preservingCursor {
+            showsFullFiles = full
+            fullFileOverrides = [:]
+            prepareFullFile()
+        }
+        return true
+    }
+
+    /// Builds the selected file's whole-file view if it's set to show in full, fetching its contents if needed.
+    ///
+    /// Added and deleted files are already whole in the diff, so they need no fetch. Fetched contents are kept per
+    /// commit, so refreshing an unchanged PR doesn't fetch them again. Failures land in `fullFileErrors`, and the file
+    /// keeps showing its hunks.
+    ///
+    /// A view built right away replaces the displayed file without moving the cursor, so callers wrap this in
+    /// `preservingCursor(_:)` or reset the cursor. A view built after a fetch keeps the cursor on its line itself.
+    private func prepareFullFile() {
+        guard let path = selectedPath, wantsFullFile(path), fullFiles[path] == nil, let file = filesByPath[path],
+            !file.isBinary, !loadingFullFiles.contains(path)
+        else { return }
+        guard file.needsContentsForFullFile else {
+            fullFiles[path] = file.fullFile(headText: "")
+            return
+        }
+        guard let commit = reviewContext?.headCommitID else { return }
+        let key = "\(commit):\(path)"
+        if let text = headTexts[key] {
+            buildFullFile(file, headText: text)
+            return
+        }
+        loadingFullFiles.insert(path)
+        fullFileErrors[path] = nil
+        Task {
+            defer { loadingFullFiles.remove(path) }
+            do {
+                let text = try await GitHubCLI().fileContents(of: pr, path: path, commitID: commit)
+                headTexts[key] = text
+                // A refresh may have replaced the diff while this loaded; build against the current one.
+                if let current = filesByPath[path], reviewContext?.headCommitID == commit {
+                    preservingCursor { buildFullFile(current, headText: text) }
+                }
+            } catch {
+                fullFileErrors[path] = "Couldn't load the full file: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Stores a file's whole-file view built from its contents, or records why it couldn't be built.
+    ///
+    /// Like `prepareFullFile()`, it leaves the cursor alone.
+    ///
+    /// - Parameters:
+    ///   - file: The file's diff.
+    ///   - headText: The file's contents at the PR's head commit.
+    private func buildFullFile(_ file: FileDiff, headText: String) {
+        guard let full = file.fullFile(headText: headText) else {
+            fullFileErrors[file.path] = "The file on GitHub doesn't match this diff. Refresh to load the latest changes."
+            return
+        }
+        fullFiles[file.path] = full
+    }
+
+    /// Makes a change to how the selected file is shown, then puts the cursor and selection back on the same lines.
+    ///
+    /// Hunks and whole-file views number lines differently, so lines are matched by their line numbers. When the cursor
+    /// was on a line the new view doesn't have, it moves to the nearest line after it.
+    ///
+    /// - Parameter change: The change, which may replace the selected file's displayed diff.
+    private func preservingCursor(_ change: () -> Void) {
+        let before = selectedFile
+        let cursorLine = cursorLineID.flatMap { before?.line(withID: $0) }
+        let anchorLine = selectionAnchor.flatMap { before?.line(withID: $0) }
+        change()
+        guard let after = selectedFile, after != before else { return }
+        selectionAnchor = anchorLine.flatMap(after.lineID(matching:))
+        guard let cursorLine else {
+            resetCursor()
+            return
+        }
+        let lines = after.cursorLines
+        let position = { (line: DiffLine) in line.newLine ?? line.oldLine ?? 0 }
+        let id =
+            after.lineID(matching: cursorLine)
+            ?? lines.first { position($0) >= position(cursorLine) }?.id
+            ?? lines.last?.id
+        if let id { placeCursor(id, placement: .center) }
     }
 }

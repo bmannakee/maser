@@ -31,6 +31,7 @@ struct HTMLView: NSViewRepresentable {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
         context.coordinator.lastScrollToEnd = scrollToEnd
         return view
     }
@@ -49,7 +50,7 @@ struct HTMLView: NSViewRepresentable {
 
     /// Tracks what the web view has loaded and carries scroll requests across reloads.
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         /// The HTML most recently sent to the web view, or `nil` before the first load.
         var loadedHTML: String?
         /// The `scrollToEnd` value already acted on, so each new value scrolls once.
@@ -120,6 +121,22 @@ struct HTMLView: NSViewRepresentable {
                 return
             }
             decisionHandler(.cancel)
+            open(url)
+        }
+
+        // Links with `target="_blank"` ask for a new web view instead of navigating; open them the same way.
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            if let url = navigationAction.request.url { open(url) }
+            return nil
+        }
+
+        /// Handles a clicked link: a `maser-quote:` link goes to `onQuote`, anything else to the default browser.
+        private func open(_ url: URL) {
             if url.scheme == ConversationHTML.quoteScheme {
                 // The ID is everything after `maser-quote:`, which WebKit may have percent-encoded.
                 let id = url.absoluteString.dropFirst(ConversationHTML.quoteScheme.count + 1)

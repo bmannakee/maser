@@ -45,6 +45,11 @@ struct MaserCommands: Commands {
             review(.toggleComments, title: model?.showComments == true ? "Hide Comments" : "Show Comments")
                 .disabled(model?.tab != .files)
             Divider()
+            review(.toggleFullFile, title: showsFullFile ? "Show Only This File's Changes" : "Show Full File")
+                .disabled(model?.canScrollDiff != true)
+            review(.expandAllFiles).disabled(model?.canScrollDiff != true)
+            review(.collapseAllFiles).disabled(model?.canScrollDiff != true)
+            Divider()
         }
 
         CommandMenu("Review") {
@@ -74,6 +79,12 @@ struct MaserCommands: Commands {
         CommandGroup(after: .help) {
             global(.showKeybindings)
         }
+    }
+
+    /// Whether the focused window's selected file is set to show in full.
+    private var showsFullFile: Bool {
+        guard let model, let path = model.selectedPath else { return false }
+        return model.wantsFullFile(path)
     }
 
     /// A menu item for an app-wide command, always enabled.

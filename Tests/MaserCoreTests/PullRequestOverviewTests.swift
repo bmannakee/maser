@@ -109,6 +109,48 @@ import Testing
         #expect(pr.reviewDecision == nil)
     }
 
+    /// Leaves lists that fit in one page complete, and marks the ones whose `totalCount` says there are more.
+    @Test func marksTruncatedLists() throws {
+        #expect(try decoded().incompleteLists.isEmpty)
+        let json = Self.response
+            .replacingOccurrences(of: #""comments":{"nodes""#, with: #""comments":{"totalCount":150,"nodes""#)
+            .replacingOccurrences(of: #""contexts":{"nodes""#, with: #""contexts":{"totalCount":5,"nodes""#)
+        let pr = try PullRequestOverview.decode(from: Data(json.utf8))
+        #expect(pr.incompleteLists == [.comments])
+    }
+
+    /// Replaces a truncated list with every item from its paged query, and marks it complete.
+    @Test func replacesListsWithAllPages() throws {
+        var pr = try decoded()
+        pr.incompleteLists = [.comments, .checks]
+        let comments = """
+            {"id":"IC_0","author":{"login":"zed"},"body":"first","bodyHTML":"<p>first</p>","createdAt":"2026-10-20T11:00:00Z","url":"https://github.com/o/r/pull/7#issuecomment-0"}
+            {"id":"IC_1","author":{"login":"bob"},"body":"LGTM?","bodyHTML":"<p>LGTM?</p>","createdAt":"2026-10-21T10:00:00Z","url":"https://github.com/o/r/pull/7#issuecomment-1"}
+
+            """
+        try pr.replace(.comments, withLines: Data(comments.utf8))
+        #expect(pr.comments.map(\.id) == ["IC_0", "IC_1"])
+        #expect(pr.incompleteLists == [.checks])
+
+        let checks = """
+            {"__typename":"CheckRun","name":"zz","status":"COMPLETED","conclusion":"SUCCESS","detailsUrl":null,"checkSuite":null}
+            {"__typename":"StatusContext","context":"aa","state":"FAILURE","targetUrl":null,"description":null}
+            """
+        try pr.replace(.checks, withLines: Data(checks.utf8))
+        #expect(pr.checks.map(\.name) == ["aa", "zz"])
+        #expect(pr.incompleteLists.isEmpty)
+    }
+
+    /// Each paged query takes `$endCursor` and selects `pageInfo`, as `gh api graphql --paginate` needs.
+    @Test func pagedQueriesPaginate() {
+        for list in PullRequestOverview.PagedList.allCases {
+            let (query, jq) = PullRequestOverview.pagedQuery(for: list)
+            #expect(query.contains("$endCursor: String") && query.contains("after: $endCursor"))
+            #expect(query.contains("pageInfo { hasNextPage endCursor }"))
+            #expect(jq.hasSuffix(".nodes[]"))
+        }
+    }
+
     @Test func missingPullRequestThrows() {
         #expect(throws: (any Error).self) {
             try PullRequestOverview.decode(from: Data(#"{"data":{"repository":{"pullRequest":null}}}"#.utf8))

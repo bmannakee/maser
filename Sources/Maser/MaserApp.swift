@@ -1,7 +1,8 @@
 // The app's entry point and its windows.
 //
 // `MaserApp` declares the scenes: the review queue, one window per pull request, and the Open Pull Request and
-// Keyboard Shortcuts windows. At launch it starts the config watcher and the vim-style key router that all windows share.
+// Keyboard Shortcuts windows. At launch it starts the config watcher and the vim-style key router that all windows share,
+// and brings the app to the front once launching has finished.
 
 import AppKit
 import MaserCore
@@ -10,11 +11,12 @@ import SwiftUI
 /// The Maser app: a queue of pull requests awaiting review, and a review window for each one opened.
 @main
 struct MaserApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     /// Makes the process a regular foreground app, then starts loading the config and routing vim-style keys.
     init() {
         // When launched via `swift run` there is no app bundle; make it a regular foreground app.
         NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate()
 
         ConfigStore.shared.start()
         KeyRouter.shared.start()
@@ -48,5 +50,13 @@ struct MaserApp: App {
             KeybindingsView()
         }
         .defaultSize(width: 640, height: 480)
+    }
+}
+
+/// Handles app lifecycle events that SwiftUI's `App` doesn't expose.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    // Asking to activate before launch finishes can be ignored, which left the app open but in the background.
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApplication.shared.activate()
     }
 }

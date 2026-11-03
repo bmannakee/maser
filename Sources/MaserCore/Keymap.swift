@@ -72,6 +72,7 @@ public struct Keymap: Sendable, Equatable {
             .showOverview: KeyChord("1", modifiers: .command),
             .showFiles: KeyChord("2", modifiers: .command),
             .toggleComments: KeyChord("0", modifiers: [.command, .option]),
+            .toggleFullFile: KeyChord("e", modifiers: [.command, .option]),
             .nextFile: KeyChord(.down, modifiers: [.command, .option]),
             .previousFile: KeyChord(.up, modifiers: [.command, .option]),
             .nextThread: KeyChord(.down, modifiers: [.command, .control]),
@@ -88,6 +89,9 @@ public struct Keymap: Sendable, Equatable {
             .previousFile: [[KeyChord("[")]],
             .nextHunk: [[KeyChord("}")]],
             .previousHunk: [[KeyChord("{")]],
+            .toggleFullFile: [[KeyChord("z"), KeyChord("a")]],
+            .expandAllFiles: [[KeyChord("z"), KeyChord("R")]],
+            .collapseAllFiles: [[KeyChord("z"), KeyChord("M")]],
             .selectLines: [[KeyChord("V")]],
             .cancel: [[KeyChord(.escape)]],
             .reply: [[KeyChord("R")]],
@@ -258,7 +262,7 @@ extension Keymap {
     ///
     /// - Parameter error: The error from `TOMLDecoder`.
     /// - Returns: A message such as `keys.refresh: expected a string`.
-    private static func describe(_ error: DecodingError) -> String {
+    static func describe(_ error: DecodingError) -> String {
         let (context, message): (DecodingError.Context?, String) =
             switch error {
             case let .typeMismatch(type, context): (context, "expected \(type == String.self ? "a string" : "\(type)")")
@@ -328,7 +332,7 @@ extension Keymap {
 // MARK: - Template
 
 extension Keymap {
-    /// A commented-out config listing every command with its default bindings.
+    /// A commented-out config listing every command with its default bindings, then the other settings.
     ///
     /// Written as the initial `config.toml`. Commands without a default are listed as `"none"`.
     public static var template: String {
@@ -375,6 +379,7 @@ extension Keymap {
             [keys.normal]
             \(normalRows.joined(separator: "\n"))
 
+            \(Settings.template)
             """
     }
 }

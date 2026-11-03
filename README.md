@@ -16,6 +16,15 @@ swift run Maser                                   # review queue
 swift run Maser https://github.com/owner/repo/pull/123   # open a PR directly
 ```
 
+To use it as a regular app (Dock icon, Spotlight, Login Items), build `Maser.app`:
+
+```sh
+scripts/bundle                    # builds .build/Maser.app, signed for this Mac
+cp -R .build/Maser.app /Applications/
+```
+
+The bundle is signed ad hoc, with no developer account. Built on the Mac that runs it, it isn't quarantined, so Gatekeeper doesn't ask about it. To run it on another Mac, build it there, or sign it with a Developer ID and notarize it.
+
 The queue lists open PRs requesting your review; double-click one (or ⌘O to paste any PR URL) to open a review window. Each window has tabs:
 
 - **Overview** — title, description, comments and reviews (rendered by GitHub), plus mergeability, review status, CI checks and labels.
@@ -25,6 +34,9 @@ The queue lists open PRs requesting your review; double-click one (or ⌘O to pa
   `R` replies to the selected thread. Line comments collect in a pending review, visible only to you, until you
   **Finish Review** (`S`, toolbar) as Comment, Approve or Request changes. Replies join the pending review if you have one;
   otherwise they post immediately (GitHub's rule).
+  `z a` shows the whole file instead of just the changed hunks (`z R` for every file, `z M` to go back); hunk
+  navigation still jumps between the changes. GitHub only takes comments on lines in the diff, so the extra lines are
+  for reading.
 
 ## Keyboard
 
@@ -46,6 +58,8 @@ Every action is a command you can trigger two ways:
 | Next / previous line (Files) | | `j` / `k` |
 | Select lines / cancel selection | | `V` / `esc` |
 | Next / previous hunk | | `}` / `{` |
+| Show full file / only changes (this file) | ⌥⌘E | `z a` |
+| Show all files in full / only changes | | `z R` / `z M` |
 | Next / previous file | ⌥⌘↓ / ⌥⌘↑ | `]` / `[` |
 | Next / previous comment thread | ⌃⌘↓ / ⌃⌘↑ | `n` / `N` |
 | Scroll diff down / up a page | | `ctrl+f` or `space` / `ctrl+b` or `shift+space` |
@@ -70,7 +84,15 @@ refresh = "none"                # remove a shortcut
 next-file = ["j", "down"]       # several bindings
 show-overview = "g g"           # sequences: space-separated keystrokes
 previous-thread = "ctrl+p"
+
+[diff]
+view = "full"                   # open files in full; the default is "hunks"
+
+[github]
+gh = "~/.local/bin/gh"          # only if Maser can't find gh
 ```
+
+Maser looks for `gh` in Homebrew, MacPorts, Nix, `~/.local/bin` and mise or asdf shims, then asks your login shell. Set `[github] gh` if it's somewhere else.
 
 Keys are characters (`j`, `J` for shift+j, `?`), named keys (`up`, `down`, `left`, `right`, `enter`, `tab`, `space`, `esc`, `backspace`, `delete`, `pageup`, `pagedown`, `home`, `end`), optionally with `ctrl+`, `opt+`, `shift+`, `cmd+` (menu shortcuts only). Binding keys to a command takes them away from whatever had them by default. Esc cancels a half-typed sequence.
 

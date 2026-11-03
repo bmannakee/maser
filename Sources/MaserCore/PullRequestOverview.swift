@@ -75,12 +75,14 @@ public struct PullRequestOverview: Hashable, Sendable {
     public let labels: [IssueLabel]
     /// Users (by login) and teams (by name) whose review is still requested.
     public let requestedReviewers: [String]
-    /// The latest 100 conversation comments, oldest first.
-    public let comments: [IssueComment]
-    /// The latest 100 submitted reviews; the viewer's pending draft review is left out.
-    public let reviews: [Review]
+    /// The conversation comments, oldest first.
+    public internal(set) var comments: [IssueComment]
+    /// The submitted reviews; the viewer's pending draft review is left out.
+    public internal(set) var reviews: [Review]
     /// Checks on the head commit, most urgent first.
-    public let checks: [Check]
+    public internal(set) var checks: [Check]
+    /// The lists the overview query cut short, which `GitHubCLI.overview(for:)` then fetches in full.
+    var incompleteLists: Set<PagedList> = []
     /// The combined state of all checks on the head commit, or `nil` if it has none.
     public let checksRollup: CheckState?
 
@@ -249,10 +251,27 @@ public struct Check: Identifiable, Hashable, Sendable {
 // MARK: - GraphQL
 
 extension PullRequestOverview {
+    /// A list the overview query fetches only one page of.
+    enum PagedList: CaseIterable {
+        case comments, reviews, checks
+    }
+
+    /// The fields fetched for each conversation comment.
+    private static let commentFields = "id author { login } body bodyHTML createdAt url"
+    /// The fields fetched for each review.
+    private static let reviewFields = "id author { login } state body bodyHTML submittedAt url"
+    /// The fields fetched for each check run or commit status.
+    private static let contextFields = """
+        __typename
+        ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { workflow { name } } } }
+        ... on StatusContext { context state targetUrl description }
+        """
+
     /// The GraphQL query for everything the Overview tab shows.
     ///
-    /// Takes `$owner`, `$name` and `$number`. Lists are capped (the latest 100 comments and reviews, the first 100
-    /// checks, 50 labels and review requests) and not paginated.
+    /// Takes `$owner`, `$name` and `$number`. Comments, reviews and checks come with their `totalCount`; when there are
+    /// more than one page holds, the list is marked in `incompleteLists` and `pagedQuery(for:)` fetches all of it.
+    /// Labels and review requests stop at 100.
     static let query = """
         query($owner: String!, $name: String!, $number: Int!) {
           repository(owner: $owner, name: $name) {
@@ -262,19 +281,72 @@ extension PullRequestOverview {
               baseRefName headRefName additions deletions changedFiles
               body bodyHTML
               mergeable mergeStateStatus reviewDecision
-              labels(first: 50) { nodes { name color } }
-              reviewRequests(first: 50) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } }
-              comments(last: 100) { nodes { id author { login } body bodyHTML createdAt url } }
-              reviews(last: 100) { nodes { id author { login } state body bodyHTML submittedAt url } }
-              commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
-                __typename
-                ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { workflow { name } } } }
-                ... on StatusContext { context state targetUrl description }
+              labels(first: 100) { nodes { name color } }
+              reviewRequests(first: 100) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } }
+              comments(last: 100) { totalCount nodes { \(commentFields) } }
+              reviews(last: 100) { totalCount nodes { \(reviewFields) } }
+              commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { totalCount nodes {
+                \(contextFields)
               } } } } } }
             }
           }
         }
         """
+
+    /// The query that fetches every item in a list, paginated by `gh api graphql --paginate` through `$endCursor`, and
+    /// the `--jq` filter that prints one item per line.
+    ///
+    /// Takes the same variables as `query`.
+    ///
+    /// - Parameter list: The list to fetch.
+    /// - Returns: The query and its filter.
+    static func pagedQuery(for list: PagedList) -> (query: String, jq: String) {
+        let connection: String
+        let jq: String
+        switch list {
+        case .comments:
+            connection =
+                "comments(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { \(commentFields) } }"
+            jq = ".data.repository.pullRequest.comments.nodes[]"
+        case .reviews:
+            connection = "reviews(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { \(reviewFields) } }"
+            jq = ".data.repository.pullRequest.reviews.nodes[]"
+        case .checks:
+            connection = """
+                commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100, after: $endCursor) {
+                  pageInfo { hasNextPage endCursor } nodes { \(contextFields) }
+                } } } } }
+                """
+            jq = ".data.repository.pullRequest.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]"
+        }
+        let query = """
+            query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
+              repository(owner: $owner, name: $name) { pullRequest(number: $number) { \(connection) } }
+            }
+            """
+        return (query, jq)
+    }
+
+    /// Replaces one list with every item fetched by `pagedQuery(for:)`.
+    ///
+    /// - Parameters:
+    ///   - list: The list the data is for.
+    ///   - data: Newline-separated JSON items, as the paged query's filter prints them.
+    /// - Throws: A `DecodingError` if an item doesn't have the expected shape.
+    mutating func replace(_ list: PagedList, withLines data: Data) throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        /// Decodes each line of `data` as one `T`.
+        func items<T: Decodable>(_: T.Type) throws -> [T] {
+            try data.split(separator: UInt8(ascii: "\n")).map { try decoder.decode(T.self, from: Data($0)) }
+        }
+        switch list {
+        case .comments: comments = try items(RawComment.self).map(Self.comment)
+        case .reviews: reviews = try items(RawReview.self).compactMap(Self.review)
+        case .checks: checks = Self.checks(from: try items(RawContext.self))
+        }
+        incompleteLists.remove(list)
+    }
 
     /// Thrown when the response has no such repository or pull request.
     struct NotFound: Error, LocalizedError {
@@ -321,22 +393,38 @@ extension PullRequestOverview {
         reviewDecision = raw.reviewDecision.flatMap(ReviewDecision.init(rawValue:))
         labels = raw.labels.values.map { IssueLabel(name: $0.name, color: $0.color) }
         requestedReviewers = raw.reviewRequests.values.compactMap { $0.requestedReviewer?.login ?? $0.requestedReviewer?.name }
-        comments = raw.comments.values.map {
-            IssueComment(
-                id: $0.id, author: $0.author?.login ?? "ghost", body: $0.body ?? "", bodyHTML: $0.bodyHTML,
-                createdAt: $0.createdAt, url: $0.url)
-        }
-        reviews = raw.reviews.values.compactMap { review in
-            // Pending reviews (the viewer's unsubmitted draft) have no submittedAt.
-            guard let submittedAt = review.submittedAt, let state = Review.State(rawValue: review.state) else { return nil }
-            return Review(
-                id: review.id, author: review.author?.login ?? "ghost", state: state,
-                body: review.body ?? "", bodyHTML: review.bodyHTML, submittedAt: submittedAt, url: review.url)
-        }
+        comments = raw.comments.values.map(Self.comment)
+        reviews = raw.reviews.values.compactMap(Self.review)
 
         let rollup = raw.commits.values.first?.commit.statusCheckRollup
         checksRollup = rollup.map { CheckState(statusState: $0.state) }
-        checks = (rollup?.contexts.values ?? []).enumerated().map { index, context in
+        checks = Self.checks(from: rollup?.contexts.values ?? [])
+
+        if raw.comments.isTruncated { incompleteLists.insert(.comments) }
+        if raw.reviews.isTruncated { incompleteLists.insert(.reviews) }
+        if rollup?.contexts.isTruncated == true { incompleteLists.insert(.checks) }
+    }
+
+    /// Builds a conversation comment from its GraphQL node; a deleted account becomes `"ghost"`.
+    private static func comment(_ raw: RawComment) -> IssueComment {
+        IssueComment(
+            id: raw.id, author: raw.author?.login ?? "ghost", body: raw.body ?? "", bodyHTML: raw.bodyHTML,
+            createdAt: raw.createdAt, url: raw.url)
+    }
+
+    /// Builds a submitted review from its GraphQL node.
+    ///
+    /// - Returns: The review, or `nil` for the viewer's pending review (which has no `submittedAt`) or an unknown state.
+    private static func review(_ raw: RawReview) -> Review? {
+        guard let submittedAt = raw.submittedAt, let state = Review.State(rawValue: raw.state) else { return nil }
+        return Review(
+            id: raw.id, author: raw.author?.login ?? "ghost", state: state,
+            body: raw.body ?? "", bodyHTML: raw.bodyHTML, submittedAt: submittedAt, url: raw.url)
+    }
+
+    /// Builds the checks from the rollup's contexts, most urgent first, then by name.
+    private static func checks(from contexts: [RawContext]) -> [Check] {
+        contexts.enumerated().map { index, context in
             if context.typename == "StatusContext" {
                 Check(
                     id: index, name: context.context ?? "status", detail: context.description,
@@ -363,8 +451,12 @@ extension PullRequestOverview {
     /// GraphQL connection; nodes may be null.
     struct Nodes<Node: Decodable>: Decodable {
         let nodes: [Node?]
+        /// How many items the whole connection has, when the query asks for it.
+        var totalCount: Int?
         /// The non-null nodes.
         var values: [Node] { nodes.compactMap(\.self) }
+        /// Whether the connection has more items than this page holds.
+        var isTruncated: Bool { (totalCount ?? 0) > nodes.count }
     }
 
     /// A GitHub user or bot, identified by login.

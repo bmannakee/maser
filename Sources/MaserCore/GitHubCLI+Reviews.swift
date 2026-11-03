@@ -20,7 +20,15 @@ extension GitHubCLI {
         let data = try await graphQL(
             ReviewThread.query, host: pr.host, paginate: true, jq: ReviewThread.jqFilter,
             strings: try repoVariables(pr), ints: ["number": pr.number])
-        return try ReviewThread.decodeLines(from: data)
+        var threads = try ReviewThread.decodeLines(from: data)
+        // The query gets each thread's first page of comments; fetch the rest of any longer thread.
+        for index in threads.indices where threads[index].hasMoreComments {
+            let comments = try await graphQL(
+                ReviewThread.commentsQuery, host: pr.host, paginate: true, jq: ReviewThread.commentsJQFilter,
+                strings: ["thread": threads[index].id])
+            threads[index] = threads[index].replacingComments(try ReviewThread.decodeCommentLines(from: comments))
+        }
+        return threads
     }
 
     /// Fetches the PR's node ID and the viewer's pending review, if they have one.
@@ -59,7 +67,8 @@ extension GitHubCLI {
     ///   - reviewID: The pending review's node ID.
     ///   - target: The line or range to attach the thread to; a range sends `startLine` and `startSide` as well.
     ///   - body: The comment's Markdown source.
-    /// - Throws: `GitHubCLIError.failed` if `gh` fails, for example when the target isn't a line in the PR's diff.
+    /// - Throws: `GitHubCLIError.rejected` if GitHub doesn't create the thread, as when the target isn't a line in the
+    ///   PR's diff, or `GitHubCLIError.failed` if `gh` fails.
     @concurrent
     public func addReviewThread(on pr: PullRequest, reviewID: String, target: CommentTarget, body: String) async throws {
         var strings = ["review": reviewID, "path": target.path, "body": body, "side": target.side.rawValue]
@@ -68,7 +77,7 @@ extension GitHubCLI {
             ints["startLine"] = startLine
             strings["startSide"] = startSide.rawValue
         }
-        _ = try await graphQL(
+        let id = try await graphQL(
             """
             mutation($review: ID!, $path: String!, $body: String!, $line: Int!, $side: DiffSide!, $startLine: Int, $startSide: DiffSide) {
               addPullRequestReviewThread(input: {
@@ -76,7 +85,12 @@ extension GitHubCLI {
                 line: $line, side: $side, startLine: $startLine, startSide: $startSide
               }) { thread { id } }
             }
-            """, host: pr.host, strings: strings, ints: ints)
+            """, host: pr.host, jq: ".data.addPullRequestReviewThread.thread.id // \"\"", strings: strings, ints: ints)
+        // For a line outside the diff, GitHub answers with a null thread rather than an error.
+        guard !String(decoding: id, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw GitHubCLIError.rejected(
+                "GitHub didn't add the comment. Comments can only go on lines that are part of the diff.")
+        }
     }
 
     /// Replies to a review thread.

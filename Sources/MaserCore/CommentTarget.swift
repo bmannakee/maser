@@ -7,9 +7,16 @@
 import Foundation
 
 extension DiffLine {
-    /// The side of the diff a comment on this line attaches to; `nil` when the line can't be commented on.
+    /// Whether the line cursor can stop on this line: any real line of the file, not a "No newline" marker.
+    public var isCursorStop: Bool { kind != .noNewlineMarker }
+
+    /// The side of the diff a comment on this line attaches to.
+    ///
+    /// `nil` when the line can't be commented on: a "No newline" marker, or a line filled in from the whole file,
+    /// which GitHub silently refuses because it's outside the diff.
     public var commentSide: DiffSide? {
-        switch kind {
+        guard !isExpansion else { return nil }
+        return switch kind {
         case .deletion: .left
         case .addition, .context: .right
         case .noNewlineMarker: nil
@@ -21,7 +28,8 @@ extension DiffLine {
     /// Deletions use the old file's line number; additions and context lines use the new file's. `nil` when the line
     /// can't be commented on.
     public var commentLine: Int? {
-        switch kind {
+        guard !isExpansion else { return nil }
+        return switch kind {
         case .deletion: oldLine
         case .addition, .context: newLine
         case .noNewlineMarker: nil
@@ -41,8 +49,6 @@ public struct CommentTarget: Hashable, Sendable {
     public let startSide: DiffSide?
     /// The first line of a multi-line comment; `nil` for a single-line comment.
     public let startLine: Int?
-    /// The IDs of the diff lines the comment covers, for highlighting.
-    public let lineIDs: ClosedRange<Int>
 
     /// A short label for the target, such as "line 12", "old line 7", "lines 10–14" or "old line 2 to line 3".
     public var description: String {
@@ -73,6 +79,26 @@ extension FileDiff {
     /// The lines that can carry a comment, in display order.
     public var commentableLines: [DiffLine] {
         hunks.flatMap { $0.lines.filter { $0.commentSide != nil } }
+    }
+
+    /// The lines the cursor moves through, in display order: every line but "No newline" markers.
+    ///
+    /// The same as `commentableLines` unless the file is expanded, when it also includes the filled-in lines.
+    public var cursorLines: [DiffLine] {
+        hunks.flatMap { $0.lines.filter(\.isCursorStop) }
+    }
+
+    /// Returns the IDs of the lines a comment target covers, for highlighting.
+    ///
+    /// Looked up by line number, so it works on the hunks and the whole-file view alike.
+    ///
+    /// - Parameter target: A target on this file.
+    /// - Returns: The covered IDs, or `nil` if the target's lines aren't in this diff.
+    public func lineIDs(for target: CommentTarget) -> ClosedRange<Int>? {
+        guard let last = lineID(side: target.side, line: target.line),
+            let first = lineID(side: target.startSide ?? target.side, line: target.startLine ?? target.line)
+        else { return nil }
+        return min(first, last)...max(first, last)
     }
 
     /// Returns the hunk containing a line.
@@ -122,8 +148,7 @@ extension FileDiff {
             side: side,
             line: line,
             startSide: isRange ? startSide : nil,
-            startLine: isRange ? startLine : nil,
-            lineIDs: first.id...last.id
+            startLine: isRange ? startLine : nil
         )
     }
 }
