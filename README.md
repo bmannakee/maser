@@ -6,7 +6,7 @@ Maser talks to GitHub through the [`gh` CLI](https://cli.github.com), so it uses
 
 ## Requirements
 
-- macOS 27, Xcode 27 (Swift 6.4)
+- macOS 26 or later; Xcode 26 or its command-line tools (Swift 6.2 or later)
 - `gh`, logged in (`gh auth login`)
 
 ## Running
