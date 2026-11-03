@@ -96,13 +96,17 @@ enum ConversationHTML {
         }
     }
 
-    /// A `<time>` element showing a relative date ("2 days ago"), with the exact date and time as its tooltip.
+    /// A `<time>` element showing when something happened, with the exact date and time as its tooltip.
     ///
-    /// The relative text is fixed when the page is rendered.
+    /// Like github.com, it reads "5 minutes ago" for the last month and "on Mar 3, 2026" before that. The text is fixed
+    /// when the page is rendered, so `ReviewModel.refreshConversationTimes()` re-renders the page as it ages.
     private static func time(_ date: Date) -> String {
-        let relative = date.formatted(.relative(presentation: .named, unitsStyle: .wide))
         let absolute = date.formatted(date: .abbreviated, time: .shortened)
-        return #"<time title="\#(escape(absolute))">\#(escape(relative))</time>"#
+        let text =
+            Date.now.timeIntervalSince(date) < 30 * 24 * 3600
+            ? date.formatted(.relative(presentation: .named, unitsStyle: .wide))
+            : "on \(date.formatted(date: .abbreviated, time: .omitted))"
+        return #"<time title="\#(escape(absolute))">\#(escape(text))</time>"#
     }
 
     /// Escapes text for HTML content and double-quoted attribute values.

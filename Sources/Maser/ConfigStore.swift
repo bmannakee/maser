@@ -1,7 +1,7 @@
-// The user's config file and the key bindings loaded from it.
+// The user's config file and the key bindings and settings loaded from it.
 //
-// `ConfigStore` finds `config.toml`, parses it into a `Keymap`, and reloads it whenever the file changes, so edits take
-// effect without restarting. Problems in the file are collected for the banner that `configProblemsBanner()` shows.
+// `ConfigStore` finds `config.toml`, parses it into a `Keymap` and `Settings`, and reloads it whenever the file changes,
+// so edits take effect without restarting. Problems in the file are collected for the banner that `configProblemsBanner()` shows.
 // `FileWatcher` does the change detection.
 
 import AppKit
@@ -23,6 +23,10 @@ final class ConfigStore {
 
     /// The current bindings: the defaults, or the last config that parsed.
     private(set) var keymap = Keymap.defaults
+    /// The current settings: the defaults, or the last config that parsed.
+    private(set) var settings = Settings.defaults {
+        didSet { GitHubCLI.setConfiguredExecutable(settings.ghPath) }
+    }
     /// Human-readable problems from the last load, such as unknown commands or a read or parse error.
     private(set) var problems: [String] = []
     /// Whether the user closed the problems banner; reset whenever the list of problems changes.
@@ -63,6 +67,7 @@ final class ConfigStore {
             text = try String(contentsOf: fileURL, encoding: .utf8)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             keymap = .defaults
+            settings = .defaults
             setProblems([])
             configLog.notice("No config at \(self.displayPath, privacy: .public); using defaults")
             return
@@ -73,10 +78,13 @@ final class ConfigStore {
 
         do {
             let result = try Keymap.load(toml: text)
+            let settingsResult = try Settings.load(toml: text)
             keymap = result.keymap
-            setProblems(result.problems)
+            settings = settingsResult.settings
+            let problems = result.problems + settingsResult.problems
+            setProblems(problems)
             configLog.notice(
-                "Loaded \(self.displayPath, privacy: .public) with \(result.problems.count) problem(s): \(result.problems.joined(separator: " | "), privacy: .public)"
+                "Loaded \(self.displayPath, privacy: .public) with \(problems.count) problem(s): \(problems.joined(separator: " | "), privacy: .public)"
             )
         } catch {
             // Keep the last good bindings while the file is mid-edit.

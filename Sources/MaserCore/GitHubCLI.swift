@@ -5,15 +5,22 @@
 // `GitHubCLI+Reviews.swift`.
 
 import Foundation
+import Synchronization
 
 /// An error from running `gh` or from the input given to it.
 public enum GitHubCLIError: Error, LocalizedError {
-    /// `gh` isn't in any of the locations in `GitHubCLI.searchPaths`.
+    /// `gh` isn't in any of `GitHubCLI.searchPaths`, and the login shell couldn't find it either.
     case notInstalled
+    /// The `gh` path set in `config.toml` isn't an executable file.
+    case configuredPathNotExecutable(String)
     /// `gh` exited with a non-zero status; `stderr` holds its error output.
     case failed(status: Int32, stderr: String)
     /// The URL isn't a pull request URL of the form `https://host/owner/repo/pull/123`.
     case invalidPullRequestURL(String)
+    /// GitHub accepted a request but didn't do it, with an explanation for the user.
+    case rejected(String)
+    /// A file was too big to show in full.
+    case fileTooLarge(path: String, bytes: Int)
 
     /// A user-facing message; for `failed`, it includes the error output from `gh`.
     public var errorDescription: String? {
@@ -21,9 +28,18 @@ public enum GitHubCLIError: Error, LocalizedError {
         case let .invalidPullRequestURL(url):
             "Not a pull request URL: \(url)"
         case .notInstalled:
-            "The GitHub CLI (gh) was not found. Install it with `brew install gh` and run `gh auth login`."
+            """
+            The GitHub CLI (gh) was not found. Install it with `brew install gh` and run `gh auth login`, or set its \
+            location in config.toml: gh = "/path/to/gh" under [github].
+            """
+        case let .configuredPathNotExecutable(path):
+            "The gh set in config.toml ([github] gh = \"\(path)\") isn't an executable file."
         case let .failed(status, stderr):
             "gh exited with status \(status): \(stderr.trimmingCharacters(in: .whitespacesAndNewlines))"
+        case let .rejected(message):
+            message
+        case let .fileTooLarge(path, bytes):
+            "\(path) is too large to show in full (\(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)))."
         }
     }
 }
@@ -32,24 +48,85 @@ public enum GitHubCLIError: Error, LocalizedError {
 ///
 /// Credentials stay with `gh`; the app never sees a token. Every call runs `gh` as a subprocess off the main actor.
 public struct GitHubCLI: Sendable {
-    /// The directories searched for `gh`, in order.
+    /// The directories searched for `gh`, in order, before asking the login shell.
     ///
-    /// GUI apps don't inherit the shell's `PATH`, so these are the usual install locations rather than a `PATH` lookup.
-    static let searchPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+    /// GUI apps don't inherit the shell's `PATH`, so these are the usual install locations: Homebrew, the system,
+    /// MacPorts, Nix, user-local installs, and mise and asdf shims. `~` is expanded.
+    static let searchPaths = [
+        "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/opt/local/bin",
+        "~/.nix-profile/bin", "/run/current-system/sw/bin", "/nix/var/nix/profiles/default/bin",
+        "~/.local/bin", "~/bin", "~/.local/share/mise/shims", "~/.asdf/shims",
+    ]
 
-    /// The `gh` executable that every call runs.
-    let executable: URL
+    /// Where `gh` is: the path set in `config.toml` (if any) and the executable found, cached once found.
+    private static let location = Mutex<(configured: String?, found: URL?)>((nil, nil))
 
-    /// Finds the `gh` executable.
+    /// Creates a client.
     ///
-    /// - Throws: `GitHubCLIError.notInstalled` if no executable `gh` is in `searchPaths`.
-    public init() throws {
+    /// Finding `gh` is left to the first call, which happens off the main actor.
+    public init() {}
+
+    /// Sets the `gh` executable to use instead of searching for one, from `config.toml`.
+    ///
+    /// - Parameter path: The path to `gh`, with `~` allowed, or `nil` to search the usual places.
+    public static func setConfiguredExecutable(_ path: String?) {
+        location.withLock { location in
+            guard location.configured != path else { return }
+            location = (path, nil)
+        }
+    }
+
+    /// Returns the `gh` executable, finding it the first time.
+    ///
+    /// Uses the configured path if there is one. Otherwise it checks `searchPaths`, and then asks the user's login
+    /// shell, which knows the `PATH` set up in their shell profile.
+    ///
+    /// - Returns: The executable's URL.
+    /// - Throws: `GitHubCLIError.configuredPathNotExecutable` or `GitHubCLIError.notInstalled`.
+    @concurrent
+    static func executable() async throws -> URL {
+        let (configured, found) = location.withLock { $0 }
+        if let found { return found }
+        let url: URL
+        if let configured {
+            let path = NSString(string: configured).expandingTildeInPath
+            guard FileManager.default.isExecutableFile(atPath: path) else {
+                throw GitHubCLIError.configuredPathNotExecutable(configured)
+            }
+            url = URL(filePath: path)
+        } else if let path = searchPaths.lazy
+            .map({ NSString(string: $0).appendingPathComponent("gh") })
+            .map({ NSString(string: $0).expandingTildeInPath })
+            .first(where: { FileManager.default.isExecutableFile(atPath: $0) })
+        {
+            url = URL(filePath: path)
+        } else if let path = await pathFromLoginShell() {
+            url = URL(filePath: path)
+        } else {
+            throw GitHubCLIError.notInstalled
+        }
+        location.withLock { location in
+            // Keep it only if the config didn't change meanwhile.
+            if location.configured == configured { location.found = url }
+        }
+        return url
+    }
+
+    /// Asks the user's login shell where `gh` is, giving up after five seconds.
+    ///
+    /// - Returns: The absolute path of an executable `gh`, or `nil` if the shell doesn't find one.
+    private static func pathFromLoginShell() async -> String? {
+        let shell = ProcessInfo.processInfo.environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
         guard
-            let path = Self.searchPaths
-                .map({ "\($0)/gh" })
-                .first(where: { FileManager.default.isExecutableFile(atPath: $0) })
-        else { throw GitHubCLIError.notInstalled }
-        executable = URL(fileURLWithPath: path)
+            let result = try? await Subprocess.run(
+                URL(filePath: shell), ["-l", "-c", "command -v gh"], timeout: .seconds(5)),
+            result.status == 0
+        else { return nil }
+        // Shell profiles can print other things; the answer is the last line that's an executable path.
+        return String(decoding: result.stdout, as: UTF8.self)
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .last { $0.hasPrefix("/") && FileManager.default.isExecutableFile(atPath: $0) }
     }
 
     /// Fetches the open PRs where the viewer's review is requested.
@@ -109,7 +186,10 @@ public struct GitHubCLI: Sendable {
         )
     }
 
-    /// Fetches a PR's description, discussion, reviews, mergeability and CI status in one GraphQL call.
+    /// Fetches a PR's description, discussion, reviews, mergeability and CI status.
+    ///
+    /// One GraphQL call usually gets everything. When a PR has more comments, reviews or checks than fit in one page,
+    /// that list is then fetched in full.
     ///
     /// - Parameter pr: The pull request to load.
     /// - Returns: The PR's overview.
@@ -117,9 +197,16 @@ public struct GitHubCLI: Sendable {
     ///   a decoding error if the response isn't the expected JSON.
     @concurrent
     public func overview(for pr: PullRequest) async throws -> PullRequestOverview {
-        let data = try await graphQL(
-            PullRequestOverview.query, host: pr.host, strings: try repoVariables(pr), ints: ["number": pr.number])
-        return try PullRequestOverview.decode(from: data)
+        let variables = try repoVariables(pr)
+        let data = try await graphQL(PullRequestOverview.query, host: pr.host, strings: variables, ints: ["number": pr.number])
+        var overview = try PullRequestOverview.decode(from: data)
+        for list in PullRequestOverview.PagedList.allCases where overview.incompleteLists.contains(list) {
+            let (query, jq) = PullRequestOverview.pagedQuery(for: list)
+            let lines = try await graphQL(
+                query, host: pr.host, paginate: true, jq: jq, strings: variables, ints: ["number": pr.number])
+            try overview.replace(list, withLines: lines)
+        }
+        return overview
     }
 
     /// Posts a comment to the PR's conversation.
@@ -153,36 +240,138 @@ public struct GitHubCLI: Sendable {
         return DiffParser.parse(String(decoding: data, as: UTF8.self))
     }
 
+    /// Fetches a file's contents as of a commit.
+    ///
+    /// - Parameters:
+    ///   - pr: The pull request whose repository holds the file.
+    ///   - path: The file's path, relative to the repository root.
+    ///   - commitID: The commit to read the file at, such as `ReviewContext.headCommitID`.
+    ///   - maxBytes: The largest file to accept.
+    /// - Returns: The file's text, decoded as UTF-8.
+    /// - Throws: `GitHubCLIError.fileTooLarge` above `maxBytes`, or `GitHubCLIError.failed` if `gh` fails, for example
+    ///   when the path isn't a file at that commit.
+    @concurrent
+    public func fileContents(
+        of pr: PullRequest, path: String, commitID: String, maxBytes: Int = 4_000_000
+    ) async throws -> String {
+        // Encode each path component, so names with spaces, `#` or `?` stay part of the path.
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "?#;")
+        let encodedPath = path.split(separator: "/", omittingEmptySubsequences: false)
+            .map { $0.addingPercentEncoding(withAllowedCharacters: allowed) ?? String($0) }
+            .joined(separator: "/")
+        let data = try await run([
+            "api", "--hostname", pr.host,
+            "-H", "Accept: application/vnd.github.raw+json",
+            "repos/\(pr.repository.nameWithOwner)/contents/\(encodedPath)?ref=\(commitID)",
+        ])
+        guard data.count <= maxBytes else { throw GitHubCLIError.fileTooLarge(path: path, bytes: data.count) }
+        return String(decoding: data, as: UTF8.self)
+    }
+
     /// Runs `gh` with `arguments` and waits for it to exit.
+    ///
+    /// The wait doesn't tie up a thread, so many `gh` processes can run at once without starving other async work.
     ///
     /// - Parameter arguments: The arguments to pass to `gh`, not including the executable.
     /// - Returns: Everything `gh` wrote to standard output.
-    /// - Throws: `GitHubCLIError.failed` with `gh`'s standard error if it exits with a non-zero status, or the error from
-    ///   `Process.run()` if `gh` can't be launched.
+    /// - Throws: `GitHubCLIError.failed` with `gh`'s standard error if it exits with a non-zero status, the errors from
+    ///   `executable()` if `gh` can't be found, or the error from `Process.run()` if it can't be launched.
     @concurrent
     func run(_ arguments: [String]) async throws -> Data {
+        let result = try await Subprocess.run(try await Self.executable(), arguments)
+        guard result.status == 0 else {
+            throw GitHubCLIError.failed(status: result.status, stderr: String(decoding: result.stderr, as: UTF8.self))
+        }
+        return result.stdout
+    }
+}
+
+/// Runs a subprocess and collects its output without blocking a thread while it runs.
+enum Subprocess {
+    /// What a finished subprocess produced.
+    struct Result: Sendable {
+        /// The exit status; for a process killed by a signal, the signal number.
+        let status: Int32
+        let stdout: Data
+        let stderr: Data
+    }
+
+    /// Runs an executable to completion.
+    ///
+    /// Both output pipes are drained as data arrives, so a process with lots of output can't stall on a full pipe.
+    ///
+    /// - Parameters:
+    ///   - executable: The program to run.
+    ///   - arguments: Its arguments.
+    ///   - timeout: How long to let it run before terminating it, or `nil` for no limit.
+    /// - Returns: The exit status and everything written to standard output and standard error.
+    /// - Throws: The error from `Process.run()` if the program can't be launched.
+    static func run(_ executable: URL, _ arguments: [String], timeout: Duration? = nil) async throws -> Result {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
+        process.standardInput = FileHandle.nullDevice
         let stdout = Pipe()
         let stderr = Pipe()
         process.standardOutput = stdout
         process.standardError = stderr
 
-        try process.run()
-
-        // Drain both pipes concurrently so large output can't fill a pipe buffer and stall gh.
-        async let out = Task.detached { stdout.fileHandleForReading.readDataToEndOfFile() }.value
-        async let err = Task.detached { stderr.fileHandleForReading.readDataToEndOfFile() }.value
-        let (outData, errData) = await (out, err)
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            throw GitHubCLIError.failed(
-                status: process.terminationStatus,
-                stderr: String(decoding: errData, as: UTF8.self)
-            )
+        let output = Output()
+        // Three things must finish before the result is ready: end of standard output, end of standard error, and exit.
+        let group = DispatchGroup()
+        for (pipe, isStdout) in [(stdout, true), (stderr, false)] {
+            group.enter()
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                    group.leave()
+                } else {
+                    output.append(data, toStdout: isStdout)
+                }
+            }
         }
-        return outData
+        group.enter()
+        process.terminationHandler = { _ in group.leave() }
+
+        do {
+            try process.run()
+        } catch {
+            stdout.fileHandleForReading.readabilityHandler = nil
+            stderr.fileHandleForReading.readabilityHandler = nil
+            throw error
+        }
+        let timer = timeout.map { timeout in
+            Task {
+                try await Task.sleep(for: timeout)
+                process.terminate()
+            }
+        }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            group.notify(queue: .global()) { continuation.resume() }
+        }
+        timer?.cancel()
+        let (out, err) = output.contents
+        return Result(status: process.terminationStatus, stdout: out, stderr: err)
+    }
+
+    /// Output collected from the pipes' handlers, which run on arbitrary threads.
+    ///
+    /// `@unchecked Sendable` is safe because every access to the buffers holds `lock`.
+    private final class Output: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stdout = Data()
+        private var stderr = Data()
+
+        /// Appends a chunk read from one of the pipes.
+        func append(_ data: Data, toStdout: Bool) {
+            lock.withLock {
+                if toStdout { stdout.append(data) } else { stderr.append(data) }
+            }
+        }
+
+        /// Everything collected so far from standard output and standard error.
+        var contents: (Data, Data) { lock.withLock { (stdout, stderr) } }
     }
 }

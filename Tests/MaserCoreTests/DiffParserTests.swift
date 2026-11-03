@@ -136,6 +136,31 @@ import Testing
         #expect(HunkRange("@@ garbage @@") == nil)
     }
 
+    /// Unquotes paths git writes in quotes, with octal UTF-8 bytes and C escapes, in every header line.
+    @Test func quotedPaths() {
+        let diff = #"""
+            diff --git "a/caf\303\251.txt" "b/caf\303\251.txt"
+            index 1..2 100644
+            --- "a/caf\303\251.txt"
+            +++ "b/caf\303\251.txt"
+            @@ -1 +1 @@
+            -a
+            +b
+            diff --git "a/tab\there.txt" "b/new \"name\".txt"
+            similarity index 100%
+            rename from "tab\there.txt"
+            rename to "new \"name\".txt"
+            diff --git a/plain.png "b/\303\251.png"
+            Binary files a/plain.png and "b/\303\251.png" differ
+            """#
+        let files = DiffParser.parse(diff)
+        #expect(files.map(\.path) == ["café.txt", #"new "name".txt"#, "é.png"])
+        #expect(files[1].oldPath == "tab\there.txt")
+        #expect(files[2].isBinary)
+        #expect(DiffParser.unquotedPath(#""back\\slash""#) == #"back\slash"#)
+        #expect(DiffParser.unquotedPath("not quoted") == "not quoted")
+    }
+
     /// Reads a path containing spaces from a `diff --git` header, and gives up when the two paths differ.
     @Test func gitHeaderPath() {
         #expect(DiffParser.pathFromGitHeader("diff --git a/with space.txt b/with space.txt") == "with space.txt")

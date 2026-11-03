@@ -42,12 +42,40 @@ import Testing
         #expect(try ReviewThread.decodeLines(from: Data()).isEmpty)
     }
 
-    /// Decodes the PR's node ID with and without a pending review.
+    /// Decodes the PR's node ID and head commit, with and without a pending review.
     @Test func decodesReviewContext() throws {
-        let json = #"{"data":{"repository":{"pullRequest":{"id":"PR_1","reviews":{"nodes":[{"id":"PRR_9"}]}}}}}"#
-        #expect(try ReviewContext.decode(from: Data(json.utf8)) == ReviewContext(pullRequestID: "PR_1", pendingReviewID: "PRR_9"))
-        let none = #"{"data":{"repository":{"pullRequest":{"id":"PR_1","reviews":{"nodes":[]}}}}}"#
+        let json =
+            #"{"data":{"repository":{"pullRequest":{"id":"PR_1","headRefOid":"abc123","reviews":{"nodes":[{"id":"PRR_9"}]}}}}}"#
+        #expect(
+            try ReviewContext.decode(from: Data(json.utf8))
+                == ReviewContext(pullRequestID: "PR_1", pendingReviewID: "PRR_9", headCommitID: "abc123"))
+        let none = #"{"data":{"repository":{"pullRequest":{"id":"PR_1","headRefOid":"abc123","reviews":{"nodes":[]}}}}}"#
         #expect(try ReviewContext.decode(from: Data(none.utf8)).pendingReviewID == nil)
+    }
+
+    /// Marks a thread whose first page of comments is short of its `totalCount`, then replaces its comments with the
+    /// full list from `commentsQuery`.
+    @Test func longThreadsGetTheirRemainingComments() throws {
+        let line = """
+            {"id":"T1","path":"a.txt","line":3,"startLine":null,"originalLine":3,"diffSide":"RIGHT","isOutdated":false,"isResolved":false,"comments":{"totalCount":3,"nodes":[{"id":"C1","author":{"login":"alice"},"body":"one","createdAt":"2026-10-28T19:34:26Z","url":null,"state":"SUBMITTED"}]}}
+            """
+        let thread = try #require(try ReviewThread.decodeLines(from: Data(line.utf8)).first)
+        #expect(thread.hasMoreComments)
+        let notLong = try #require(try ReviewThread.decodeLines(from: Data(Self.lines.utf8)).first)
+        #expect(!notLong.hasMoreComments)
+
+        let all = """
+            {"id":"C1","author":{"login":"alice"},"body":"one","createdAt":"2026-10-28T19:34:26Z","url":null,"state":"SUBMITTED"}
+            {"id":"C2","author":null,"body":"two","createdAt":"2026-10-28T19:35:26Z","url":null,"state":"SUBMITTED"}
+            {"id":"C3","author":{"login":"me"},"body":"three","createdAt":"2026-10-28T19:36:26Z","url":null,"state":"PENDING"}
+
+            """
+        let full = thread.replacingComments(try ReviewThread.decodeCommentLines(from: Data(all.utf8)))
+        #expect(full.comments.map(\.body) == ["one", "two", "three"])
+        #expect(full.comments.map(\.author) == ["alice", "ghost", "me"])
+        #expect(full.hasPendingComments)
+        #expect(!full.hasMoreComments)
+        #expect(thread.replacingComments([]) == thread)
     }
 }
 
@@ -93,7 +121,7 @@ import Testing
         let target = try #require(Self.file.commentTarget(anchor: 4, cursor: 2))
         #expect(target.startSide == .left && target.startLine == 2)
         #expect(target.side == .right && target.line == 3)
-        #expect(target.lineIDs == 2...4)
+        #expect(Self.file.lineIDs(for: target) == 2...4)
         #expect(target.description == "old line 2 to line 3")
         #expect(CommentTarget.describe(side: .right, line: 5, startSide: .right, startLine: 5) == "line 5")
         #expect(CommentTarget.describe(side: .left, line: 5, startSide: nil, startLine: 3) == "old lines 3–5")
@@ -119,7 +147,7 @@ struct LiveGitHubTests {
               "updatedAt":"2026-10-28T00:00:00Z","url":"https://github.com/cli/cli/pull/14858"}]
             """
         let pr = try #require(try PullRequest.decodeList(from: Data(json.utf8)).first)
-        let cli = try GitHubCLI()
+        let cli = GitHubCLI()
 
         let files = try await cli.fileDiffs(for: pr)
         #expect(!files.isEmpty)
@@ -141,6 +169,36 @@ struct LiveGitHubTests {
             #expect(file.lineID(side: thread.side, line: thread.line!) != nil, "\(thread.path):\(thread.line!)")
         }
     }
+
+    /// Fetches every page of a busy PR's lists: rust-lang/rust#162811 has more than 100 conversation comments.
+    ///
+    /// Also runs each paged query and the thread-comments query directly, so a typo in any of them fails here.
+    @Test func paginatesLongLists() async throws {
+        let cli = GitHubCLI()
+        let pr = try await cli.pullRequest(url: URL(string: "https://github.com/rust-lang/rust/pull/162811")!)
+        let overview = try await cli.overview(for: pr)
+        #expect(overview.comments.count > 100)
+        #expect(overview.incompleteLists.isEmpty)
+        let ids = overview.comments.map(\.id)
+        #expect(Set(ids).count == ids.count)
+
+        var paged = overview
+        for list in PullRequestOverview.PagedList.allCases {
+            let (query, jq) = PullRequestOverview.pagedQuery(for: list)
+            let lines = try await cli.graphQL(
+                query, host: pr.host, paginate: true, jq: jq, strings: try cli.repoVariables(pr), ints: ["number": pr.number])
+            try paged.replace(list, withLines: lines)
+        }
+        #expect(paged.comments == overview.comments)
+        #expect(paged.reviews == overview.reviews)
+        #expect(paged.checks.count == overview.checks.count)
+
+        let thread = try #require(try await cli.reviewThreads(for: pr).first)
+        let comments = try await cli.graphQL(
+            ReviewThread.commentsQuery, host: pr.host, paginate: true, jq: ReviewThread.commentsJQFilter,
+            strings: ["thread": thread.id])
+        #expect(try ReviewThread.decodeCommentLines(from: comments) == thread.comments)
+    }
 }
 
 /// Tests that write to GitHub, on the closed test PR `bmannakee/maser#1`.
@@ -150,10 +208,10 @@ struct LiveGitHubTests {
 struct LiveReviewWriteTests {
     /// Runs a pending review through its whole life, checking GitHub's state after each step.
     ///
-    /// Starts a review, adds a range thread and a single-line thread, replies, deletes the reply and discards the
-    /// review. Any existing pending review is discarded first.
+    /// Starts a review, adds a range thread and a single-line thread, checks that a thread on a line outside the diff is
+    /// an error, replies, deletes the reply and discards the review. Any existing pending review is discarded first.
     @Test func pendingReviewRoundTrip() async throws {
-        let cli = try GitHubCLI()
+        let cli = GitHubCLI()
         let pr = try await cli.pullRequest(url: URL(string: "https://github.com/bmannakee/maser/pull/1")!)
         let file = try #require(try await cli.fileDiffs(for: pr).first { $0.path == "COMMENT-TEST.md" })
         let lines = file.commentableLines
@@ -171,6 +229,11 @@ struct LiveReviewWriteTests {
 
         try await cli.addReviewThread(on: pr, reviewID: reviewID, target: range, body: "range")
         try await cli.addReviewThread(on: pr, reviewID: reviewID, target: single, body: "single")
+        // README.md's diff covers lines 1–6. GitHub answers line 40 with a null thread, which must not pass silently.
+        let outside = CommentTarget(path: "README.md", side: .right, line: 40, startSide: nil, startLine: nil)
+        await #expect(throws: GitHubCLIError.self) {
+            try await cli.addReviewThread(on: pr, reviewID: reviewID, target: outside, body: "outside")
+        }
         var threads = try await cli.reviewThreads(for: pr)
         #expect(threads.count == 2)
         let allPending = threads.allSatisfy(\.isPending)

@@ -30,7 +30,13 @@ public struct FileDiff: Identifiable, Hashable, Sendable {
     /// Whether git reported the file as binary; binary files have no hunks.
     public var isBinary: Bool
     /// The file's hunks, in diff order.
+    ///
+    /// In a full-file view (`isFullFile`), unchanged stretches between them are hunks too, marked `isExpansion`.
     public var hunks: [Hunk]
+    /// Whether this is the whole file, with the unchanged lines between hunks filled in.
+    ///
+    /// See `fullFile(headText:)`.
+    public var isFullFile = false
 
     /// The file's path, which is unique within one diff.
     public var id: String { path }
@@ -78,12 +84,28 @@ public struct FileDiff: Identifiable, Hashable, Sendable {
 
 /// A contiguous block of changes within a file, introduced by an `@@` header.
 public struct Hunk: Identifiable, Hashable, Sendable {
-    /// Unique among the hunks and lines of one parse.
+    /// Unique among the hunks and lines of one file.
     public let id: Int
-    /// The full `@@ -a,b +c,d @@ context` line.
+    /// The full `@@ -a,b +c,d @@ context` line; empty for an expansion.
     public let header: String
     /// The hunk's lines, in diff order.
     public var lines: [DiffLine]
+    /// Whether this is a stretch of unchanged lines filled in from the whole file, rather than part of GitHub's diff.
+    public let isExpansion: Bool
+
+    /// Creates a hunk.
+    ///
+    /// - Parameters:
+    ///   - id: Unique among the hunks and lines of the file.
+    ///   - header: The `@@` line, or empty for an expansion.
+    ///   - lines: The hunk's lines.
+    ///   - isExpansion: Whether the lines were filled in from the whole file.
+    init(id: Int, header: String, lines: [DiffLine], isExpansion: Bool = false) {
+        self.id = id
+        self.header = header
+        self.lines = lines
+        self.isExpansion = isExpansion
+    }
 }
 
 /// One line of a hunk, with its line numbers on each side.
@@ -95,7 +117,7 @@ public struct DiffLine: Identifiable, Hashable, Sendable {
         case noNewlineMarker
     }
 
-    /// Unique within its file; stable for a given diff.
+    /// Unique within its file, and increasing in display order.
     public let id: Int
     /// Whether the line is context, added, deleted, or a no-newline marker.
     public let kind: Kind
@@ -105,6 +127,33 @@ public struct DiffLine: Identifiable, Hashable, Sendable {
     public let oldLine: Int?
     /// Line number in the head version; `nil` for deletions and markers.
     public let newLine: Int?
+    /// Whether the line is an unchanged line filled in from the whole file, outside GitHub's diff.
+    ///
+    /// GitHub only accepts review comments on lines in the diff, so these can't be commented on.
+    public let isExpansion: Bool
+
+    /// Creates a diff line.
+    ///
+    /// - Parameters:
+    ///   - id: Unique within the file, increasing in display order.
+    ///   - kind: What the line represents.
+    ///   - text: The content, without the diff marker.
+    ///   - oldLine: The line number in the base version, if the line exists there.
+    ///   - newLine: The line number in the head version, if the line exists there.
+    ///   - isExpansion: Whether the line was filled in from the whole file.
+    init(id: Int, kind: Kind, text: String, oldLine: Int?, newLine: Int?, isExpansion: Bool = false) {
+        self.id = id
+        self.kind = kind
+        self.text = text
+        self.oldLine = oldLine
+        self.newLine = newLine
+        self.isExpansion = isExpansion
+    }
+
+    /// Returns a copy of the line with a different ID.
+    func with(id: Int) -> DiffLine {
+        DiffLine(id: id, kind: kind, text: text, oldLine: oldLine, newLine: newLine, isExpansion: isExpansion)
+    }
 }
 
 /// Parses unified diff text into `FileDiff` values.
@@ -182,10 +231,10 @@ public enum DiffParser {
             } else if line.hasPrefix("deleted file mode") {
                 file!.status = .deleted
             } else if line.hasPrefix("rename from ") {
-                file!.oldPath = String(line.dropFirst("rename from ".count))
+                file!.oldPath = unquotedPath(line.dropFirst("rename from ".count))
                 file!.status = .renamed
             } else if line.hasPrefix("rename to ") {
-                file!.path = String(line.dropFirst("rename to ".count))
+                file!.path = unquotedPath(line.dropFirst("rename to ".count))
             } else if line.hasPrefix("Binary files ") || line == "GIT binary patch" {
                 file!.isBinary = true
             } else if line.hasPrefix("--- ") {
@@ -205,11 +254,15 @@ public enum DiffParser {
     ///
     /// `diff --git a/foo b/foo` → `foo`, when both sides match (the common, unambiguous case). Paths with spaces
     /// make the header ambiguous when the sides differ, so the parser then relies on later header lines instead.
+    /// Quoted paths (`"a/caf\303\251" "b/caf\303\251"`) aren't ambiguous, so the `b/` path is returned unquoted.
     ///
     /// - Parameter line: The full header line.
     /// - Returns: The path, or `nil` if the two sides differ or the line isn't in the expected form.
     static func pathFromGitHeader(_ line: String) -> String? {
         let rest = line.dropFirst("diff --git ".count)
+        if rest.contains("\"") {
+            return quotedHeaderPath(rest)
+        }
         guard rest.hasPrefix("a/"), rest.count % 2 == 1 else { return nil }
         let half = (rest.count - 1) / 2
         let a = rest.prefix(half), b = rest.suffix(half)
@@ -229,7 +282,86 @@ public enum DiffParser {
         // git appends a tab after names containing spaces.
         var path = path
         while path.last == "\t" { path = path.dropLast() }
-        return path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : String(path)
+        let unquoted = unquotedPath(path)
+        return unquoted.hasPrefix(prefix) ? String(unquoted.dropFirst(prefix.count)) : unquoted
+    }
+
+    /// Returns the `b/` path from the part of a `diff --git` header after `diff --git `, when a path is quoted.
+    ///
+    /// - Parameter rest: Two paths separated by a space, at least one of them quoted.
+    /// - Returns: The second path without quotes or its `b/` prefix, or `nil` if the line isn't in the expected form.
+    private static func quotedHeaderPath(_ rest: Substring) -> String? {
+        let second: Substring
+        if rest.first == "\"" {
+            guard let end = closingQuote(in: rest), rest[rest.index(after: end)...].first == " " else { return nil }
+            second = rest[rest.index(end, offsetBy: 2)...]
+        } else {
+            // The first path is plain, so the second must be the quoted one.
+            guard let start = rest.range(of: " \"b/", options: .backwards) else { return nil }
+            second = rest[rest.index(after: start.lowerBound)...]
+        }
+        let path = unquotedPath(second)
+        return path.hasPrefix("b/") ? String(path.dropFirst(2)) : nil
+    }
+
+    /// Finds the quote that closes a quoted path.
+    ///
+    /// - Parameter text: Text starting with `"`.
+    /// - Returns: The index of the first unescaped `"` after the opening one, or `nil` if there isn't one.
+    private static func closingQuote(in text: Substring) -> Substring.Index? {
+        var index = text.index(after: text.startIndex)
+        while index < text.endIndex {
+            switch text[index] {
+            case "\\": index = text.index(after: index)
+            case "\"": return index
+            default: break
+            }
+            if index < text.endIndex { index = text.index(after: index) }
+        }
+        return nil
+    }
+
+    /// Undoes git's quoting of a path with unusual characters.
+    ///
+    /// git wraps such paths in double quotes and writes C-style escapes: `\"`, `\\`, `\t`, `\n` and the like, and
+    /// non-ASCII bytes as three octal digits (`caf\303\251` is "café" in UTF-8).
+    ///
+    /// - Parameter text: A path as it appears in a diff header, quoted or not.
+    /// - Returns: The path with quotes and escapes removed; an unquoted path comes back unchanged.
+    static func unquotedPath(_ text: Substring) -> String {
+        guard text.count >= 2, text.first == "\"", text.last == "\"" else { return String(text) }
+        let inner = Array(text.dropFirst().dropLast().utf8)
+        var bytes: [UInt8] = []
+        var index = 0
+        while index < inner.count {
+            let byte = inner[index]
+            index += 1
+            guard byte == UInt8(ascii: "\\"), index < inner.count else {
+                bytes.append(byte)
+                continue
+            }
+            let escaped = inner[index]
+            index += 1
+            switch escaped {
+            case UInt8(ascii: "0")...UInt8(ascii: "7"):
+                // Up to three octal digits make one byte.
+                var value = UInt32(escaped - UInt8(ascii: "0"))
+                for _ in 0..<2 where index < inner.count && (UInt8(ascii: "0")...UInt8(ascii: "7")).contains(inner[index]) {
+                    value = value * 8 + UInt32(inner[index] - UInt8(ascii: "0"))
+                    index += 1
+                }
+                bytes.append(UInt8(truncatingIfNeeded: value))
+            case UInt8(ascii: "a"): bytes.append(0x07)
+            case UInt8(ascii: "b"): bytes.append(0x08)
+            case UInt8(ascii: "t"): bytes.append(0x09)
+            case UInt8(ascii: "n"): bytes.append(0x0A)
+            case UInt8(ascii: "v"): bytes.append(0x0B)
+            case UInt8(ascii: "f"): bytes.append(0x0C)
+            case UInt8(ascii: "r"): bytes.append(0x0D)
+            default: bytes.append(escaped)  // `\"`, `\\`, and anything unexpected, taken literally
+            }
+        }
+        return String(decoding: bytes, as: UTF8.self)
     }
 }
 

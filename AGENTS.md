@@ -10,6 +10,7 @@ update it here in the same PR.
 swift build                        # debug build
 swift run Maser [PR URL…]          # run; URLs open review windows
 scripts/check                      # format lint + build + tests; run before every commit
+scripts/bundle                     # release build wrapped in .build/Maser.app, signed ad hoc
 swift format --in-place --recursive Sources Tests Package.swift   # apply formatting
 ```
 
@@ -53,6 +54,13 @@ Every user action is a `CommandID`, so menus, vim-style keys and `config.toml` s
 5. Update the keyboard table in `README.md`, plus `KeyHintBar` if it's a main Files-tab key.
 
 Vim-style keys are paused while a text field or editor has focus. Esc leaves a multi-line editor.
+
+### Settings
+
+Plain settings in `config.toml` (anything that isn't a key binding) go in `Settings` in MaserCore, in a table named
+for the area: `[diff]`, `[github]`. Add the field with its default, read it in `Settings.load(toml:)` (report bad
+values in `problems`), list it commented out in `Settings.template`, and document it in the README. `ConfigStore`
+publishes the loaded `settings` to the app.
 
 ## Documentation and comments
 

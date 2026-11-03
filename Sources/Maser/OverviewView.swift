@@ -41,6 +41,13 @@ struct OverviewView: View {
                     }
                     .frame(width: 300)
                 }
+                .task {
+                    // Keep "5 minutes ago" true while the conversation is showing.
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(60))
+                        model.refreshConversationTimes()
+                    }
+                }
             }
         }
     }

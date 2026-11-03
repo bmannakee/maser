@@ -149,6 +149,10 @@ private struct DiffPane: View {
                 VStack(spacing: 0) {
                     DiffView(model: model, file: file)
                         .id(file.id)  // fresh scroll position per file
+                    if let status = model.diffNotice ?? model.fullFileStatus {
+                        Divider()
+                        DiffStatusLine(text: status, isLoading: model.loadingFullFiles.contains(file.path))
+                    }
                     Divider()
                     KeyHintBar()
                 }
@@ -192,7 +196,10 @@ private struct DiffView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(file.hunks) { hunk in
-                            HunkHeaderRow(header: hunk.header)
+                            // The whole file reads as one continuous text, so the hunk headers are left out.
+                            if !file.isFullFile {
+                                HunkHeaderRow(header: hunk.header)
+                            }
                             ForEach(hunk.lines) { line in
                                 DiffLineRow(
                                     line: line,
@@ -271,6 +278,29 @@ extension DiffView {
     }
 }
 
+/// A line under the diff saying why a key did nothing, or how loading the full file is going.
+private struct DiffStatusLine: View {
+    let text: String
+    /// Whether to show a spinner, while the full file loads.
+    let isLoading: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if isLoading {
+                ProgressView().controlSize(.mini)
+            } else {
+                Image(systemName: "info.circle")
+            }
+            Text(text).lineLimit(2).textSelection(.enabled)
+            Spacer(minLength: 0)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+    }
+}
+
 /// A hunk's `@@ … @@` header line in the diff.
 private struct HunkHeaderRow: View {
     let header: String
@@ -305,7 +335,7 @@ private struct DiffLineRow: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                guard line.commentSide != nil else { return }
+                guard line.isCursorStop else { return }
                 model.setCursor(line.id, extend: NSEvent.modifierFlags.contains(.shift))
             }
             gutterIcon
@@ -326,13 +356,13 @@ private struct DiffLineRow: View {
         }
     }
 
-    /// A thread marker, or on the cursor line without a thread, a button to comment on it.
+    /// A thread marker, or on a commentable cursor line without a thread, a button to comment on it.
     @ViewBuilder
     private var gutterIcon: some View {
         if let pending = marker {
             Image(systemName: pending ? "text.bubble" : "text.bubble.fill")
                 .foregroundStyle(pending ? Color.orange : Color.accentColor)
-        } else if isCursor {
+        } else if isCursor, line.commentSide != nil {
             Button {
                 model.startComment()
             } label: {
@@ -395,6 +425,7 @@ private struct KeyHintBar: View {
         ("line", [.cursorDown, .cursorUp]),
         ("file", [.previousFile, .nextFile]),
         ("hunk", [.previousHunk, .nextHunk]),
+        ("full file", [.toggleFullFile]),
         ("select", [.selectLines]),
         ("comment", [.comment]),
         ("reply", [.reply]),

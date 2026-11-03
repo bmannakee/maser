@@ -47,6 +47,9 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
     public let isResolved: Bool
     /// The thread's comments, oldest first; never empty.
     public let comments: [ReviewComment]
+    /// Whether GitHub has more comments in the thread than `comments` holds, because the query only fetched its first
+    /// page.
+    let hasMoreComments: Bool
 
     // Safe: every initializer guarantees `comments` is non-empty.
     /// The comment that started the thread.
@@ -65,13 +68,22 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
     public func removingPendingComments() -> ReviewThread? {
         let posted = comments.filter { !$0.isPending }
         guard !posted.isEmpty else { return nil }
-        return ReviewThread(copying: self, comments: posted)
+        return ReviewThread(copying: self, comments: posted, hasMoreComments: hasMoreComments)
+    }
+
+    /// Returns the thread with all its comments, as fetched by `commentsQuery`.
+    ///
+    /// - Parameter comments: Every comment in the thread, oldest first. If empty, the thread is returned unchanged.
+    /// - Returns: The thread with `comments` and `hasMoreComments` cleared.
+    func replacingComments(_ comments: [ReviewComment]) -> ReviewThread {
+        guard !comments.isEmpty else { return self }
+        return ReviewThread(copying: self, comments: comments, hasMoreComments: false)
     }
 
     /// Creates a copy of `thread` with `comments` in place of its own.
     ///
     /// The caller must pass a non-empty `comments`, which `root` relies on.
-    private init(copying thread: ReviewThread, comments: [ReviewComment]) {
+    private init(copying thread: ReviewThread, comments: [ReviewComment], hasMoreComments: Bool) {
         id = thread.id
         path = thread.path
         line = thread.line
@@ -82,6 +94,7 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
         isOutdated = thread.isOutdated
         isResolved = thread.isResolved
         self.comments = comments
+        self.hasMoreComments = hasMoreComments
     }
 
     /// The `--jq` filter that turns each page of output from `query` into one compact JSON thread object per line.
@@ -89,7 +102,7 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
 
     /// The GraphQL query for a PR's review threads, paginated by `gh api graphql --paginate` through `$endCursor`.
     ///
-    /// Each thread fetches its first 100 comments only.
+    /// Each thread fetches its first 100 comments, and their `totalCount`; `commentsQuery` gets the rest.
     static let query = """
         query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
           repository(owner: $owner, name: $name) {
@@ -98,13 +111,47 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
                 pageInfo { hasNextPage endCursor }
                 nodes {
                   id path line startLine originalLine diffSide startDiffSide isOutdated isResolved
-                  comments(first: 100) { nodes { id author { login } body createdAt url state } }
+                  comments(first: 100) { totalCount nodes { \(commentFields) } }
                 }
               }
             }
           }
         }
         """
+
+    /// The fields fetched for each comment.
+    private static let commentFields = "id author { login } body createdAt url state"
+
+    /// The GraphQL query for all of one thread's comments, paginated through `$endCursor`; takes the thread's `$thread`
+    /// ID.
+    static let commentsQuery = """
+        query($thread: ID!, $endCursor: String) {
+          node(id: $thread) {
+            ... on PullRequestReviewThread {
+              comments(first: 100, after: $endCursor) {
+                pageInfo { hasNextPage endCursor }
+                nodes { \(commentFields) }
+              }
+            }
+          }
+        }
+        """
+
+    /// The `--jq` filter that turns each page of `commentsQuery` output into one JSON comment object per line.
+    static let commentsJQFilter = ".data.node.comments.nodes[]"
+
+    /// Decodes the line-per-comment output of `commentsQuery` filtered through `commentsJQFilter`.
+    ///
+    /// - Parameter data: Newline-separated JSON comment objects.
+    /// - Returns: The comments, in the order GitHub returned them (oldest first).
+    /// - Throws: A `DecodingError` if a line isn't a valid comment object.
+    static func decodeCommentLines(from data: Data) throws -> [ReviewComment] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try data.split(separator: UInt8(ascii: "\n")).map {
+            ReviewComment(try decoder.decode(Raw.Comment.self, from: Data($0)))
+        }
+    }
 
     /// Decodes the line-per-thread output of `query` filtered through `jqFilter`.
     ///
@@ -131,17 +178,9 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
     /// A missing author becomes `"ghost"`, an unknown side becomes `.right`, and a thread with no current line is
     /// treated as outdated even if GitHub doesn't flag it.
     private init?(_ raw: Raw) {
-        let comments = raw.comments.nodes.compactMap(\.self).map { comment in
-            ReviewComment(
-                id: comment.id,
-                author: comment.author?.login ?? "ghost",
-                body: comment.body,
-                createdAt: comment.createdAt,
-                url: comment.url.flatMap(URL.init(string:)),
-                isPending: comment.state == "PENDING"
-            )
-        }
+        let comments = raw.comments.nodes.compactMap(\.self).map(ReviewComment.init)
         guard !comments.isEmpty else { return nil }
+        hasMoreComments = (raw.comments.totalCount ?? 0) > raw.comments.nodes.count
         id = raw.id
         path = raw.path
         line = raw.line
@@ -155,9 +194,12 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
     }
 
     /// A review thread node exactly as the GraphQL API returns it.
-    private struct Raw: Decodable {
-        /// A GraphQL connection's `nodes`, which may contain `null`s.
-        struct Nodes: Decodable { let nodes: [Comment?] }
+    fileprivate struct Raw: Decodable {
+        /// A GraphQL connection's `nodes`, which may contain `null`s, and how many there are in all.
+        struct Nodes: Decodable {
+            let totalCount: Int?
+            let nodes: [Comment?]
+        }
         /// A comment's author; `null` in the JSON when the account was deleted.
         struct Actor: Decodable { let login: String }
         /// A comment node, with its `state` as a raw `PullRequestReviewCommentState` such as `"PENDING"`.
@@ -183,20 +225,38 @@ public struct ReviewThread: Identifiable, Hashable, Sendable {
     }
 }
 
+extension ReviewComment {
+    /// Creates a comment from its decoded GraphQL node; a missing author becomes `"ghost"`.
+    fileprivate init(_ raw: ReviewThread.Raw.Comment) {
+        self.init(
+            id: raw.id,
+            author: raw.author?.login ?? "ghost",
+            body: raw.body,
+            createdAt: raw.createdAt,
+            url: raw.url.flatMap(URL.init(string:)),
+            isPending: raw.state == "PENDING"
+        )
+    }
+}
+
 /// What's needed to write a review: the PR's node ID and the viewer's pending review, if any.
+///
+/// It also has the PR's head commit, which full-file views read files at.
 public struct ReviewContext: Hashable, Sendable {
     /// The pull request's GraphQL node ID.
     public let pullRequestID: String
     /// The node ID of the viewer's pending review; `nil` when they don't have one.
     public var pendingReviewID: String?
+    /// The SHA of the PR's head commit.
+    public let headCommitID: String
 
-    /// The GraphQL query for the PR's node ID and the viewer's pending review.
+    /// The GraphQL query for the PR's node ID, head commit and the viewer's pending review.
     ///
     /// GitHub returns only the viewer's own pending review, since nobody else's is visible to them.
     static let query = """
         query($owner: String!, $name: String!, $number: Int!) {
           repository(owner: $owner, name: $name) {
-            pullRequest(number: $number) { id reviews(states: PENDING, first: 1) { nodes { id } } }
+            pullRequest(number: $number) { id headRefOid reviews(states: PENDING, first: 1) { nodes { id } } }
           }
         }
         """
@@ -216,6 +276,7 @@ public struct ReviewContext: Hashable, Sendable {
                 struct Reviews: Decodable { let nodes: [Node?] }
                 struct Node: Decodable { let id: String }
                 let id: String
+                let headRefOid: String
                 let reviews: Reviews
             }
             let data: Payload
@@ -223,7 +284,9 @@ public struct ReviewContext: Hashable, Sendable {
         guard let pr = try JSONDecoder().decode(Response.self, from: data).data.repository?.pullRequest else {
             throw PullRequestOverview.NotFound()
         }
-        return ReviewContext(pullRequestID: pr.id, pendingReviewID: pr.reviews.nodes.compactMap(\.self).first?.id)
+        return ReviewContext(
+            pullRequestID: pr.id, pendingReviewID: pr.reviews.nodes.compactMap(\.self).first?.id,
+            headCommitID: pr.headRefOid)
     }
 }
 
