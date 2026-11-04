@@ -670,7 +670,8 @@ final class ReviewModel {
     private func placeCursor(_ lineID: Int, placement: ScrollRequest.Placement) {
         guard let path = selectedPath else { return }
         cursorLineID = lineID
-        diffNotice = nil
+        // Only write when it changes, so a held j or k doesn't redraw the status line on every repeat.
+        if diffNotice != nil { diffNotice = nil }
         holdCursorUntil = .now + 0.5
         scrollRequest = ScrollRequest(path: path, lineID: lineID, placement: placement)
     }
