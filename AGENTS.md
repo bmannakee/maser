@@ -8,7 +8,7 @@ update it here in the same PR.
 
 ```sh
 swift build                        # debug build
-swift run Maser [PR URL…]          # run; URLs open review windows
+swift run Maser [PR URL…]          # run; the first URL opens in the main window, the rest in their own
 scripts/check                      # format lint + build + tests; run before every commit
 scripts/bundle                     # release build wrapped in .build/Maser.app, signed ad hoc
 swift format --in-place --recursive Sources Tests Package.swift   # apply formatting
@@ -36,8 +36,11 @@ Rules:
 - **GitHub goes only through `gh`,** via `GitHubCLI` in MaserCore. The app never sees or stores a token.
   Use GraphQL (`GitHubCLI.graphQL`) when REST is missing data (REST omits pending review comments, for example).
 - **Keep logic out of views.** If a view needs a computation, put it in MaserCore (testable) or in the view model.
-- **One model per review window.** `ReviewModel` (`@MainActor @Observable`) owns a window's state and actions.
-  Views read it, and commands reach it through `perform(_:)`.
+- **One model per review.** `ReviewModel` (`@MainActor @Observable`) owns one PR's review state and actions.
+  Views read it, and commands reach it through `perform(_:)`. The main window (`MainView`) shows the queue in a
+  sidebar and keeps a `ReviewModel` for each PR it has shown; Open in New Window puts a review in a `ReviewWindow`.
+- **One key handler per window.** `KeyRouter` gives each window a single `commandHandler`. A window showing several
+  things (the main window) decides who gets each key, by focus; views inside it don't register their own.
 - **Never crash on GitHub data.** Optional fields decode as optionals, unknown enum values fall back to a default,
   and failures become a message in the UI.
 

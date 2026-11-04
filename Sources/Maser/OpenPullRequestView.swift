@@ -1,7 +1,7 @@
 // The Open Pull Request window.
 //
 // A small window, reachable from any window through the `openPullRequest` command, that takes a GitHub PR URL, looks
-// the PR up with `gh`, and opens a review window for it.
+// the PR up with `gh`, and shows its review in the main window.
 
 import AppKit
 import MaserCore
@@ -65,7 +65,7 @@ struct OpenPullRequestView: View {
         }
     }
 
-    /// Looks up the PR and opens a review window for it, closing this one on success.
+    /// Looks up the PR and shows it in the main window, closing this one on success.
     private func open() {
         guard let url else { return }
         isLoading = true
@@ -74,8 +74,8 @@ struct OpenPullRequestView: View {
             defer { isLoading = false }
             do {
                 let pr = try await GitHubCLI().pullRequest(url: url)
-                openWindow(value: pr)
                 dismissWindow(id: Self.windowID)
+                MainWindows.shared.show(pr, openWindow: openWindow)
             } catch {
                 self.error = error.localizedDescription
             }
