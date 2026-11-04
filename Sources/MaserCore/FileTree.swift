@@ -91,4 +91,21 @@ public enum FileTree {
     public static func filePaths(in nodes: [FileNode]) -> [String] {
         nodes.flatMap { node in node.children.map(filePaths(in:)) ?? [node.id] }
     }
+
+    /// Every row of the tree with its nesting depth, for sizing the tree to its widest row.
+    ///
+    /// - Parameter nodes: The tree's top-level nodes.
+    /// - Returns: Each node's depth (0 at the top) and display name, depth-first, directories included.
+    public static func rows(in nodes: [FileNode]) -> [(depth: Int, name: String)] {
+        /// Collects the rows under `nodes`, which sit at `depth`.
+        func collect(_ nodes: [FileNode], depth: Int, into rows: inout [(depth: Int, name: String)]) {
+            for node in nodes {
+                rows.append((depth, node.name))
+                if let children = node.children { collect(children, depth: depth + 1, into: &rows) }
+            }
+        }
+        var rows: [(depth: Int, name: String)] = []
+        collect(nodes, depth: 0, into: &rows)
+        return rows
+    }
 }

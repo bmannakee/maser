@@ -13,20 +13,43 @@ struct FilesView: View {
     @Bindable var model: ReviewModel
 
     var body: some View {
-        // Three plain split panes rather than a NavigationSplitView with an inspector: this tab sits in the main
+        // Plain fixed-width panes rather than a NavigationSplitView with an inspector: this tab sits in the main
         // window's split view, and both a nested split view and an inspector beside the file tree there send AppKit
-        // into an endless constraint-update loop that crashes the app on switching to Files.
-        HSplitView {
+        // into an endless constraint-update loop that crashes the app on switching to Files. Fixed widths also keep
+        // the diff as wide as possible.
+        HStack(spacing: 0) {
             FileTreeView(model: model)
                 .listStyle(.sidebar)
-                .frame(minWidth: 180, idealWidth: 260, maxWidth: 500)
+                .frame(width: Self.treeWidth(for: model.tree))
+            Divider()
             DiffPane(model: model)
-                .frame(minWidth: 400, maxWidth: .infinity)
+                .frame(maxWidth: .infinity)
             if model.showComments {
+                Divider()
                 CommentsPane(model: model)
-                    .frame(minWidth: 240, idealWidth: 340, maxWidth: 600)
+                    .frame(width: Self.commentsWidth)
             }
         }
+    }
+
+    /// Width of the comments pane: enough for a readable comment, and no more.
+    private static let commentsWidth: CGFloat = 320
+
+    /// Returns a width that fits the file tree's widest row, between 160 and 360 points.
+    ///
+    /// Longer names are truncated in the middle; the full path is in each row's tooltip.
+    ///
+    /// - Parameter tree: The tree's top-level nodes.
+    /// - Returns: The tree pane's width.
+    private static func treeWidth(for tree: [FileNode]) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let widest =
+            FileTree.rows(in: tree).map { row in
+                // List insets, the disclosure indent per level, the icon, and room for a comment-count badge.
+                let text = (row.name as NSString).size(withAttributes: [.font: font]).width
+                return 20 + CGFloat(row.depth) * 16 + 24 + text + 36
+            }.max() ?? 0
+        return min(max(widest.rounded(.up), 160), 360)
     }
 }
 

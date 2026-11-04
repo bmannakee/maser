@@ -141,7 +141,7 @@ struct MainView: View {
                 sections: sections, selection: $selection, filter: $filter, focus: $focus,
                 openID: state.openPR?.id, open: open
             )
-            .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 520)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 320)
         } detail: {
             detail
         }
@@ -150,9 +150,18 @@ struct MainView: View {
         .focusedSceneValue(\.refreshAction, RefreshAction { refresh() })
         .focusedSceneValue(\.filterAction, FilterAction { focusFilter() })
         .configProblemsBanner()
-        .defaultFocus($focus, .list)
+        // No `defaultFocus`: it pulled focus back to the list whenever a comment box took it.
+        .onAppear { if state.openReview == nil { focus = .list } }
         .onChange(of: state.queueFocusRequest) { focus = .list }
-        // Clicking a PR shows it once the selection settles, so arrowing through the list doesn't load every PR.
+        // A click shows the PR right away and gives it the keys; the queue gets them back only when clicked again or
+        // asked for (⌘0, g p).
+        .onChange(of: selection) { _, ids in
+            guard Self.isMouseEvent(NSApp.currentEvent), ids.count == 1, let id = ids.first,
+                let pr = sections?.lazy.compactMap(\.prs).joined().first(where: { $0.id == id })
+            else { return }
+            open([pr], newWindow: false)
+        }
+        // Moving through the list with keys shows a PR once the selection settles, so passing PRs aren't all loaded.
         .task(id: selection) {
             guard selection.count == 1, let id = selection.first, id != state.openPR?.id,
                 let pr = sections?.lazy.compactMap(\.prs).joined().first(where: { $0.id == id })
@@ -185,6 +194,14 @@ struct MainView: View {
             )
             .navigationTitle("Pull Requests")
         }
+    }
+
+    /// Whether an event is a mouse click, to tell clicking a PR from moving to it with keys.
+    ///
+    /// - Parameter event: The event being handled, if any.
+    /// - Returns: True for left mouse-down and mouse-up events; a right click only opens the context menu.
+    private static func isMouseEvent(_ event: NSEvent?) -> Bool {
+        event?.type == .leftMouseDown || event?.type == .leftMouseUp
     }
 
     /// Whether vim-style keys go to the queue: when the sidebar has focus or no PR is open.

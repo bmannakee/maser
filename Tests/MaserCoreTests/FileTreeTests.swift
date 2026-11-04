@@ -29,6 +29,14 @@ import Testing
         #expect(FileTree.firstFilePath(in: tree) == "a/b/c/deep.txt")
     }
 
+    /// Lists every row depth-first with its depth, for sizing the sidebar to the widest one.
+    @Test func rowsWithDepths() {
+        let tree = FileTree.build(paths: ["README.md", "Sources/Maser/App.swift", "Sources/MaserCore/Diff.swift"])
+        let rows = FileTree.rows(in: tree).map { "\($0.depth) \($0.name)" }
+        #expect(rows == ["0 Sources", "1 Maser", "2 App.swift", "1 MaserCore", "2 Diff.swift", "0 README.md"])
+        #expect(FileTree.rows(in: []).isEmpty)
+    }
+
     @Test func emptyTree() {
         #expect(FileTree.build(paths: []).isEmpty)
         #expect(FileTree.firstFilePath(in: []) == nil)
