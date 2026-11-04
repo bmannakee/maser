@@ -1,0 +1,11 @@
+start: AppKitWindow focus=nil sel=[] vis=shown queueKeys=false open=15
+/ in review: AppKitWindow focus=nil sel=[] vis=shown queueKeys=false open=15
+cmd-0: SwiftUIOutlineListView focus=Optional(Maser.QueueFocus.list) sel=["15"] vis=shown queueKeys=true open=15
+j: SwiftUIOutlineListView focus=Optional(Maser.QueueFocus.list) sel=["15"] vis=shown queueKeys=true open=15
+k: SwiftUIOutlineListView focus=Optional(Maser.QueueFocus.list) sel=["16"] vis=shown queueKeys=true open=16
+j, return: AppKitWindow focus=nil sel=["15"] vis=shown queueKeys=false open=15
+e (keys in review): AppKitWindow focus=nil sel=["15"] vis=hidden queueKeys=false open=15
+e again: SwiftUIOutlineListView focus=Optional(Maser.QueueFocus.list) sel=["15"] vis=shown queueKeys=true open=15
+e third: AppKitWindow focus=nil sel=["15"] vis=hidden queueKeys=false open=15
+/ in queue: AppKitWindow focus=nil sel=["15"] vis=hidden queueKeys=false open=15
+survived

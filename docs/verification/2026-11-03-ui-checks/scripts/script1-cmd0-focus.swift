@@ -1,0 +1,12 @@
+            say("start: \(responder())")
+            focus = .list
+            try? await Task.sleep(for: .seconds(0.5))
+            open([state.openPR!], newWindow: false)
+            try? await Task.sleep(for: .seconds(0.5))
+            say("after open: \(responder())")
+            state.focusQueue()
+            try? await Task.sleep(for: .seconds(0.5))
+            say("after cmd-0: \(responder())")
+            run(.cursorDown)
+            try? await Task.sleep(for: .seconds(0.5))
+            say("after j: \(responder())")
