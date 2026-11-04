@@ -13,11 +13,14 @@ struct FilesView: View {
     @Bindable var model: ReviewModel
 
     var body: some View {
-        NavigationSplitView {
+        // Not a NavigationSplitView: this tab sits in the main window's split view, and nesting one split view in
+        // another sends AppKit into an endless constraint-update loop that crashes the app on switching to Files.
+        HSplitView {
             FileTreeView(model: model)
-                .navigationSplitViewColumnWidth(min: 180, ideal: 260, max: 500)
-        } detail: {
+                .listStyle(.sidebar)
+                .frame(minWidth: 180, idealWidth: 260, maxWidth: 500)
             DiffPane(model: model)
+                .frame(minWidth: 400, maxWidth: .infinity)
         }
         .inspector(isPresented: $model.showComments) {
             CommentsPane(model: model)
