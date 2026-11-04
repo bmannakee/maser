@@ -190,7 +190,9 @@ struct MainView: View {
     /// Whether vim-style keys go to the queue: when the sidebar has focus or no PR is open.
     private var keysGoToQueue: Bool { focus != nil || state.openReview == nil }
 
-    /// Runs a vim-style key's command in the queue or the open review, whichever has the keys.
+    /// Runs a vim-style key's command in the queue or the open review.
+    ///
+    /// While the sidebar has focus the queue gets each key first, and the review gets the ones it doesn't use.
     ///
     /// - Parameters:
     ///   - command: The command to run.
@@ -201,7 +203,8 @@ struct MainView: View {
             focusFilter()
             return true
         }
-        if keysGoToQueue { return performInQueue(command, in: sections) }
+        // Keys the queue doesn't use (c, g f, S…) go on to the open review, so they work right after a click in the list.
+        if keysGoToQueue, performInQueue(command, in: sections) { return true }
         return state.openReview?.perform(command) ?? false
     }
 

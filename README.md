@@ -32,7 +32,8 @@ filter. Move with `j`/`k` and jump between sections with `]`/`[`.
 
 The queue sits in the main window's sidebar, with the selected PR's review beside it. Clicking a PR shows it; Return
 shows it and moves the keys to the review. ⌘0 (or `g p`) brings the main window forward with the queue focused, from
-anywhere, and Esc in the queue goes back to the review. Reviews you've opened stay loaded, so switching between PRs is
+anywhere, and Esc in the queue goes back to the review. While the queue has the keys, the ones it doesn't use (`c`,
+`g f`, `S`…) still reach the open review. Reviews you've opened stay loaded, so switching between PRs is
 instant. ⌥Return, or Open in New Window in the context menu, opens a PR in a window of its own, to compare two side by
 side. ⌘O opens any PR by URL. Each review has tabs:
 

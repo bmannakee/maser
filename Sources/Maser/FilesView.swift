@@ -1,6 +1,6 @@
 // The Files tab of a review window: the changed files, a file's diff, and its review comments.
 //
-// `FilesView` lays out the file tree, the diff with its vim-style line cursor, and the comments inspector, where line
+// `FilesView` lays out the file tree, the diff with its vim-style line cursor, and the comments pane, where line
 // comments and replies are written. The views hold little state of their own: they read from and act through the
 // window's `ReviewModel`.
 
@@ -8,23 +8,24 @@ import AppKit
 import MaserCore
 import SwiftUI
 
-/// The Files tab: the changed-file tree, the selected file's diff, and its comments in an inspector.
+/// The Files tab: the changed-file tree, the selected file's diff, and its comments, side by side.
 struct FilesView: View {
     @Bindable var model: ReviewModel
 
     var body: some View {
-        // Not a NavigationSplitView: this tab sits in the main window's split view, and nesting one split view in
-        // another sends AppKit into an endless constraint-update loop that crashes the app on switching to Files.
+        // Three plain split panes rather than a NavigationSplitView with an inspector: this tab sits in the main
+        // window's split view, and both a nested split view and an inspector beside the file tree there send AppKit
+        // into an endless constraint-update loop that crashes the app on switching to Files.
         HSplitView {
             FileTreeView(model: model)
                 .listStyle(.sidebar)
                 .frame(minWidth: 180, idealWidth: 260, maxWidth: 500)
             DiffPane(model: model)
                 .frame(minWidth: 400, maxWidth: .infinity)
-        }
-        .inspector(isPresented: $model.showComments) {
-            CommentsPane(model: model)
-                .inspectorColumnWidth(min: 240, ideal: 340, max: 600)
+            if model.showComments {
+                CommentsPane(model: model)
+                    .frame(minWidth: 240, idealWidth: 340, maxWidth: 600)
+            }
         }
     }
 }
@@ -501,7 +502,7 @@ private struct KeyHintBar: View {
 
 // MARK: - Comments
 
-/// The comments inspector: the inline draft's composer, if any, above the selected file's threads.
+/// The comments pane: the inline draft's composer, if any, above the selected file's threads.
 private struct CommentsPane: View {
     @Bindable var model: ReviewModel
 
