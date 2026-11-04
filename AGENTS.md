@@ -136,6 +136,18 @@ enforced in review.
   add a comment stating the invariant.
 - User-facing errors are short, specific sentences. Show the message from `gh` where it helps.
 
+## Requirements, risks and verification
+
+Maser is run as if it were regulated software, for practice. `docs/design/` holds the user needs, requirements, risk
+file, usability file and traceability, modeled on IEC 62304, ISO 14971 and IEC 62366. `docs/verification/` holds dated
+verification records. See `docs/design/README.md` for the ID scheme.
+
+- A PR that changes behavior updates the affected requirements, and the risk file if a hazard or control changes, in
+  the same PR. The PR description names the IDs it touches.
+- A new requirement says how it will be verified. A risk control that isn't built yet is a `Proposed` requirement
+  with an issue.
+- Checks you run by hand or with a one-off script go in a verification record. Prefer making them repeatable tests.
+
 ## Tests
 
 - Every MaserCore change comes with Swift Testing tests (`@Test`, `#expect`, `#require`).
