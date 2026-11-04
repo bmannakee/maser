@@ -1,0 +1,7 @@
+start: AppKitWindow focus=nil splits=[340, 1600]
+list focused: SwiftUIOutlineListView focus=Optional(Maser.QueueFocus.list)
+overview c from list: PlatformTextView focus=nil
+files: AppKitWindow focus=nil splits=[340, 1600]
+files c +0.3s: PlatformTextView focus=nil draft=true
+files c +2.3s: PlatformTextView focus=nil draft=true
+survived

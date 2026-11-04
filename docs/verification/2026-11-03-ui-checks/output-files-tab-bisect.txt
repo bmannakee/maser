@@ -1,0 +1,7 @@
+MASER_FILES_PLAIN: 10 tab switches, survived=1
+MASER_NO_INSPECTOR: 10 tab switches, survived=1
+MASER_NO_TREE: 10 tab switches, survived=1
+MASER_NO_DIFF: 1 tab switches, survived=0
+MASER_THREE_PANE: 10 tab switches, survived=1
+MASER_HSTACK_TREE: 10 tab switches, survived=1
+MASER_FINAL: 16 tab switches, survived=1
