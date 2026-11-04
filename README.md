@@ -31,8 +31,9 @@ it, and empty sections are hidden. Type `/` (or ⌘F) to filter by title, reposi
 filter. Move with `j`/`k` and jump between sections with `]`/`[`.
 
 The queue sits in the main window's sidebar, with the selected PR's review beside it. Clicking a PR, or pressing Return
-on it, shows it and moves the keys to the review. The queue takes the keys back only when you click it or press ⌘0
-(or `g p`), which also brings the main window forward from anywhere; Esc in the queue goes back to the review. While the queue has the keys, the ones it doesn't use (`c`,
+on it, shows it and moves the keys to the review. The queue takes the keys back only when you press ⌘0 (or `g p`),
+which also brings the main window forward from anywhere, or `e`, which shows and hides it; Esc in the queue goes back to
+the review. `/` filters the queue only while it has the keys; ⌘F works from anywhere. While the queue has the keys, the ones it doesn't use (`c`,
 `g f`, `S`…) still reach the open review. Reviews you've opened stay loaded, so switching between PRs is
 instant. ⌥Return, or Open in New Window in the context menu, opens a PR in a window of its own, to compare two side by
 side. ⌘O opens any PR by URL. Each review has tabs:
@@ -60,7 +61,9 @@ Every action is a command you can trigger two ways:
 | Open pull request | ⌘O | |
 | Refresh | ⌘R | `r` |
 | Filter the queue | ⌘F | `/` |
-| Show the queue (from anywhere) | ⌘0 | `g p` |
+| Show the queue and give it the keys (from anywhere) | ⌘0 | `g p` |
+| Show/hide the queue | | `e` |
+| Open the selected PR (queue) / in a new window | | `enter` / `opt+enter` |
 | Open on GitHub | ⇧⌘O | `o` |
 | Comment (Overview: on the PR; Files: on the cursor line or selection) | ⌥⌘C | `c` |
 | Reply to the selected thread | | `R` |

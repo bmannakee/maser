@@ -398,6 +398,8 @@ final class ReviewModel {
         case .scrollToBottom: return scrollDiff(.bottom)
         // App-wide commands, handled for every window by `commandHandler(_:)`.
         case .openPullRequest, .openConfig, .showKeybindings, .showPullRequests: return false
+        // The main window's queue handles these; Return falls through to whatever has focus.
+        case .togglePullRequests, .openSelected: return false
         // Only the review queue has a filter.
         case .filter: return false
         }

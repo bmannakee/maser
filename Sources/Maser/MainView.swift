@@ -21,22 +21,38 @@ final class MainWindowState {
     var columnVisibility = NavigationSplitViewVisibility.all
     /// Bumped to ask the window to show the sidebar and focus the list.
     private(set) var queueFocusRequest = 0
+    /// Whether vim-style keys go to the queue rather than the open review.
+    ///
+    /// Tracked here rather than read from keyboard focus: AppKit doesn't always move focus to the list when asked.
+    var queueHasKeys = true
 
     /// The review in the detail column.
     var openReview: ReviewModel? { openPR.flatMap { reviews[$0.id] } }
 
     /// Shows a PR's review in the detail column, creating it the first time.
     ///
-    /// - Parameter pr: The pull request to show.
-    func open(_ pr: PullRequest) {
+    /// - Parameters:
+    ///   - pr: The pull request to show.
+    ///   - takeKeys: Whether the review gets the keys. False while moving through the queue with keys, which shows
+    ///     each PR without leaving the queue.
+    func open(_ pr: PullRequest, takeKeys: Bool = true) {
         if reviews[pr.id] == nil { reviews[pr.id] = ReviewModel(pr: pr) }
         openPR = pr
+        if takeKeys { queueHasKeys = false }
     }
 
-    /// Asks the window to show the sidebar and focus the list.
+    /// Shows the sidebar and gives the queue the keys.
     func focusQueue() {
         columnVisibility = .all
+        queueHasKeys = true
         queueFocusRequest += 1
+    }
+
+    /// Hides the sidebar and gives the open review the keys; does nothing with no review open.
+    func hideQueue() {
+        guard openReview != nil else { return }
+        columnVisibility = .detailOnly
+        queueHasKeys = false
     }
 }
 
@@ -152,7 +168,20 @@ struct MainView: View {
         .configProblemsBanner()
         // No `defaultFocus`: it pulled focus back to the list whenever a comment box took it.
         .onAppear { if state.openReview == nil { focus = .list } }
-        .onChange(of: state.queueFocusRequest) { focus = .list }
+        .onChange(of: state.queueFocusRequest) {
+            // Start j/k from the open PR, and highlight the list. Setting focus directly doesn't always take, so clear
+            // it first; the keys go to the queue either way.
+            if selection.isEmpty, let id = state.openPR?.id { selection = [id] }
+            focus = nil
+            Task {
+                await Task.yield()
+                focus = .list
+            }
+        }
+        .onChange(of: focus) { old, new in
+            // Leaving the filter box with Return or Esc keeps the keys in the queue.
+            if old == .filter, new == .list { state.queueHasKeys = true }
+        }
         // A click shows the PR right away and gives it the keys; the queue gets them back only when clicked again or
         // asked for (⌘0, g p).
         .onChange(of: selection) { _, ids in
@@ -168,7 +197,7 @@ struct MainView: View {
             else { return }
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
-            state.open(pr)
+            state.open(pr, takeKeys: false)
         }
         .task {
             if let pr = MainWindows.shared.takePending() { state.open(pr) }
@@ -185,8 +214,12 @@ struct MainView: View {
         if let review = state.openReview {
             ReviewView(model: review)
                 .id(review.pr.id)
-                // Clicking the review gives it the keys; the list would otherwise keep them.
-                .simultaneousGesture(TapGesture().onEnded { if focus == .list { focus = nil } })
+                // Clicking the review gives it the keys.
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        state.queueHasKeys = false
+                        if focus == .list { focus = nil }
+                    })
         } else {
             ContentUnavailableView(
                 "No pull request open", systemImage: "arrow.triangle.pull",
@@ -204,23 +237,33 @@ struct MainView: View {
         event?.type == .leftMouseDown || event?.type == .leftMouseUp
     }
 
-    /// Whether vim-style keys go to the queue: when the sidebar has focus or no PR is open.
-    private var keysGoToQueue: Bool { focus != nil || state.openReview == nil }
+    /// Whether vim-style keys go to the queue: when it has them, or no PR is open.
+    private var keysGoToQueue: Bool { state.queueHasKeys || state.openReview == nil }
 
     /// Runs a vim-style key's command in the queue or the open review.
     ///
-    /// While the sidebar has focus the queue gets each key first, and the review gets the ones it doesn't use.
+    /// While the queue has the keys it gets each one first, and the review gets the ones it doesn't use.
     ///
     /// - Parameters:
     ///   - command: The command to run.
     ///   - sections: The queue's sections as shown.
     /// - Returns: False for commands that don't apply, so the key falls through.
     private func perform(_ command: CommandID, in sections: [QueueSection]) -> Bool {
-        if command == .filter {
-            focusFilter()
+        switch command {
+        case .togglePullRequests:
+            // Hidden: show it with the keys. Showing: hide it, unless there's no review to show instead.
+            if state.columnVisibility == .detailOnly || state.openReview == nil {
+                state.focusQueue()
+            } else {
+                state.hideQueue()
+                focus = nil
+            }
             return true
+        // `/` only filters while the queue has the keys, so a stray press in the diff does nothing.
+        case .filter where !keysGoToQueue: return true
+        default: break
         }
-        // Keys the queue doesn't use (c, g f, S…) go on to the open review, so they work right after a click in the list.
+        // Keys the queue doesn't use (c, g f, S…) go on to the open review.
         if keysGoToQueue, performInQueue(command, in: sections) { return true }
         return state.openReview?.perform(command) ?? false
     }
@@ -236,11 +279,17 @@ struct MainView: View {
         let index = prs.lastIndex { selection.contains($0.id) }
         switch command {
         case .refresh: Task { await queue.refresh() }
+        case .filter: focusFilter()
+        case .openSelected:
+            let chosen = prs.filter { selection.contains($0.id) }
+            guard !chosen.isEmpty else { return false }
+            open(chosen, newWindow: NSApp.currentEvent?.modifierFlags.contains(.option) == true)
         case .cancel:
             // Esc clears the filter, then hands the keys back to the open review.
             if !filter.isEmpty {
                 filter = ""
             } else if state.openReview != nil {
+                state.queueHasKeys = false
                 focus = nil
             } else {
                 return false
@@ -295,9 +344,10 @@ struct MainView: View {
         }
     }
 
-    /// Shows the sidebar and focuses the filter box.
+    /// Shows the sidebar and focuses the filter box, giving the queue the keys.
     private func focusFilter() {
         state.columnVisibility = .all
+        state.queueHasKeys = true
         focus = .filter
     }
 

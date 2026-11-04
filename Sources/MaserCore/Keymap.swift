@@ -112,6 +112,8 @@ public struct Keymap: Sendable, Equatable {
             .showOverview: [[KeyChord("g"), KeyChord("o")]],
             .showFiles: [[KeyChord("g"), KeyChord("f")]],
             .showPullRequests: [[KeyChord("g"), KeyChord("p")]],
+            .togglePullRequests: [[KeyChord("e")]],
+            .openSelected: [[KeyChord(.enter)], [KeyChord(.enter, modifiers: .option)]],
             .toggleComments: [[KeyChord("i")]],
             .refresh: [[KeyChord("r")]],
             .filter: [[KeyChord("/")]],
