@@ -167,7 +167,13 @@ struct MainView: View {
         .focusedSceneValue(\.filterAction, FilterAction { focusFilter() })
         .configProblemsBanner()
         // No `defaultFocus`: it pulled focus back to the list whenever a comment box took it.
-        .onAppear { if state.openReview == nil { focus = .list } }
+        .onAppear {
+            // With no review to show, a sidebar restored as hidden would leave an empty window.
+            if state.openReview == nil {
+                state.columnVisibility = .all
+                focus = .list
+            }
+        }
         .onChange(of: state.queueFocusRequest) {
             // Start j/k from the open PR, and highlight the list. Setting focus directly doesn't always take, so clear
             // it first; the keys go to the queue either way.
