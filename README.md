@@ -25,7 +25,11 @@ cp -R .build/Maser.app /Applications/
 
 The bundle is signed ad hoc, with no developer account. Built on the Mac that runs it, it isn't quarantined, so Gatekeeper doesn't ask about it. To run it on another Mac, build it there, or sign it with a Developer ID and notarize it.
 
-The queue lists open PRs requesting your review; double-click one (or ⌘O to paste any PR URL) to open a review window. Each window has tabs:
+The queue lists open PRs in sections: **Review requested**, **Yours** and **Involving you** (you commented, were
+mentioned or are assigned), plus any searches you add to `config.toml`. A PR shows only in the first section that finds
+it, and empty sections are hidden. Type `/` (or ⌘F) to filter by title, repository, author or `#number`; Esc clears the
+filter. Move with `j`/`k`, jump between sections with `]`/`[`, and press Return or double-click to open a review window
+(⌘O pastes any PR URL). Each review window has tabs:
 
 - **Overview** — title, description, comments and reviews (rendered by GitHub), plus mergeability, review status, CI checks and labels.
   Write a comment in the box at the bottom (`c` to jump there, ⌘↩ to post, Esc to leave it); **Quote reply** on any comment quotes it into your draft.
@@ -49,23 +53,24 @@ Every action is a command you can trigger two ways:
 | --- | --- | --- |
 | Open pull request | ⌘O | |
 | Refresh | ⌘R | `r` |
+| Filter the queue | ⌘F | `/` |
 | Open on GitHub | ⇧⌘O | `o` |
 | Comment (Overview: on the PR; Files: on the cursor line or selection) | ⌥⌘C | `c` |
 | Reply to the selected thread | | `R` |
 | Finish review | ⌥⌘R | `S` |
 | Overview / Files tab | ⌘1 / ⌘2 | `g o` / `g f` |
 | Show/hide comments | ⌥⌘0 | `i` |
-| Next / previous line (Files) | | `j` / `k` |
+| Next / previous line (Files), or PR (queue) | | `j` / `k` |
 | Select lines / cancel selection | | `V` / `esc` |
 | Next / previous hunk | | `}` / `{` |
 | Show full file / only changes (this file) | ⌥⌘E | `z a` |
 | Show all files in full / only changes | | `z R` / `z M` |
-| Next / previous file | ⌥⌘↓ / ⌥⌘↑ | `]` / `[` |
+| Next / previous file, or queue section | ⌥⌘↓ / ⌥⌘↑ | `]` / `[` |
 | Next / previous comment thread | ⌃⌘↓ / ⌃⌘↑ | `n` / `N` |
 | Scroll diff down / up a page | | `ctrl+f` or `space` / `ctrl+b` or `shift+space` |
 | Scroll diff down / up half a page | | `ctrl+d` / `ctrl+u` |
 | Scroll diff down / up a line | | `ctrl+e` / `ctrl+y` |
-| Top / bottom of diff | | `g g` / `G` |
+| Top / bottom of diff, or first / last PR (queue) | | `g g` / `G` |
 | Open config file | ⌘, | |
 | Keyboard shortcuts | ⌘/ | `?` |
 
@@ -90,7 +95,17 @@ view = "full"                   # open files in full; the default is "hunks"
 
 [github]
 gh = "~/.local/bin/gh"          # only if Maser can't find gh
+
+[queue]
+sections = ["review-requested", "yours"]   # built-in sections to show; default adds "involving"
+searches = [                               # more sections, in GitHub's search syntax
+  { name = "maser", query = "repo:bmannakee/maser" },
+  { name = "Team", query = "org:my-org team-review-requested:my-org/backend" },
+]
 ```
+
+Queue searches show open PRs unless the query picks a state (`is:closed`, `is:merged`). Quote phrases as on GitHub,
+with TOML escapes: `query = "label:\"needs review\""`. Hover a section's heading to see its query.
 
 Maser looks for `gh` in Homebrew, MacPorts, Nix, `~/.local/bin` and mise or asdf shims, then asks your login shell. Set `[github] gh` if it's somewhere else.
 

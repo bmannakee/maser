@@ -68,6 +68,7 @@ public struct Keymap: Sendable, Equatable {
         menu: [
             .openPullRequest: KeyChord("o", modifiers: .command),
             .refresh: KeyChord("r", modifiers: .command),
+            .filter: KeyChord("f", modifiers: .command),
             .openOnGitHub: KeyChord("o", modifiers: [.command, .shift]),
             .showOverview: KeyChord("1", modifiers: .command),
             .showFiles: KeyChord("2", modifiers: .command),
@@ -111,6 +112,7 @@ public struct Keymap: Sendable, Equatable {
             .showFiles: [[KeyChord("g"), KeyChord("f")]],
             .toggleComments: [[KeyChord("i")]],
             .refresh: [[KeyChord("r")]],
+            .filter: [[KeyChord("/")]],
             .openOnGitHub: [[KeyChord("o")]],
             .showKeybindings: [[KeyChord("?")]],
         ]
