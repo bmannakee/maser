@@ -129,21 +129,29 @@ public struct GitHubCLI: Sendable {
             .last { $0.hasPrefix("/") && FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    /// Fetches the open PRs where the viewer's review is requested.
+    /// Runs a pull request search, such as one section of the review queue.
     ///
-    /// - Parameter limit: The most PRs to return.
+    /// - Parameters:
+    ///   - search: The search; open PRs only unless its query picks a state.
+    ///   - limit: The most PRs to return.
     /// - Returns: The PRs in the order `gh search prs` returns them.
-    /// - Throws: `GitHubCLIError.failed` if `gh` fails, or a decoding error if its output isn't the expected JSON.
+    /// - Throws: `GitHubCLIError.failed` if `gh` fails, for example on a query GitHub can't parse, or a decoding error
+    ///   if its output isn't the expected JSON.
     @concurrent
-    public func reviewRequests(limit: Int = 100) async throws -> [PullRequest] {
-        let data = try await run([
-            "search", "prs",
-            "--review-requested=@me",
-            "--state=open",
-            "--limit", String(limit),
-            "--json", PullRequest.jsonFields,
-        ])
-        return try PullRequest.decodeList(from: data)
+    public func searchPullRequests(_ search: PullRequestSearch, limit: Int = 100) async throws -> [PullRequest] {
+        try PullRequest.decodeList(from: await run(Self.searchArguments(for: search, limit: limit)))
+    }
+
+    /// The `gh` arguments for a pull request search.
+    ///
+    /// The search's words go after `--`, so a word such as `-label:wip` isn't taken for a flag.
+    ///
+    /// - Parameters:
+    ///   - search: The search.
+    ///   - limit: The most PRs to return.
+    /// - Returns: The arguments, starting with `search prs`.
+    static func searchArguments(for search: PullRequestSearch, limit: Int) -> [String] {
+        ["search", "prs", "--limit", String(limit), "--json", PullRequest.jsonFields, "--"] + search.searchWords
     }
 
     /// Looks up a single PR from its web URL, e.g. `https://github.com/owner/repo/pull/123`.

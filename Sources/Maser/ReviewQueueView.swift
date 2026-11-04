@@ -1,54 +1,100 @@
 // The review queue: the app's main window.
 //
-// Lists the open PRs where the user's review is requested, newest activity first, and opens a review window for any of
-// them. It also opens PR URLs passed on the command line at launch. The list lives in `ReviewQueue`, shared by every
-// queue window, so a new window (such as the one a Dock click opens) shows the last list at once.
+// Lists open PRs in sections, one per search: review requested, yours, involving you, and any searches from
+// `config.toml`. It opens a review window for any of them, and opens PR URLs passed on the command line at launch. The
+// sections live in `ReviewQueue`, shared by every queue window, so a new window (such as the one a Dock click opens)
+// shows the last results at once.
 
 import MaserCore
 import Observation
 import SwiftUI
 
-/// The PRs awaiting the user's review, shared by every queue window and kept between them.
+/// The queue's searches and their results, shared by every queue window and kept between them.
 @MainActor @Observable
 final class ReviewQueue {
     /// The app's single queue.
     static let shared = ReviewQueue()
 
-    /// The PRs from the last successful load, most recently updated first; `nil` before the first one.
-    private(set) var prs: [PullRequest]?
-    /// The message from the last failed load, cleared by the next successful one.
-    private(set) var error: String?
+    /// One section per search, in queue order, before de-duplication and filtering; `nil` before the first load.
+    private(set) var sections: [QueueSection]?
     /// Whether a load is in progress.
     private(set) var isLoading = false
-    /// When the list last loaded successfully.
+    /// When the sections last loaded.
     private var loadedAt: Date?
+    /// The searches the load in progress is running, if any.
+    private var loadingSearches: [PullRequestSearch]?
+    /// Set when the searches change during a load, so it runs again with the new ones.
+    private var needsReload = false
 
     /// Only `shared` exists.
     private init() {}
 
-    /// Fetches the PRs awaiting review, keeping the current list on screen meanwhile.
+    /// Runs the configured searches in parallel, keeping the current results on screen meanwhile.
     ///
-    /// - Parameter maxAge: Skip the fetch if the list loaded less than this many seconds ago; `0` always fetches.
+    /// A search that fails keeps its last results and shows the error; the others still update.
+    ///
+    /// - Parameter maxAge: Skip the fetch if the queue loaded less than this many seconds ago with the same searches;
+    ///   `0` always fetches.
     func refresh(maxAge: TimeInterval = 0) async {
-        guard !isLoading else { return }
-        if let loadedAt, Date.now.timeIntervalSince(loadedAt) < maxAge { return }
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            let prs = try await GitHubCLI().reviewRequests()
-            self.prs = prs.sorted { $0.updatedAt > $1.updatedAt }
-            error = nil
-            loadedAt = .now
-        } catch {
-            self.error = error.localizedDescription
+        let searches = ConfigStore.shared.settings.queueSearches
+        guard !isLoading else {
+            needsReload = needsReload || searches != loadingSearches
+            return
         }
+        if let loadedAt, Date.now.timeIntervalSince(loadedAt) < maxAge, searches == sections?.map(\.search) { return }
+        isLoading = true
+        defer {
+            isLoading = false
+            loadingSearches = nil
+        }
+        repeat {
+            needsReload = false
+            let searches = ConfigStore.shared.settings.queueSearches
+            loadingSearches = searches
+            await load(searches)
+        } while needsReload
+    }
+
+    /// Runs searches and replaces the sections with their results.
+    ///
+    /// - Parameter searches: The searches, in queue order.
+    private func load(_ searches: [PullRequestSearch]) async {
+        let previous = Dictionary((sections ?? []).map { ($0.id, $0.prs) }, uniquingKeysWith: { first, _ in first })
+        let results = await withTaskGroup(of: (Int, Result<[PullRequest], any Error>).self) { group in
+            let cli = GitHubCLI()
+            for (index, search) in searches.enumerated() {
+                group.addTask {
+                    do { return (index, .success(try await cli.searchPullRequests(search))) } catch {
+                        return (index, .failure(error))
+                    }
+                }
+            }
+            var results: [Int: Result<[PullRequest], any Error>] = [:]
+            for await (index, result) in group { results[index] = result }
+            return results
+        }
+        sections = searches.enumerated().map { index, search in
+            switch results[index] {
+            case let .success(prs): QueueSection(search: search, prs: prs)
+            case let .failure(error):
+                QueueSection(search: search, prs: previous[search.id] ?? nil, error: error.localizedDescription)
+            case nil: QueueSection(search: search, prs: previous[search.id] ?? nil)
+            }
+        }
+        loadedAt = .now
     }
 }
 
-/// Lists open PRs awaiting the user's review.
+/// Lists open PRs in sections, with a filter box.
 struct ReviewQueueView: View {
+    /// The parts of the window that take keyboard focus.
+    private enum Focus: Hashable { case list, filter }
+
     private let queue = ReviewQueue.shared
     @State private var selection: Set<PullRequest.ID> = []
+    /// The filter box's text; every word must match a PR.
+    @State private var filter = ""
+    @FocusState private var focus: Focus?
     @Environment(\.openURL) private var openURL
     @Environment(\.openWindow) private var openWindow
 
@@ -56,29 +102,98 @@ struct ReviewQueueView: View {
     @MainActor private static var openedLaunchArguments = false
 
     var body: some View {
-        content
-            .navigationTitle("Review Requests")
-            .toolbar {
-                Button("Open Pull Request…", systemImage: "plus") {
-                    openWindow(id: OpenPullRequestView.windowID)
-                }
-                .help("Open Pull Request…", .openPullRequest)
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await queue.refresh() }
-                }
-                .help("Refresh", .refresh)
-                .disabled(queue.isLoading)
+        let sections = queue.sections.map { QueueSection.displayed($0, filter: filter) }
+        VStack(spacing: 0) {
+            filterBar
+            Divider()
+            content(sections)
+        }
+        .navigationTitle("Pull Requests")
+        .toolbar {
+            Button("Open Pull Request…", systemImage: "plus") {
+                openWindow(id: OpenPullRequestView.windowID)
             }
-            .focusedSceneValue(\.refreshAction, RefreshAction { Task { await queue.refresh() } })
-            .commandHandler { command in
-                guard command == .refresh else { return false }
+            .help("Open Pull Request…", .openPullRequest)
+            Button("Refresh", systemImage: "arrow.clockwise") {
                 Task { await queue.refresh() }
-                return true
             }
-            .configProblemsBanner()
-            .task { await openLaunchArguments() }
-            // A new window shows the last list right away and only refetches if it's more than a minute old.
-            .task { await queue.refresh(maxAge: 60) }
+            .help("Refresh", .refresh)
+            .disabled(queue.isLoading)
+        }
+        .focusedSceneValue(\.refreshAction, RefreshAction { Task { await queue.refresh() } })
+        .focusedSceneValue(\.filterAction, FilterAction { focus = .filter })
+        .commandHandler { perform($0, in: sections ?? []) }
+        .configProblemsBanner()
+        .defaultFocus($focus, .list)
+        .task { await openLaunchArguments() }
+        // A new window shows the last results right away and only refetches if they're more than a minute old.
+        // Changing the searches in config.toml reloads at once.
+        .task(id: ConfigStore.shared.settings.queueSearches) { await queue.refresh(maxAge: 60) }
+    }
+
+    /// The filter box.
+    ///
+    /// Return or Esc goes back to the list; Esc also clears the filter.
+    private var filterBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.secondary)
+            TextField("Filter by title, repository, author or #number", text: $filter)
+                .textFieldStyle(.plain)
+                .focused($focus, equals: .filter)
+                .onSubmit { focus = .list }
+                .onExitCommand {
+                    filter = ""
+                    focus = .list
+                }
+            if queue.isLoading {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .help("Filter Pull Requests", .filter)
+    }
+
+    /// Runs a vim-style key's command in the queue.
+    ///
+    /// - Parameters:
+    ///   - command: The command to run.
+    ///   - sections: The sections as shown, for moving the selection.
+    /// - Returns: False for commands that don't apply here, so the key falls through.
+    private func perform(_ command: CommandID, in sections: [QueueSection]) -> Bool {
+        let prs = sections.flatMap { $0.prs ?? [] }
+        let index = prs.lastIndex { selection.contains($0.id) }
+        switch command {
+        case .refresh: Task { await queue.refresh() }
+        case .filter: focus = .filter
+        case .cancel:
+            guard !filter.isEmpty else { return false }
+            filter = ""
+        case .cursorDown: select(prs, at: index.map { $0 + 1 } ?? 0)
+        case .cursorUp: select(prs, at: index.map { $0 - 1 } ?? 0)
+        case .scrollToTop: select(prs, at: 0)
+        case .scrollToBottom: select(prs, at: prs.count - 1)
+        // In the queue, ] and [ move between sections rather than files.
+        case .nextFile, .previousFile:
+            if let target = QueueSection.sectionStart(from: index, in: sections, forward: command == .nextFile) {
+                select(prs, at: target)
+            }
+        case .openOnGitHub:
+            for pr in prs where selection.contains(pr.id) { openURL(pr.url) }
+        default: return false
+        }
+        return true
+    }
+
+    /// Selects one PR, clamped to the list, and gives the list focus so Return opens it.
+    ///
+    /// - Parameters:
+    ///   - prs: The PRs as shown, in order.
+    ///   - index: The position to select.
+    private func select(_ prs: [PullRequest], at index: Int) {
+        guard !prs.isEmpty else { return }
+        selection = [prs[min(max(index, 0), prs.count - 1)].id]
+        focus = .list
     }
 
     /// Opens a review window for each PR URL passed on the command line (`swift run Maser <url>…`), once per launch.
@@ -98,46 +213,68 @@ struct ReviewQueueView: View {
         }
     }
 
-    /// The list, or a progress, error or empty state.
+    /// The sections, or a progress or empty state.
     ///
-    /// A failed refresh keeps the last list and shows the error above it.
+    /// - Parameter sections: The sections as shown, or `nil` before the first load.
+    /// - Returns: The list, or a placeholder.
     @ViewBuilder
-    private var content: some View {
-        if let prs = queue.prs {
-            VStack(spacing: 0) {
-                if let error = queue.error {
-                    Label("Couldn't refresh: \(error)", systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                    Divider()
-                }
-                if prs.isEmpty {
-                    ContentUnavailableView("No reviews requested", systemImage: "checkmark.circle")
-                } else {
-                    list(prs)
-                }
-            }
-        } else if let error = queue.error {
-            ContentUnavailableView("Couldn't load PRs", systemImage: "exclamationmark.triangle", description: Text(error))
+    private func content(_ sections: [QueueSection]?) -> some View {
+        if let sections, !sections.isEmpty {
+            list(sections)
+        } else if sections != nil, !filter.isEmpty {
+            ContentUnavailableView.search(text: filter)
+        } else if sections != nil {
+            ContentUnavailableView(
+                "Nothing to review", systemImage: "checkmark.circle",
+                description: Text(emptyDescription))
         } else {
-            ProgressView()
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    /// The PRs as a selectable list; double-click or Return opens them.
-    private func list(_ prs: [PullRequest]) -> some View {
-        List(prs, selection: $selection) { pr in
-            PullRequestRow(pr: pr)
-        }
-        .contextMenu(forSelectionType: PullRequest.ID.self) { ids in
-            Button("Review") { review(ids, in: prs) }
-            // A PR's ID is its github.com URL.
-            Button("Open on GitHub") { ids.forEach { openURL($0) } }
-        } primaryAction: { ids in
-            review(ids, in: prs)  // Double-click or Return.
+    /// What the queue searched, for the empty state.
+    private var emptyDescription: String {
+        let names = (queue.sections ?? []).map { $0.search.name.lowercased() }
+        guard !names.isEmpty else { return "The queue has no searches. Add some under [queue] in config.toml." }
+        return "No open pull requests in: \(names.joined(separator: ", ")). Add searches under [queue] in config.toml."
+    }
+
+    /// The sections as a selectable list; double-click or Return opens the selected PRs.
+    ///
+    /// - Parameter sections: The sections to show, already de-duplicated and filtered.
+    /// - Returns: The list.
+    private func list(_ sections: [QueueSection]) -> some View {
+        let prs = sections.flatMap { $0.prs ?? [] }
+        return ScrollViewReader { proxy in
+            List(selection: $selection) {
+                ForEach(sections) { section in
+                    Section {
+                        if let error = section.error {
+                            Label("Couldn't search: \(error)", systemImage: "exclamationmark.triangle.fill")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                                .selectionDisabled()
+                        }
+                        ForEach(section.prs ?? []) { pr in
+                            PullRequestRow(pr: pr)
+                        }
+                    } header: {
+                        SectionHeader(search: section.search, count: section.prs?.count ?? 0)
+                    }
+                }
+            }
+            .focused($focus, equals: .list)
+            .contextMenu(forSelectionType: PullRequest.ID.self) { ids in
+                Button("Review") { review(ids, in: prs) }
+                // A PR's ID is its github.com URL.
+                Button("Open on GitHub") { ids.forEach { openURL($0) } }
+            } primaryAction: { ids in
+                review(ids, in: prs)  // Double-click or Return.
+            }
+            .onChange(of: selection) { _, ids in
+                if ids.count == 1, let id = ids.first { proxy.scrollTo(id) }
+            }
         }
     }
 
@@ -145,11 +282,25 @@ struct ReviewQueueView: View {
     ///
     /// - Parameters:
     ///   - ids: The selected PRs.
-    ///   - prs: The loaded PRs to look the IDs up in.
+    ///   - prs: The shown PRs to look the IDs up in.
     private func review(_ ids: Set<PullRequest.ID>, in prs: [PullRequest]) {
         for pr in prs where ids.contains(pr.id) {
             openWindow(value: pr)
         }
+    }
+}
+
+/// A section's heading: its name, how many PRs it shows, and its query as a tooltip.
+private struct SectionHeader: View {
+    let search: PullRequestSearch
+    let count: Int
+
+    var body: some View {
+        HStack {
+            Text(search.name)
+            Text("\(count)").foregroundStyle(.tertiary)
+        }
+        .help(search.query)
     }
 }
 

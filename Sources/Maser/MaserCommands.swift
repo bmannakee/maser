@@ -13,10 +13,17 @@ extension FocusedValues {
     @Entry var reviewModel: ReviewModel?
     /// Reloads whatever the focused window shows.
     @Entry var refreshAction: RefreshAction?
+    /// Focuses the review queue's filter box, when a queue window has focus.
+    @Entry var filterAction: FilterAction?
 }
 
 /// A focused window's way to reload its content, published so the Refresh menu item can reach it.
 struct RefreshAction {
+    let perform: @MainActor () -> Void
+}
+
+/// A queue window's way to focus its filter box, published so the Filter menu item can reach it.
+struct FilterAction {
     let perform: @MainActor () -> Void
 }
 
@@ -27,6 +34,7 @@ struct RefreshAction {
 struct MaserCommands: Commands {
     @FocusedValue(\.reviewModel) private var model
     @FocusedValue(\.refreshAction) private var refresh
+    @FocusedValue(\.filterAction) private var filter
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
@@ -36,6 +44,11 @@ struct MaserCommands: Commands {
 
         CommandGroup(after: .newItem) {
             global(.openPullRequest)
+        }
+
+        CommandGroup(after: .textEditing) {
+            CommandButton(.filter) { filter?.perform() }
+                .disabled(filter == nil)
         }
 
         CommandGroup(before: .toolbar) {

@@ -9,6 +9,7 @@
 public enum CommandID: String, CaseIterable, Sendable {
     case openPullRequest = "open-pull-request"
     case refresh = "refresh"
+    case filter = "filter"
     case openOnGitHub = "open-on-github"
     case showOverview = "show-overview"
     case showFiles = "show-files"
@@ -45,6 +46,7 @@ public enum CommandID: String, CaseIterable, Sendable {
         switch self {
         case .openPullRequest: "Open Pull Request…"
         case .refresh: "Refresh"
+        case .filter: "Filter Pull Requests"
         case .openOnGitHub: "Open on GitHub"
         case .showOverview: "Overview"
         case .showFiles: "Files"
