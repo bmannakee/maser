@@ -46,6 +46,11 @@ struct MaserCommands: Commands {
             global(.openPullRequest)
         }
 
+        CommandGroup(before: .windowList) {
+            global(.showPullRequests)
+            Divider()
+        }
+
         CommandGroup(after: .textEditing) {
             CommandButton(.filter) { filter?.perform() }
                 .disabled(filter == nil)

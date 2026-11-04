@@ -1,25 +1,19 @@
-// The root view of a pull request review window.
+// The review screen for one pull request, and the separate window that can hold one.
 //
-// `ReviewView` creates the window's `ReviewModel`, shows the Overview or Files tab, and adds the toolbar. It also wires
-// the model to the menu bar and the vim-style key router, and presents the Finish Review sheet.
+// `ReviewView` shows a `ReviewModel`'s Overview or Files tab, adds the toolbar, wires the model to the menu bar, and
+// presents the Finish Review sheet. It usually fills the main window's detail column (see `MainView`); `ReviewWindow`
+// puts one in a window of its own, for reviewing PRs side by side.
 
 import MaserCore
 import SwiftUI
 
-/// A PR review window, showing the Overview or Files tab with a toolbar to switch between them.
+/// A PR review, showing the Overview or Files tab with a toolbar to switch between them.
 ///
-/// The tabs are whole-window views. The toolbar picker, the menu bar and vim-style keys all switch them; the picker's
-/// tooltip lists the current bindings.
+/// The toolbar picker, the menu bar and vim-style keys all switch tabs; the picker's tooltip lists the current
+/// bindings. The view loads the PR's data when it appears, unless the model loaded it in the last minute. Whoever shows
+/// it routes vim-style keys to the model, since a window has one key handler.
 struct ReviewView: View {
-    /// The window's state, created once and kept for the window's lifetime.
-    @State private var model: ReviewModel
-
-    /// Creates a review window for a pull request; it loads the PR's data when it appears.
-    ///
-    /// - Parameter pr: The pull request to review.
-    init(pr: PullRequest) {
-        _model = State(initialValue: ReviewModel(pr: pr))
-    }
+    let model: ReviewModel
 
     var body: some View {
         @Bindable var model = model
@@ -70,12 +64,29 @@ struct ReviewView: View {
             }
         }
         .focusedSceneValue(\.reviewModel, model)
-        .focusedSceneValue(\.refreshAction, RefreshAction { [model] in Task { await model.load() } })
-        .commandHandler { [model] in model.perform($0) }
-        .configProblemsBanner()
         .sheet(isPresented: $model.isFinishingReview) {
             FinishReviewView(model: model)
         }
-        .task { await model.load() }
+        .task { await model.loadIfStale(maxAge: 60) }
+    }
+}
+
+/// A window holding one PR's review, opened with Open in New Window to review PRs side by side.
+struct ReviewWindow: View {
+    /// The window's state, created once and kept for the window's lifetime.
+    @State private var model: ReviewModel
+
+    /// Creates a review window for a pull request; it loads the PR's data when it appears.
+    ///
+    /// - Parameter pr: The pull request to review.
+    init(pr: PullRequest) {
+        _model = State(initialValue: ReviewModel(pr: pr))
+    }
+
+    var body: some View {
+        ReviewView(model: model)
+            .focusedSceneValue(\.refreshAction, RefreshAction { [model] in Task { await model.load() } })
+            .commandHandler { [model] in model.perform($0) }
+            .configProblemsBanner()
     }
 }

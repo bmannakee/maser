@@ -1,14 +1,15 @@
-// The state and actions behind one pull request review window.
+// The state and actions behind one pull request's review.
 //
 // `ReviewModel` loads the PR's overview, changed files, review threads and pending review through `GitHubCLI`, and owns
-// everything the window's views share: the current tab, the selected file and whether it shows in full, the vim-style
-// line cursor and `V` selection, comment drafts, and scroll requests. Window commands (menu items and vim-style keys) arrive through `perform(_:)`.
+// everything the review's views share: the current tab, the selected file and whether it shows in full, the vim-style
+// line cursor and `V` selection, comment drafts, and scroll requests. Commands (menu items and vim-style keys) arrive
+// through `perform(_:)`. The main window keeps one per PR it has shown, so going back to a PR keeps its state.
 
 import AppKit
 import MaserCore
 import Observation
 
-/// State for one PR review window.
+/// State for one PR's review, in the main window or a window of its own.
 @MainActor @Observable
 final class ReviewModel {
     /// The progress of loading one part of the window's data.
@@ -175,6 +176,8 @@ final class ReviewModel {
     ///
     /// Programmatic cursor moves scroll the diff, and the visibility changes that causes mustn't move the cursor again.
     private var holdCursorUntil = Date.distantPast
+    /// When `load()` last finished, for `loadIfStale(maxAge:)`.
+    private var loadedAt: Date?
 
     // Writing a review
     /// The line comment or reply being written, if any.
@@ -193,7 +196,7 @@ final class ReviewModel {
     private(set) var reviewError: String?
     private(set) var isSubmittingReview = false
 
-    /// Creates the state for a review window; call `load()` to fetch the PR's data.
+    /// Creates the state for a PR's review; call `load()` to fetch the PR's data.
     ///
     /// - Parameter pr: The pull request to review.
     init(pr: PullRequest) {
@@ -270,6 +273,15 @@ final class ReviewModel {
         async let overview: Void = loadOverview()
         async let files: Void = loadFiles()
         _ = await (overview, files)
+        loadedAt = .now
+    }
+
+    /// Loads the PR's data unless it loaded recently, as when going back to a PR in the main window.
+    ///
+    /// - Parameter maxAge: How many seconds old the data may be before it's refreshed.
+    func loadIfStale(maxAge: TimeInterval) async {
+        if let loadedAt, Date.now.timeIntervalSince(loadedAt) < maxAge { return }
+        await load()
     }
 
     /// Loads the PR's description and conversation, and renders the conversation's HTML.
@@ -385,7 +397,7 @@ final class ReviewModel {
         case .scrollToTop: return scrollDiff(.top)
         case .scrollToBottom: return scrollDiff(.bottom)
         // App-wide commands, handled for every window by `commandHandler(_:)`.
-        case .openPullRequest, .openConfig, .showKeybindings: return false
+        case .openPullRequest, .openConfig, .showKeybindings, .showPullRequests: return false
         // Only the review queue has a filter.
         case .filter: return false
         }

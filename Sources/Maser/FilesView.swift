@@ -233,11 +233,15 @@ private struct DiffView: View {
                 guard let request, request.path == file.path, request.placement == .nearest else { return }
                 bringIntoView(request.lineID)
             }
-            // Runs on appear too, so jumping to a thread in another file scrolls once it loads.
+            // Runs on appear too, so jumping to a thread in another file scrolls once it loads, and going back to a PR
+            // in the main window returns to the cursor, however it got there.
             .task(id: model.scrollRequest) {
-                guard let request = model.scrollRequest, request.path == file.path, request.placement == .center else {
-                    return
-                }
+                // `.nearest` requests are handled by `onChange` above, except the one already there on appear.
+                let isFirstRun = !scrollState.hasAppeared
+                scrollState.hasAppeared = true
+                guard let request = model.scrollRequest, request.path == file.path,
+                    request.placement == .center || isFirstRun
+                else { return }
                 await Task.yield()
                 position.scrollTo(id: request.lineID, anchor: .center)
             }
@@ -252,6 +256,8 @@ extension DiffView {
         var geometry: ScrollGeometry?
         /// The IDs of the rows at least 90% in view, as last reported.
         var visibleIDs: Set<Int> = []
+        /// Whether the scroll request task has run once, so later runs know they aren't for the view appearing.
+        var hasAppeared = false
     }
 
     /// Scrolls just far enough to show a line, and not at all if it's already in view.

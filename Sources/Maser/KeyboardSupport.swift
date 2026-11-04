@@ -113,7 +113,8 @@ extension View {
 
     /// Lets the window this view is in run commands from vim-style keys (see `KeyRouter`).
     ///
-    /// The app-wide commands in `GlobalCommands` (open PR, open config, show keybindings) are tried first, so they work
+    /// The app-wide commands in `GlobalCommands` (open PR, show pull requests, open config, show keybindings) are tried
+    /// first, so they work
     /// in every window that uses this, even with a handler that returns `false` for everything.
     ///
     /// - Parameter perform: Runs a window-specific command and returns `true` if it handled it.
@@ -155,13 +156,14 @@ enum GlobalCommands {
     ///
     /// - Parameters:
     ///   - command: The command to run.
-    ///   - openWindow: Opens the Open Pull Request and Keybindings windows.
+    ///   - openWindow: Opens the Open Pull Request, main and Keybindings windows.
     /// - Returns: `true` if the command was app-wide and ran; `false` to let the window handle it.
     static func perform(_ command: CommandID, openWindow: OpenWindowAction) -> Bool {
         switch command {
         case .openPullRequest: openWindow(id: OpenPullRequestView.windowID)
         case .openConfig: ConfigStore.shared.openConfigFile()
         case .showKeybindings: openWindow(id: KeybindingsView.windowID)
+        case .showPullRequests: MainWindows.shared.showQueue(openWindow: openWindow)
         default: return false
         }
         return true
@@ -187,7 +189,7 @@ private struct CommandHandlerModifier: ViewModifier {
 /// Reports the `NSWindow` hosting a SwiftUI view.
 ///
 /// Calls `onWindow` when the view joins a window and again on every SwiftUI update, so callers should expect repeats.
-private struct WindowReader: NSViewRepresentable {
+struct WindowReader: NSViewRepresentable {
     let onWindow: @MainActor (NSWindow) -> Void
 
     func makeNSView(context: Context) -> ReaderView {
