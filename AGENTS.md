@@ -156,6 +156,9 @@ verification records. See `docs/design/README.md` for the ID scheme.
 ## Tests
 
 - Every MaserCore change comes with Swift Testing tests (`@Test`, `#expect`, `#require`).
+- Name each test with the requirements it verifies: `@Test("REQ-QUE-002: Keeps each PR in its first section")`,
+  and cite the test from those requirements in `docs/design/requirements.md`. `maser-trace` checks both directions. A
+  test that verifies no requirement means a requirement is missing: add it.
   Use realistic fixtures: the JSON shapes `gh` actually returns.
 - Views aren't unit tested, so keep their logic thin. When you change UI behavior that tests can't reach
   (keys, focus, scrolling, layout), say so in the PR under "Not checked by hand".

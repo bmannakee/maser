@@ -12,11 +12,11 @@ Every user need must have at least one implemented requirement.
 <!-- trace:begin needs-to-requirements -->
 | Need | Implemented requirements | Proposed |
 | --- | --- | --- |
-| UN-1 | REQ-QUE-001, REQ-QUE-002, REQ-QUE-003, REQ-QUE-004, REQ-QUE-006, REQ-WIN-001, REQ-WIN-005, REQ-WIN-006 | — |
-| UN-2 | REQ-GH-003, REQ-GH-004, REQ-OVR-001, REQ-OVR-003 | — |
+| UN-1 | REQ-QUE-001, REQ-QUE-002, REQ-QUE-003, REQ-QUE-004, REQ-QUE-006, REQ-QUE-007, REQ-WIN-001, REQ-WIN-005, REQ-WIN-006 | — |
+| UN-2 | REQ-GH-003, REQ-GH-004, REQ-OVR-001, REQ-OVR-003, REQ-DIF-008 | — |
 | UN-3 | REQ-GH-003, REQ-DIF-001, REQ-DIF-002, REQ-DIF-003, REQ-DIF-004 | REQ-CMT-007 |
-| UN-4 | REQ-WIN-004, REQ-OVR-004, REQ-DIF-003, REQ-CMT-001, REQ-CMT-002, REQ-CMT-003, REQ-CMT-005, REQ-CMT-006 | — |
-| UN-5 | REQ-WIN-002, REQ-WIN-003, REQ-DIF-006, REQ-KEY-001, REQ-KEY-002, REQ-KEY-003, REQ-KEY-004, REQ-KEY-005 | — |
+| UN-4 | REQ-WIN-004, REQ-OVR-004, REQ-DIF-003, REQ-DIF-008, REQ-CMT-001, REQ-CMT-002, REQ-CMT-003, REQ-CMT-005, REQ-CMT-006 | — |
+| UN-5 | REQ-QUE-007, REQ-WIN-002, REQ-WIN-003, REQ-DIF-006, REQ-KEY-001, REQ-KEY-002, REQ-KEY-003, REQ-KEY-004, REQ-KEY-005 | — |
 | UN-6 | REQ-KEY-005, REQ-CFG-001, REQ-CFG-002, REQ-CFG-003, REQ-CFG-004, REQ-CFG-005 | — |
 | UN-7 | REQ-GH-002, REQ-GH-006, REQ-CFG-005, REQ-PLT-001, REQ-PLT-002 | — |
 | UN-8 | REQ-GH-001, REQ-WIN-002, REQ-OVR-002, REQ-CMT-005 | REQ-CMT-007, REQ-CMT-009 |
@@ -60,14 +60,14 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | Coverage | Count | Requirements (REQ-…) |
 | --- | --- | --- |
 | Unit tests, fully | 14 | GH-003, GH-004, QUE-001, QUE-002, QUE-003, OVR-001, DIF-001, DIF-002, CMT-001, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
-| Unit tests, partly (the rest is a gap) | 7 | GH-002, GH-006, QUE-004, OVR-004, DIF-003, DIF-004, DIF-006 |
+| Unit tests, partly (the rest is a gap) | 9 | GH-002, GH-006, QUE-004, QUE-007, OVR-004, DIF-003, DIF-004, DIF-006, DIF-008 |
 | Live GitHub tests only | 4 | DIF-007, CMT-002, CMT-005, CMT-006 |
 | A one-off scripted run or use (not repeatable) | 6 | WIN-003, WIN-006, WIN-007, DIF-005, KEY-003, KEY-004 |
 | Inspection only | 6 | GH-001, GH-005, OVR-002, CMT-004, PLT-001, PLT-002 |
 | None yet | 12 | QUE-005, QUE-006, WIN-001, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-002, KEY-005, CFG-001, PLT-003 |
 | Proposed (not built) | 3 | CMT-007, CMT-008, CMT-009 |
 
-52 requirements: 49 implemented and 3 proposed.
+54 requirements: 51 implemented and 3 proposed.
 <!-- trace:end coverage -->
 
 Most of the "one-off", "inspection only" and "none yet" rows are planned UI scenarios (`UI:…` in requirements.md).
@@ -76,13 +76,10 @@ as well as for coverage.
 
 ## Next
 
-1. **Test IDs in tests:** give tests display names that start with the requirement IDs they verify, such as
-   `@Test("REQ-QUE-002: …")`. The checker already rejects a display name that cites an unknown ID. Once tests carry
-   IDs, it can also check that each cited test claims the requirement that cites it.
-2. **UI harness:**
+1. **UI harness:**
    - a debug-only scenario runner (`MASER_UI_SCENARIO=<name>`) that drives the app through its commands and asserts
      on its state, replacing the temporary hook from 2026-11-03;
    - a fake `gh` (selected with `[github] gh`) that replays recorded GitHub responses and records the mutations sent,
      including failures;
    - `scripts/check-ui` to run every scenario.
-3. **Proposed controls:** build RC-04 (#18), RC-12 (#20) and RC-10 (#19), in that order of residual risk.
+2. **Proposed controls:** build RC-04 (#18), RC-12 (#20) and RC-10 (#19), in that order of residual risk.

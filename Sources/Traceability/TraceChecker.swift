@@ -40,6 +40,10 @@ public struct Problem: Equatable, Sendable, CustomStringConvertible {
         case untrackedOpenRisk = "untracked-open-risk"
         /// A generated section of traceability.md is missing or out of date.
         case staleTraceability = "stale-traceability"
+        /// A requirement cites a test whose name doesn't claim it, or a test claims a requirement that doesn't cite it.
+        case testClaimMismatch = "test-claim-mismatch"
+        /// A product test's name claims no requirement.
+        case untracedTest = "untraced-test"
     }
 
     /// The rule broken.
@@ -72,6 +76,63 @@ struct TraceChecker {
         problems += hazardProblems()
         problems += unmetNeeds()
         problems += untrackedOpenRisks()
+        problems += testClaimProblems()
+        return problems
+    }
+
+    /// The directory of tests that verify the traceability tool rather than Maser, which needn't claim requirements.
+    static let toolTestDirectory = "Tests/TraceabilityTests/"
+
+    /// The requirement IDs a test's display name claims, such as `["REQ-DIF-001"]` for `"REQ-DIF-001: …"`.
+    ///
+    /// - Parameter test: The test.
+    /// - Returns: The requirement IDs in its display name, in order.
+    static func claims(of test: TestCase) -> [String] {
+        DesignDocuments.ids(in: test.displayName ?? "").filter { ItemKind(id: $0) == .requirement }
+    }
+
+    /// Mismatches between the tests requirements cite and the requirements tests claim, and untraced product tests.
+    ///
+    /// A whole-suite reference cites every test in the suite. Unknown suites and tests are left to
+    /// `testReferenceProblems(_:for:)`.
+    private func testClaimProblems() -> [Problem] {
+        var problems: [Problem] = []
+        // The tests each requirement cites, as "Suite.test".
+        var cited: [String: Set<String>] = [:]
+        for requirement in documents.items(.requirement) {
+            for reference in VerificationCell(requirement["Verified by"]).tests {
+                let suite = tests.tests(in: reference.suite)
+                for test in suite where reference.test == nil || reference.test == test.name {
+                    cited[requirement.id, default: []].insert("\(test.suite).\(test.name)")
+                    if !Self.claims(of: test).contains(requirement.id) {
+                        problems.append(
+                            Problem(
+                                rule: .testClaimMismatch, location: location(requirement),
+                                message:
+                                    "\(requirement.id) cites \(test.suite).\(test.name), but the test's name doesn't claim \(requirement.id) (\(test.location))"
+                            ))
+                    }
+                }
+            }
+        }
+        let requirementIDs = Set(documents.items(.requirement).map(\.id))
+        for test in tests.tests {
+            let claims = Self.claims(of: test)
+            if claims.isEmpty && !test.location.file.hasPrefix(Self.toolTestDirectory) {
+                problems.append(
+                    Problem(
+                        rule: .untracedTest, location: test.location,
+                        message:
+                            "\(test.suite).\(test.name) claims no requirement; name it @Test(\"REQ-…: …\") and cite it from the requirement"
+                    ))
+            }
+            for id in claims where requirementIDs.contains(id) && cited[id]?.contains("\(test.suite).\(test.name)") != true {
+                problems.append(
+                    Problem(
+                        rule: .testClaimMismatch, location: test.location,
+                        message: "\(test.suite).\(test.name) claims \(id), but \(id) doesn't cite it"))
+            }
+        }
         return problems
     }
 

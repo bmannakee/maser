@@ -23,7 +23,7 @@ import Testing
     }
 
     /// Splits on spaces outside quotes and drops the quotes, which `gh` puts back around words with spaces.
-    @Test func splitsQueryIntoWords() {
+    @Test("REQ-QUE-001: Splits query into words") func splitsQueryIntoWords() {
         #expect(
             PullRequestSearch.words(in: #"repo:o/r  label:"needs review" "fix crash" -label:wip"#) == [
                 "repo:o/r", "label:needs review", "fix crash", "-label:wip",
@@ -32,7 +32,7 @@ import Testing
     }
 
     /// Searches open PRs unless the query picks a state, and puts the words after `--` so `-label:x` isn't a flag.
-    @Test func ghArguments() {
+    @Test("REQ-QUE-001: gh arguments") func ghArguments() {
         let open = GitHubCLI.searchArguments(for: .reviewRequested, limit: 50)
         #expect(open.prefix(3) == ["search", "prs", "--limit"])
         #expect(open.suffix(3) == ["--", "review-requested:@me", "is:open"])
@@ -44,7 +44,7 @@ import Testing
     }
 
     /// Keeps each PR only in the first section that has it, sorts by last update, and hides empty sections.
-    @Test func displayedDeduplicates() {
+    @Test("REQ-QUE-002, REQ-QUE-004: Displayed deduplicates") func displayedDeduplicates() {
         let sections = [
             QueueSection(search: .reviewRequested, prs: [Self.pr(1, age: 100), Self.pr(2, age: 10)]),
             QueueSection(search: .yours, prs: [Self.pr(2), Self.pr(3)]),
@@ -59,7 +59,7 @@ import Testing
     }
 
     /// Every filter word must match the title, repository, author or number.
-    @Test func filters() {
+    @Test("REQ-QUE-003: Filters") func filters() {
         let sections = [
             QueueSection(
                 search: .reviewRequested,
@@ -84,7 +84,7 @@ import Testing
     }
 
     /// Jumps to the first PR of the next or previous section, skipping empty ones and stopping at either end.
-    @Test func sectionStarts() {
+    @Test("REQ-QUE-007: Section starts") func sectionStarts() {
         // Positions: section A is 0–1, B is empty, C is 2–4.
         let sections = [
             QueueSection(search: .reviewRequested, prs: [Self.pr(1), Self.pr(2)]),
@@ -108,7 +108,7 @@ import Testing
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MASER_LIVE_TESTS"] != nil))
 struct LivePullRequestSearchTests {
     /// Finds this repo's merged PRs with a search that picks a state, and runs every built-in search.
-    @Test func searches() async throws {
+    @Test("REQ-QUE-001: Searches") func searches() async throws {
         let cli = GitHubCLI()
         let merged = try await cli.searchPullRequests(
             PullRequestSearch(name: "Merged", query: "repo:bmannakee/maser is:merged"), limit: 5)

@@ -79,7 +79,13 @@ Verification references use these forms:
 
 `maser-trace` (in `Sources/maser-trace`, with its logic in `Sources/Traceability` and tests in
 `Tests/TraceabilityTests`) reads these documents, the tests in `Tests/`, and the records in `docs/verification/`. It
-prints each problem as `file:line: message [rule]`, and fails if there are any:
+prints each problem as `file:line: message [rule]`, and fails if there are any.
+
+Every test of Maser names the requirements it verifies at the start of its display name, such as
+`@Test("REQ-DIF-002, REQ-DIF-006: Matches lines across views")`, and each of those requirements cites the test. The
+traceability tool's own tests, in `Tests/TraceabilityTests`, verify the tool rather than Maser, so they don't.
+
+
 
 | Rule | Fails when |
 | --- | --- |
@@ -98,6 +104,8 @@ prints each problem as `file:line: message [rule]`, and fails if there are any:
 | `unmet-need` | No implemented requirement serves a user need. |
 | `untracked-open-risk` | A hazard's residual risk is High, or marked open, but the open risks table doesn't list it. |
 | `stale-traceability` | A generated section of traceability.md is missing or out of date. |
+| `test-claim-mismatch` | A requirement cites a test whose display name doesn't claim the requirement, or a test claims a requirement that doesn't cite it. A whole-suite reference cites every test in the suite. |
+| `untraced-test` | A test outside `Tests/TraceabilityTests` has no requirement ID in its display name. |
 
 The rules about tests are checked against the test functions in the source; they don't run the tests. Whether a cited
 test passes is up to `swift test`, and for live tests, the live runs.

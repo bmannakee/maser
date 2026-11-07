@@ -28,7 +28,7 @@ import Testing
         """)[0]
 
     /// Fills the lines before and after the hunk, numbered on both sides, as uncommentable expansion hunks.
-    @Test func fillsGapsAroundHunks() throws {
+    @Test("REQ-DIF-002, REQ-DIF-003: Fills gaps around hunks") func fillsGapsAroundHunks() throws {
         let full = try #require(Self.file.fullFile(headText: Self.headText))
         #expect(full.isFullFile)
         #expect(full.hunks.map(\.isExpansion) == [true, false, true])
@@ -48,7 +48,7 @@ import Testing
     }
 
     /// Keeps the two sides' numbering apart when a hunk changes the line count, and handles a hunk that only deletes.
-    @Test func numbersSidesAcrossLengthChanges() throws {
+    @Test("REQ-DIF-002: Numbers sides across length changes") func numbersSidesAcrossLengthChanges() throws {
         let file = DiffParser.parse(
             """
             diff --git a/f.txt b/f.txt
@@ -72,13 +72,13 @@ import Testing
     }
 
     /// Refuses contents that don't match the diff, as when the file changed on GitHub after the diff loaded.
-    @Test func rejectsMismatchedContents() {
+    @Test("REQ-DIF-002: Rejects mismatched contents") func rejectsMismatchedContents() {
         #expect(Self.file.fullFile(headText: "1\n2\n3\n4\n5\n") == nil)
         #expect(Self.file.fullFile(headText: "1\n2\n") == nil)
     }
 
     /// Needs no contents for added and deleted files, which the diff already has in full, and fills a pure rename.
-    @Test func addedDeletedAndRenamedFiles() throws {
+    @Test("REQ-DIF-002: Added deleted and renamed files") func addedDeletedAndRenamedFiles() throws {
         let files = DiffParser.parse(
             """
             diff --git a/new.txt b/new.txt
@@ -104,7 +104,7 @@ import Testing
     }
 
     /// Finds the same line across the hunk and whole-file views, and a target's lines by number in either view.
-    @Test func matchesLinesAcrossViews() throws {
+    @Test("REQ-DIF-002, REQ-DIF-006: Matches lines across views") func matchesLinesAcrossViews() throws {
         let full = try #require(Self.file.fullFile(headText: Self.headText))
         let addition = try #require(Self.file.commentableLines.first { $0.kind == .addition })
         let match = try #require(full.lineID(matching: addition))
@@ -117,7 +117,7 @@ import Testing
     }
 
     /// Treats CRLF line endings and a missing final newline the same way the diff does.
-    @Test func lineEndings() throws {
+    @Test("REQ-DIF-002: Line endings") func lineEndings() throws {
         let file = DiffParser.parse("diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -2 +2 @@\n-b\r\n+B\r\n")[0]
         let full = try #require(file.fullFile(headText: "a\r\nB\r\nc"))
         #expect(full.hunks.flatMap(\.lines).map(\.text) == ["a\r", "b\r", "B\r", "c"])
@@ -130,7 +130,7 @@ import Testing
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MASER_LIVE_TESTS"] != nil))
 struct LiveFullFileTests {
     /// Fetches README.md at the PR's head commit and expands its diff to the whole file.
-    @Test func expandsRealFile() async throws {
+    @Test("REQ-DIF-002, REQ-DIF-007: Expands real file") func expandsRealFile() async throws {
         let cli = GitHubCLI()
         let pr = try await cli.pullRequest(url: URL(string: "https://github.com/bmannakee/maser/pull/1")!)
         let file = try #require(try await cli.fileDiffs(for: pr).first { $0.path == "README.md" })

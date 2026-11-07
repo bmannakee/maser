@@ -22,7 +22,7 @@ import Testing
 
     /// Decodes threads sorted by line with outdated ones last, drops empty threads, and tells draft threads from draft
     /// replies.
-    @Test func decodesThreads() throws {
+    @Test("REQ-DIF-008: Decodes threads") func decodesThreads() throws {
         let threads = try ReviewThread.decodeLines(from: Data(Self.lines.utf8))
         #expect(threads.map(\.id) == ["T3", "T1", "T2"])  // by line, outdated last, empty dropped
         #expect(threads[0].side == .left)
@@ -38,12 +38,12 @@ import Testing
         #expect(threads[2].root.author == "ghost")
     }
 
-    @Test func emptyOutput() throws {
+    @Test("REQ-GH-004: Empty output") func emptyOutput() throws {
         #expect(try ReviewThread.decodeLines(from: Data()).isEmpty)
     }
 
     /// Decodes the PR's node ID and head commit, with and without a pending review.
-    @Test func decodesReviewContext() throws {
+    @Test("REQ-CMT-001: Decodes review context") func decodesReviewContext() throws {
         let json =
             #"{"data":{"repository":{"pullRequest":{"id":"PR_1","headRefOid":"abc123","reviews":{"nodes":[{"id":"PRR_9"}]}}}}}"#
         #expect(
@@ -55,7 +55,7 @@ import Testing
 
     /// Marks a thread whose first page of comments is short of its `totalCount`, then replaces its comments with the
     /// full list from `commentsQuery`.
-    @Test func longThreadsGetTheirRemainingComments() throws {
+    @Test("REQ-GH-003: Long threads get their remaining comments") func longThreadsGetTheirRemainingComments() throws {
         let line = """
             {"id":"T1","path":"a.txt","line":3,"startLine":null,"originalLine":3,"diffSide":"RIGHT","isOutdated":false,"isResolved":false,"comments":{"totalCount":3,"nodes":[{"id":"C1","author":{"login":"alice"},"body":"one","createdAt":"2026-10-28T19:34:26Z","url":null,"state":"SUBMITTED"}]}}
             """
@@ -101,12 +101,12 @@ import Testing
         """)[0]
 
     /// Excludes hunk headers and no-newline markers.
-    @Test func commentableLines() {
+    @Test("REQ-CMT-001: Commentable lines") func commentableLines() {
         #expect(Self.file.commentableLines.map(\.id) == [1, 2, 3, 4, 6, 7, 8])
     }
 
     /// Targets the old side for a deletion and the new side otherwise, including when the anchor equals the cursor.
-    @Test func singleLine() throws {
+    @Test("REQ-CMT-001: Single line") func singleLine() throws {
         let deletion = try #require(Self.file.commentTarget(anchor: nil, cursor: 2))
         #expect(deletion.side == .left && deletion.line == 2 && deletion.startLine == nil)
         #expect(deletion.description == "old line 2")
@@ -117,7 +117,7 @@ import Testing
     }
 
     /// A range selected bottom-up from a deletion to a context line starts on the old side and ends on the new.
-    @Test func rangeAcrossSides() throws {
+    @Test("REQ-CMT-001: Range across sides") func rangeAcrossSides() throws {
         let target = try #require(Self.file.commentTarget(anchor: 4, cursor: 2))
         #expect(target.startSide == .left && target.startLine == 2)
         #expect(target.side == .right && target.line == 3)
@@ -127,7 +127,7 @@ import Testing
         #expect(CommentTarget.describe(side: .left, line: 5, startSide: nil, startLine: 3) == "old lines 3–5")
     }
 
-    @Test func rangeIsClippedToTheCursorsHunk() {
+    @Test("REQ-CMT-001: Range is clipped to the cursor's hunk") func rangeIsClippedToTheCursorsHunk() {
         #expect(Self.file.selectionRange(anchor: 1, cursor: 7) == 6...7)
         #expect(Self.file.selectionRange(anchor: 8, cursor: 3) == 3...4)
         #expect(Self.file.selectionRange(anchor: nil, cursor: 3) == 3...3)
@@ -140,7 +140,7 @@ import Testing
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MASER_LIVE_TESTS"] != nil))
 struct LiveGitHubTests {
     /// Loads the diff, overview and threads, and checks that every current thread maps to a line in the parsed diff.
-    @Test func loadsRealPullRequest() async throws {
+    @Test("REQ-DIF-001, REQ-DIF-008: Loads real pull request") func loadsRealPullRequest() async throws {
         let json = """
             [{"author":{"login":"BagToad"},"isDraft":false,"number":14858,
               "repository":{"name":"cli","nameWithOwner":"cli/cli"},"title":"x",
@@ -173,7 +173,7 @@ struct LiveGitHubTests {
     /// Fetches every page of a busy PR's lists: rust-lang/rust#162811 has more than 100 conversation comments.
     ///
     /// Also runs each paged query and the thread-comments query directly, so a typo in any of them fails here.
-    @Test func paginatesLongLists() async throws {
+    @Test("REQ-GH-003: Paginates long lists") func paginatesLongLists() async throws {
         let cli = GitHubCLI()
         let pr = try await cli.pullRequest(url: URL(string: "https://github.com/rust-lang/rust/pull/162811")!)
         let overview = try await cli.overview(for: pr)
@@ -210,7 +210,9 @@ struct LiveReviewWriteTests {
     ///
     /// Starts a review, adds a range thread and a single-line thread, checks that a thread on a line outside the diff is
     /// an error, replies, deletes the reply and discards the review. Any existing pending review is discarded first.
-    @Test func pendingReviewRoundTrip() async throws {
+    @Test("REQ-CMT-001, REQ-CMT-002, REQ-CMT-005, REQ-CMT-006: Pending review round trip") func pendingReviewRoundTrip()
+        async throws
+    {
         let cli = GitHubCLI()
         let pr = try await cli.pullRequest(url: URL(string: "https://github.com/bmannakee/maser/pull/1")!)
         let file = try #require(try await cli.fileDiffs(for: pr).first { $0.path == "COMMENT-TEST.md" })

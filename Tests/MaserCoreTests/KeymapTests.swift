@@ -10,7 +10,7 @@ import Testing
 /// Tests for parsing binding strings into `KeyChord`s and sequences.
 @Suite struct KeyBindingParserTests {
     /// Parses a single character, including punctuation that's also binding syntax, as a plain chord.
-    @Test func characters() throws {
+    @Test("REQ-CFG-004: Characters") func characters() throws {
         #expect(try KeyBindingParser.parseChord("j") == KeyChord("j"))
         #expect(try KeyBindingParser.parseChord("J") == KeyChord("J"))
         #expect(try KeyBindingParser.parseChord("?") == KeyChord("?"))
@@ -18,14 +18,14 @@ import Testing
     }
 
     /// Turns shift plus a letter into the uppercase letter, and rejects shift on a non-letter character.
-    @Test func shiftFoldsIntoLetters() throws {
+    @Test("REQ-CFG-004: Shift folds into letters") func shiftFoldsIntoLetters() throws {
         #expect(try KeyBindingParser.parseChord("shift+j") == KeyChord("J"))
         #expect(KeyChord("j", modifiers: [.command, .shift]) == KeyChord("J", modifiers: .command))
         #expect(throws: KeyBindingError.self) { try KeyBindingParser.parseChord("shift+/") }
     }
 
     /// Accepts modifier and key names case-insensitively, with aliases like `opt` and `return`, and `ctrl++` for plus.
-    @Test func modifiersAndNamedKeys() throws {
+    @Test("REQ-CFG-004: Modifiers and named keys") func modifiersAndNamedKeys() throws {
         #expect(try KeyBindingParser.parseChord("ctrl+d") == KeyChord("d", modifiers: .control))
         #expect(try KeyBindingParser.parseChord("CMD+Opt+Down") == KeyChord(.down, modifiers: [.command, .option]))
         #expect(try KeyBindingParser.parseChord("shift+down") == KeyChord(.down, modifiers: .shift))
@@ -34,20 +34,20 @@ import Testing
     }
 
     /// Rejects unknown modifiers, unknown key names and blank sequences.
-    @Test func errors() {
+    @Test("REQ-CFG-004: Errors") func errors() {
         #expect(throws: KeyBindingError.self) { try KeyBindingParser.parseChord("hyper+j") }
         #expect(throws: KeyBindingError.self) { try KeyBindingParser.parseChord("ctrl+banana") }
         #expect(throws: KeyBindingError.self) { try KeyBindingParser.parseSequence("   ") }
     }
 
     /// Splits a sequence on whitespace, ignoring extra spaces.
-    @Test func sequences() throws {
+    @Test("REQ-CFG-004: Sequences") func sequences() throws {
         #expect(try KeyBindingParser.parseSequence("g g") == [KeyChord("g"), KeyChord("g")])
         #expect(try KeyBindingParser.parseSequence(" ctrl+w  j ") == [KeyChord("w", modifiers: .control), KeyChord("j")])
     }
 
     /// Parses a chord's `description` back to the same chord, and renders `symbols` in macOS menu order.
-    @Test func descriptionRoundTrips() throws {
+    @Test("REQ-CFG-004: Description round trips") func descriptionRoundTrips() throws {
         let chords = [
             KeyChord("j"), KeyChord("J"), KeyChord("?"), KeyChord("+", modifiers: .control),
             KeyChord(.down, modifiers: [.command, .option, .shift]), KeyChord(",", modifiers: .command),
@@ -64,7 +64,7 @@ import Testing
 /// Tests for the default keymap and for loading overrides from the TOML config.
 @Suite struct KeymapTests {
     /// Matches single keys and `g` sequences to commands, reports a bare `g` as a prefix, and has no shadowed bindings.
-    @Test func defaultsMatchSequences() {
+    @Test("REQ-KEY-001: Defaults match sequences") func defaultsMatchSequences() {
         let keymap = Keymap.defaults
         #expect(keymap.match([KeyChord("j")]) == .command(.cursorDown))
         #expect(keymap.match([KeyChord("]")]) == .command(.nextFile))
@@ -82,7 +82,7 @@ import Testing
         #expect(keymap.shadowingProblems().isEmpty)
     }
 
-    @Test func defaultScrollBindings() throws {
+    @Test("REQ-KEY-001: Default scroll bindings") func defaultScrollBindings() throws {
         let keymap = Keymap.defaults
         #expect(keymap.match(try KeyBindingParser.parseSequence("ctrl+d")) == .command(.halfPageDown))
         #expect(keymap.match(try KeyBindingParser.parseSequence("ctrl+u")) == .command(.halfPageUp))
@@ -92,7 +92,7 @@ import Testing
         #expect(keymap.match(try KeyBindingParser.parseSequence("G")) == .command(.scrollToBottom))
     }
 
-    @Test func emptyConfigIsDefaults() throws {
+    @Test("REQ-CFG-004: Empty config is defaults") func emptyConfigIsDefaults() throws {
         let result = try Keymap.load(toml: "")
         #expect(result.keymap == .defaults)
         #expect(result.problems.isEmpty)
@@ -100,7 +100,7 @@ import Testing
 
     /// Replaces a command's default bindings with the configured ones, unbinds with `"none"`, and leaves unmentioned
     /// commands alone.
-    @Test func overridesAndUnbinds() throws {
+    @Test("REQ-CFG-004: Overrides and unbinds") func overridesAndUnbinds() throws {
         let result = try Keymap.load(
             toml: """
                 [keys]
@@ -124,7 +124,7 @@ import Testing
     }
 
     /// A configured key is removed from whichever command had it by default, in both the menu and normal mode.
-    @Test func userBindingStealsKeysFromDefaults() throws {
+    @Test("REQ-CFG-004: User binding steals keys from defaults") func userBindingStealsKeysFromDefaults() throws {
         let keymap = try Keymap.load(
             toml: """
                 [keys]
@@ -141,7 +141,7 @@ import Testing
 
     /// Reports each invalid binding (unknown command or key, menu shortcuts without cmd or with a sequence, cmd in normal
     /// mode, duplicate keys) while still applying the valid ones.
-    @Test func reportsProblemsButKeepsTheRest() throws {
+    @Test("REQ-CFG-002: Reports problems but keeps the rest") func reportsProblemsButKeepsTheRest() throws {
         let result = try Keymap.load(
             toml: """
                 [keys]
@@ -172,7 +172,7 @@ import Testing
     }
 
     /// A command whose every key fails to parse keeps its default keys rather than ending up with none.
-    @Test func invalidOnlyValueKeepsDefaults() throws {
+    @Test("REQ-CFG-002: Invalid only value keeps defaults") func invalidOnlyValueKeepsDefaults() throws {
         let result = try Keymap.load(
             toml: """
                 [keys.normal]
@@ -183,7 +183,7 @@ import Testing
     }
 
     /// Reports each sequence that a shorter binding makes unreachable, and keeps the shorter binding.
-    @Test func reportsShadowedSequences() throws {
+    @Test("REQ-CFG-002: Reports shadowed sequences") func reportsShadowedSequences() throws {
         let result = try Keymap.load(
             toml: """
                 [keys.normal]
@@ -195,14 +195,14 @@ import Testing
     }
 
     /// Throws for malformed TOML and for a binding that isn't a string or array of strings.
-    @Test func invalidTOMLThrows() {
+    @Test("REQ-CFG-002: Invalid TOML throws") func invalidTOMLThrows() {
         #expect(throws: (any Error).self) { try Keymap.load(toml: "[keys\nnext-file = ") }
         #expect(throws: (any Error).self) { try Keymap.load(toml: "[keys]\nnext-file = 3") }
     }
 
     /// The config template lists every default binding, commented out, so loading it as-is or uncommented gives the
     /// defaults.
-    @Test func templateParsesAsDefaults() throws {
+    @Test("REQ-CFG-003: Template parses as defaults") func templateParsesAsDefaults() throws {
         let template = Keymap.template
         #expect(template.contains("# next-file = \"cmd+opt+down\""))
         #expect(template.contains("# show-overview = \"g o\""))
