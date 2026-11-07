@@ -72,5 +72,32 @@ Verification references use these forms:
   traceability, in the same PR. Its description says which IDs it touches.
 - A new requirement says how it will be verified before it is built.
 - A risk control that isn't built yet is a requirement with status `Proposed` and a GitHub issue.
-- The traceability matrix is maintained by hand for now. The plan is a checker in `scripts/check` that builds it from
-  these documents and the tests, and fails on broken or missing links.
+- `scripts/check` runs `maser-trace`, which checks the rules below. After changing these documents, run
+  `swift run maser-trace --write` to regenerate the tables in [traceability.md](traceability.md).
+
+## Checking traceability
+
+`maser-trace` (in `Sources/maser-trace`, with its logic in `Sources/Traceability` and tests in
+`Tests/TraceabilityTests`) reads these documents, the tests in `Tests/`, and the records in `docs/verification/`. It
+prints each problem as `file:line: message [rule]`, and fails if there are any:
+
+| Rule | Fails when |
+| --- | --- |
+| `duplicate-id` | An ID is defined in more than one row. |
+| `unknown-id` | A design document (other than this README), or a test's display name, mentions an ID that isn't defined. |
+| `requirement-without-need` | A requirement names no user need. |
+| `unstated-verification` | A requirement's "Verified by" cell cites nothing (`T:`, `L:`, `V-…`, `I:`, `U:`) and notes no `Gap` or plan. |
+| `unknown-test` | A `T:` or `L:` reference names a suite or test that doesn't exist, or cites a live test as `T:` or an offline one as `L:`. |
+| `wrong-test-count` | A whole-suite reference says `(all N)` but the suite has a different number of tests. |
+| `unknown-record-check` | A `V-YYYY-MM-DD/Vn` reference has no matching `### Vn:` heading in that day's record. |
+| `proposed-without-issue` | A `Proposed` requirement's status doesn't name an issue, such as `(#18)`. |
+| `control-link-mismatch` | A requirement names a control that doesn't list it, or a control lists a requirement that doesn't name it. |
+| `control-status-mismatch` | A control is marked `Proposed` but all its requirements are implemented, or the reverse. |
+| `unused-control` | No hazard uses a control. |
+| `incomplete-hazard` | A hazard has no harm or no control. |
+| `unmet-need` | No implemented requirement serves a user need. |
+| `untracked-open-risk` | A hazard's residual risk is High, or marked open, but the open risks table doesn't list it. |
+| `stale-traceability` | A generated section of traceability.md is missing or out of date. |
+
+The rules about tests are checked against the test functions in the source; they don't run the tests. Whether a cited
+test passes is up to `swift test`, and for live tests, the live runs.

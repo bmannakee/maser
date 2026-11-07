@@ -1,5 +1,5 @@
 #!/bin/sh
-# Pre-commit check: formatting and doc-comment lint, build, and unit tests.
+# Pre-commit check: formatting and doc-comment lint, build, unit tests, and traceability.
 #
 # Fails on the first problem. Live GitHub tests are opt-in; see AGENTS.md.
 set -eu
@@ -13,3 +13,6 @@ swift build
 
 echo "==> swift test"
 swift test
+
+echo "==> traceability (docs/design)"
+swift run --skip-build maser-trace
