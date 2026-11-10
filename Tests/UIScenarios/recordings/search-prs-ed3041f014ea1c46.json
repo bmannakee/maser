@@ -1,0 +1,17 @@
+{
+  "args" : [
+    "search",
+    "prs",
+    "--limit",
+    "100",
+    "--json",
+    "number,title,url,repository,author,updatedAt,isDraft",
+    "--",
+    "repo:bmannakee/maser",
+    "is:closed",
+    "is:unmerged"
+  ],
+  "status" : 0,
+  "stderr" : "",
+  "stdout" : "[{\"author\":{\"id\":\"MDQ6VXNlcjIxODAxMTg=\",\"is_bot\":false,\"login\":\"bmannakee\",\"type\":\"User\",\"url\":\"https://github.com/bmannakee\"},\"isDraft\":false,\"number\":1,\"repository\":{\"name\":\"maser\",\"nameWithOwner\":\"bmannakee/maser\"},\"title\":\"Test PR: Overview commenting (will be closed)\",\"updatedAt\":\"2026-11-03T01:13:05Z\",\"url\":\"https://github.com/bmannakee/maser/pull/1\"}]\n"
+}
