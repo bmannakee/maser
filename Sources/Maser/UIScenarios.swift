@@ -213,8 +213,7 @@
                     match: ["--method", "POST"], status: 1, stdout: nil,
                     stderr: "gh: Unable to create comment because issue is locked (HTTP 403)")
             ])
-            try await app.press("c")
-            try await app.waitUntil("the comment box has focus") { app.responder == .editor }
+            try app.expect(app.responder == .editor, "the comment box keeps focus after posting", app.summary)
             await app.type("This one fails.")
             try await app.press("cmd+enter")
             try await app.waitUntil("the failure shows gh's message") {
@@ -235,7 +234,8 @@
             let word = failing.search.query.split(separator: " ").last.map(String.init) ?? ""
             try app.overrideGH([.init(match: ["search", word], status: 1, stdout: nil, stderr: "HTTP 502: Bad Gateway")])
 
-            try await app.press("cmd+r")
+            // The queue's r, not ⌘R: in the test app the Refresh menu item stays disabled (see the README).
+            try await app.press("r")
             try await app.waitUntil("the failed search shows its error") {
                 app.probe.sections().first { $0.id == failing.id }?.error?.contains("Bad Gateway") == true
             }

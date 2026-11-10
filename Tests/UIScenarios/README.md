@@ -28,6 +28,10 @@ The runner refuses to start unless `[github] gh` is the fake, so a scenario can 
 Posted key events go through the same path as typing: `KeyRouter`, the menus, and the focused view. Mouse clicks aren't
 simulated, and neither is anything outside the app, such as a link opening the browser.
 
+Menu items that depend on the focused window (Refresh and Filter Pull Requests were checked) stay disabled in the test
+app, even with its window key, so scenarios use the vim-style keys for those commands (`r`, not ⌘R). Menu items that are
+always enabled, such as ⌘0, work.
+
 ## Writing a scenario
 
 1. Add a `static let` to `UIScenarios` and list it in `all`. Name it in kebab case, and start its title with the
