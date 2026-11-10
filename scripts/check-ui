@@ -1,0 +1,95 @@
+#!/bin/sh
+# Runs the UI scenarios: each one in a fresh launch of a debug build, against a fake gh that replays recordings.
+#
+# Usage: scripts/check-ui [--record] [scenario…]   (default: every scenario in Sources/Maser/UIScenarios.swift)
+#
+# Each scenario takes over the keyboard and brings a window to the front for a few seconds, so leave the Mac alone
+# while it runs. The app runs as a separate bundle (dev.maser.Maser.uitests) with its own settings, so it doesn't
+# touch a Maser you're using. --record sends commands that have no recording to the real gh, read-only, and saves
+# what it prints in Tests/UIScenarios/recordings. See Tests/UIScenarios/README.md.
+set -eu
+cd "$(dirname "$0")/.."
+
+record=""
+if [ "${1:-}" = "--record" ]; then
+    record="$(command -v gh)" || { echo "--record needs gh on the PATH" >&2; exit 2; }
+    shift
+fi
+scenarios="$*"
+if [ -z "$scenarios" ]; then
+    scenarios="$(sed -n 's/^ *"\([a-z0-9-]*\)", "REQ-.*/\1/p' Sources/Maser/UIScenarios.swift)"
+fi
+
+# A locked screen leaves loginwindow frontmost, and then no app can become active.
+if lsappinfo info -only name "$(lsappinfo front)" 2>/dev/null | grep -q loginwindow; then
+    echo "The screen is locked; the UI scenarios need it unlocked." >&2
+    exit 2
+fi
+
+echo "==> swift build"
+swift build
+bin="$(swift build --show-bin-path)"
+app=".build/MaserUITests.app"
+bundle_id="dev.maser.Maser.uitests"
+rm -rf "$app"
+mkdir -p "$app/Contents/MacOS"
+cp "$bin/Maser" "$app/Contents/MacOS/Maser"
+cat > "$app/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>$bundle_id</string>
+    <key>CFBundleName</key><string>Maser UI Tests</string>
+    <key>CFBundleExecutable</key><string>Maser</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>LSMinimumSystemVersion</key><string>26.0</string>
+    <key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>
+PLIST
+codesign --force --sign - --timestamp=none "$app"
+
+work="$(mktemp -d "${TMPDIR:-/tmp}/maser-ui.XXXXXX")"
+recordings="$PWD/Tests/UIScenarios/recordings"
+passed=0
+failed=""
+for scenario in $scenarios; do
+    dir="$work/$scenario"
+    mkdir -p "$dir/config/maser" "$dir/gh"
+    sed "s|@FAKE_GH@|$bin/fake-gh|" Tests/UIScenarios/config.toml > "$dir/config/maser/config.toml"
+    # Start from nothing saved: no restored windows or sidebar widths from an earlier run.
+    defaults delete "$bundle_id" >/dev/null 2>&1 || true
+    rm -rf "$HOME/Library/Saved Application State/$bundle_id.savedState"
+
+    open -n -W --stdout "$dir/log.txt" --stderr "$dir/log.txt" \
+        --env XDG_CONFIG_HOME="$dir/config" --env MASER_UI_SCENARIO="$scenario" --env MASER_UI_RESULT="$dir/result" \
+        --env FAKE_GH_DIR="$recordings" --env FAKE_GH_STATE="$dir/gh" --env FAKE_GH_RECORD="$record" \
+        --env FAKE_GH_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-}" \
+        "$app" --args -ApplePersistenceIgnoreState YES &
+    launcher=$!
+    # macOS won't let the app bring itself forward while another app is frontmost, so ask for it here.
+    sleep 2
+    osascript -e "tell application id \"$bundle_id\" to activate" >/dev/null 2>&1 || true
+    seconds=2
+    while kill -0 "$launcher" 2>/dev/null; do
+        sleep 1
+        seconds=$((seconds + 1))
+        if [ "$seconds" -ge 120 ]; then
+            pkill -f "$app/Contents/MacOS/Maser" || true
+            echo "timed out after 120 s" >> "$dir/result"
+        fi
+    done
+    result="$(cat "$dir/result" 2>/dev/null || echo "FAIL: no result; the app crashed or quit (see its log)")"
+    if [ "$result" = "PASS" ]; then
+        echo "✔ $scenario"
+        passed=$((passed + 1))
+    else
+        echo "✘ $scenario: $result"
+        sed 's/^/    /' "$dir/log.txt" | grep -v "^    [0-9-]* [0-9:.]* Maser\[" | tail -25
+        failed="$failed $scenario"
+    fi
+done
+
+echo "$passed passed${failed:+, failed:$failed}. Logs and gh calls: $work"
+[ -z "$failed" ]

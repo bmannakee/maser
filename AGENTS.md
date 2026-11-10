@@ -10,6 +10,7 @@ update it here in the same PR.
 swift build                        # debug build
 swift run Maser [PR URL…]          # run; the first URL opens in the main window, the rest in their own
 scripts/check                      # format lint + build + tests + traceability; run before every commit
+scripts/check-ui                   # UI scenarios against a fake gh; before merging app changes (needs an unlocked Mac)
 scripts/bundle                     # release build wrapped in .build/Maser.app, signed ad hoc
 swift run maser-trace --write      # regenerate docs/design/traceability.md after editing docs/design/
 swift format --in-place --recursive Sources Tests Package.swift   # apply formatting
@@ -33,6 +34,7 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
 | `MaserCoreTests` | Swift Testing tests for MaserCore. | MaserCore |
 | `Traceability`, `maser-trace` | Development tool: checks the links in `docs/design/` (see its README). Not part of the app. | Foundation |
 | `TraceabilityTests` | Tests for the traceability checker. | Traceability |
+| `fake-gh` | Development tool: a stand-in for `gh` that replays `Tests/UIScenarios/recordings`, for the UI scenarios. | Foundation |
 
 Rules:
 
@@ -160,8 +162,10 @@ verification records. See `docs/design/README.md` for the ID scheme.
   and cite the test from those requirements in `docs/design/requirements.md`. `maser-trace` checks both directions. A
   test that verifies no requirement means a requirement is missing: add it.
   Use realistic fixtures: the JSON shapes `gh` actually returns.
-- Views aren't unit tested, so keep their logic thin. When you change UI behavior that tests can't reach
-  (keys, focus, scrolling, layout), say so in the PR under "Not checked by hand".
+- Views aren't unit tested, so keep their logic thin. UI behavior that unit tests can't reach (keys, focus, panes,
+  layout) gets a UI scenario in `Sources/Maser/UIScenarios.swift`, titled with its requirements like a test and cited
+  as `UI:name`; see `Tests/UIScenarios/README.md`. Run `scripts/check-ui` before merging, and say in the PR what
+  still wasn't checked (mouse clicks, visual layout).
 - Inside `#expect`, avoid calling closures that rethrow (`allSatisfy`, `contains(where:)`): bind the result to a
   `let` first. The macro mis-handles them.
 

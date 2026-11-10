@@ -1,8 +1,9 @@
 // What a requirement's "Verified by" cell says, and the tests it can point at.
 //
-// A cell mixes references such as `T:Suite.test`, `L:Suite`, `V-2026-11-03/V10`, `I:` and `U:` with prose and an
-// explicit `Gap`. `VerificationCell` pulls out the references and classifies the requirement's coverage. `TestIndex`
-// lists every Swift Testing test in the repository, so references can be checked against real tests.
+// A cell mixes references such as `T:Suite.test`, `L:Suite`, `UI:scenario`, `V-2026-11-03/V10`, `I:` and `U:` with
+// prose and an explicit `Gap`. `VerificationCell` pulls out the references and classifies the requirement's coverage.
+// `TestIndex` lists every Swift Testing test and UI scenario in the repository, so references can be checked against
+// them.
 
 import Foundation
 
@@ -27,6 +28,8 @@ enum Coverage: String, CaseIterable, Sendable {
     case unitTests = "Unit tests, fully"
     /// Offline unit tests, with a gap noted.
     case unitTestsPartly = "Unit tests, partly (the rest is a gap)"
+    /// Scripted UI scenarios, but no offline unit tests.
+    case uiScenarios = "UI scenarios (no unit tests)"
     /// Live GitHub tests, but no offline tests.
     case liveTestsOnly = "Live GitHub tests only"
     /// Only a check in a verification record, or use by the user.
@@ -43,6 +46,10 @@ enum Coverage: String, CaseIterable, Sendable {
 struct VerificationCell: Equatable, Sendable {
     /// The test references, in order.
     let tests: [TestReference]
+    /// The UI scenarios cited as verifying the requirement, by name.
+    let scenarios: [String]
+    /// The UI scenarios named after `Gap` or in a `Planned` cell: ones still to write.
+    let plannedScenarios: [String]
     /// The verification record checks, such as `V-2026-11-03/V10`.
     let recordChecks: [String]
     /// Whether the cell cites inspection (`I:`).
@@ -58,6 +65,7 @@ struct VerificationCell: Equatable, Sendable {
     ///
     /// `T:` and `L:` references may continue with `, .test` for more tests in the same suite, and a whole-suite
     /// reference may claim its size with `(all N)`. A prefix only counts at the start of a word, so `UI:` isn't `I:`.
+    /// A `UI:` reference after `Gap`, or anywhere in a cell that says `Planned`, is a scenario still to write.
     ///
     /// - Parameter text: The cell's text.
     init(_ text: String) {
@@ -77,6 +85,20 @@ struct VerificationCell: Equatable, Sendable {
             }
         }
         self.tests = tests
+        let scenarioPattern = #/(?:^|[^A-Za-z])UI:(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)/#
+        let gapStart = text.range(of: "Gap")?.lowerBound ?? text.endIndex
+        var scenarios: [String] = []
+        var plannedScenarios: [String] = []
+        for match in text.matches(of: scenarioPattern) {
+            let name = String(match.name)
+            if text.contains("Planned") || match.range.lowerBound >= gapStart {
+                plannedScenarios.append(name)
+            } else {
+                scenarios.append(name)
+            }
+        }
+        self.scenarios = scenarios
+        self.plannedScenarios = plannedScenarios
         recordChecks = DesignDocuments.recordCheckIDs(in: text)
         inspection = text.contains(#/(?:^|[^A-Za-z])I:/#)
         use = text.contains(#/(?:^|[^A-Za-z])U:/#)
@@ -85,7 +107,7 @@ struct VerificationCell: Equatable, Sendable {
     }
 
     /// Whether the cell says anything about verification: a reference, a gap, or a plan.
-    var isEmpty: Bool { tests.isEmpty && recordChecks.isEmpty && !inspection && !use && !gap && !planned }
+    var isEmpty: Bool { tests.isEmpty && scenarios.isEmpty && recordChecks.isEmpty && !inspection && !use && !gap && !planned }
 
     /// Classifies a requirement's coverage.
     ///
@@ -94,6 +116,7 @@ struct VerificationCell: Equatable, Sendable {
     func coverage(isProposed: Bool) -> Coverage {
         if isProposed { return .proposed }
         if tests.contains(where: { !$0.isLive }) { return gap ? .unitTestsPartly : .unitTests }
+        if !scenarios.isEmpty { return .uiScenarios }
         if tests.contains(where: \.isLive) { return .liveTestsOnly }
         if !recordChecks.isEmpty || use { return .recordOnly }
         if inspection { return .inspectionOnly }
@@ -115,10 +138,25 @@ struct TestCase: Equatable, Sendable {
     let location: Location
 }
 
-/// Every test in the repository's `Tests` directory.
+/// One scripted UI scenario, declared in the app's scenario file.
+struct UIScenarioCase: Equatable, Sendable {
+    /// The scenario's name, as cited in `UI:name`.
+    let name: String
+    /// Its title, which names the requirements it verifies, like a test's display name.
+    let title: String
+    /// Where it's declared.
+    let location: Location
+}
+
+/// Every test in the repository's `Tests` directory, and every UI scenario.
 struct TestIndex: Sendable {
     /// The tests, in file and line order.
     let tests: [TestCase]
+    /// The UI scenarios, in declaration order.
+    let scenarios: [UIScenarioCase]
+
+    /// The file declaring the UI scenarios, relative to the repository root.
+    static let scenarioFile = "Sources/Maser/UIScenarios.swift"
 
     /// Finds the tests in every Swift file under `Tests/`.
     ///
@@ -132,7 +170,8 @@ struct TestIndex: Sendable {
         for path in paths.sorted() where path.hasSuffix(".swift") {
             sources["Tests/\(path)"] = try String(contentsOf: testsURL.appending(path: path), encoding: .utf8)
         }
-        return TestIndex(sources: sources)
+        let scenarioSource = try? String(contentsOf: root.appending(path: scenarioFile), encoding: .utf8)
+        return TestIndex(sources: sources, scenarioSource: scenarioSource)
     }
 
     /// Finds the tests in Swift sources already in memory.
@@ -141,8 +180,11 @@ struct TestIndex: Sendable {
     /// it, and a `@Test` at column 0 is a free function whose suite is its file's name. Lines inside multi-line string
     /// literals are skipped, so test code in fixtures isn't counted.
     ///
-    /// - Parameter sources: Each file's source, by path.
-    init(sources: [String: String]) {
+    /// - Parameters:
+    ///   - sources: Each test file's source, by path.
+    ///   - scenarioSource: The source of `scenarioFile`, if there is one.
+    init(sources: [String: String], scenarioSource: String? = nil) {
+        scenarios = scenarioSource.map { Self.scenarios(in: $0) } ?? []
         var tests: [TestCase] = []
         for (path, source) in sources.sorted(by: { $0.key < $1.key }) {
             let fileSuite = URL(filePath: path).deletingPathExtension().lastPathComponent
@@ -189,6 +231,18 @@ struct TestIndex: Sendable {
             }
         }
         self.tests = tests
+    }
+
+    /// Finds the scenarios declared as `UIScenario("name", "title")` in the scenario file.
+    ///
+    /// - Parameter source: The file's source.
+    /// - Returns: The scenarios, in order.
+    static func scenarios(in source: String) -> [UIScenarioCase] {
+        source.matches(of: #/UIScenario\(\s*"(?<name>[^"]+)",\s*"(?<title>[^"]*)"/#).map { match in
+            let line = source[..<match.range.lowerBound].count(where: { $0 == "\n" }) + 1
+            return UIScenarioCase(
+                name: String(match.name), title: String(match.title), location: Location(file: scenarioFile, line: line))
+        }
     }
 
     /// The tests in a suite.

@@ -59,27 +59,25 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 <!-- trace:begin coverage -->
 | Coverage | Count | Requirements (REQ-…) |
 | --- | --- | --- |
-| Unit tests, fully | 14 | GH-003, GH-004, QUE-001, QUE-002, QUE-003, OVR-001, DIF-001, DIF-002, CMT-001, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
-| Unit tests, partly (the rest is a gap) | 9 | GH-002, GH-006, QUE-004, QUE-007, OVR-004, DIF-003, DIF-004, DIF-006, DIF-008 |
+| Unit tests, fully | 15 | GH-003, GH-004, QUE-001, QUE-002, QUE-003, QUE-004, OVR-001, DIF-001, DIF-002, CMT-001, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
+| Unit tests, partly (the rest is a gap) | 8 | GH-002, GH-006, QUE-007, OVR-004, DIF-003, DIF-004, DIF-006, DIF-008 |
+| UI scenarios (no unit tests) | 6 | WIN-001, WIN-003, WIN-007, KEY-002, KEY-003, KEY-004 |
 | Live GitHub tests only | 4 | DIF-007, CMT-002, CMT-005, CMT-006 |
-| A one-off scripted run or use (not repeatable) | 6 | WIN-003, WIN-006, WIN-007, DIF-005, KEY-003, KEY-004 |
+| A one-off scripted run or use (not repeatable) | 2 | WIN-006, DIF-005 |
 | Inspection only | 6 | GH-001, GH-005, OVR-002, CMT-004, PLT-001, PLT-002 |
-| None yet | 12 | QUE-005, QUE-006, WIN-001, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-002, KEY-005, CFG-001, PLT-003 |
+| None yet | 10 | QUE-005, QUE-006, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
 | Proposed (not built) | 3 | CMT-007, CMT-008, CMT-009 |
 
 54 requirements: 51 implemented and 3 proposed.
 <!-- trace:end coverage -->
 
-Most of the "one-off", "inspection only" and "none yet" rows are planned UI scenarios (`UI:…` in requirements.md).
-Several of them implement risk controls (RC-06, RC-07, RC-08, RC-09, RC-16, RC-17), so the UI harness matters for risk
-as well as for coverage.
+Most of the "one-off", "inspection only" and "none yet" rows have UI scenarios planned (`UI:…` after `Gap` in
+requirements.md). Several implement risk controls (RC-06, RC-07, RC-08, RC-16, RC-17), so writing those scenarios matters for
+risk as well as for coverage.
 
 ## Next
 
-1. **UI harness:**
-   - a debug-only scenario runner (`MASER_UI_SCENARIO=<name>`) that drives the app through its commands and asserts
-     on its state, replacing the temporary hook from 2026-11-03;
-   - a fake `gh` (selected with `[github] gh`) that replays recorded GitHub responses and records the mutations sent,
-     including failures;
-   - `scripts/check-ui` to run every scenario.
-2. **Proposed controls:** build RC-04 (#18), RC-12 (#20) and RC-10 (#19), in that order of residual risk.
+1. **Proposed controls:** build RC-04 (#18), RC-12 (#20) and RC-10 (#19), in that order of residual risk, each with
+   its planned scenario.
+2. **More UI scenarios:** the planned ones for risk controls first: UI:finish-review-defaults (RC-07),
+   UI:discard-confirms (RC-08), UI:link-opens-browser (RC-16), UI:open-pr-marker (RC-06).
