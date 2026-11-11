@@ -38,7 +38,7 @@ extension DiffLine {
 }
 
 /// A line, or range of lines within one hunk, to start a review thread on, in GitHub's terms.
-public struct CommentTarget: Hashable, Sendable {
+public struct CommentTarget: Codable, Hashable, Sendable {
     /// The path of the file, relative to the repository root.
     public let path: String
     /// The side of the diff `line` is on.

@@ -204,6 +204,22 @@ import SwiftUI
             step("snapshot: \(url.path())")
         }
 
+        /// Whether this is the second launch of a scenario that called `crash()`.
+        var relaunched: Bool { ProcessInfo.processInfo.environment["MASER_UI_RELAUNCHED"] == "1" }
+
+        /// Kills the app at once, as a crash would, and asks `scripts/check-ui` to launch the scenario again.
+        ///
+        /// Nothing gets a chance to save on the way out. The second launch sees `relaunched` set.
+        func crash() -> Never {
+            step("crashing, to be launched again")
+            if let result = ProcessInfo.processInfo.environment["MASER_UI_RESULT"] {
+                try? Data("RELAUNCH\n".utf8).write(to: URL(filePath: result))
+            }
+            kill(getpid(), SIGKILL)
+            // SIGKILL can't be caught, so this is never reached.
+            exit(1)
+        }
+
         /// Posts one chord as a key-down event to the window, or to its sheet if one is showing, as typing would.
         ///
         /// - Parameter chord: The chord.

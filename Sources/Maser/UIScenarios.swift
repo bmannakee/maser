@@ -24,6 +24,7 @@
         static let all: [UIScenario] = [
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
             queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
+            draftSurvivesRelaunch,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -415,6 +416,62 @@
                     && ShownText.values["finish-review-account"] == "Posting as @\(other)"
             }
             try await app.press("esc")
+        }
+
+        /// Text typed but not posted comes back after a crash, and posting it clears what was kept.
+        static let draftSurvivesRelaunch = UIScenario(
+            "draft-survives-relaunch",
+            "REQ-CMT-008: An unsent comment, line comment and review summary survive a crash, and posting clears them"
+        ) { app in
+            let comment = "Unsent comment."
+            let lineComment = "Unsent line comment."
+            let summary = "Unsent summary."
+            if !app.relaunched {
+                try await app.openFromQueue(testPR)
+                try await app.waitUntil("the diff loads") { app.review?.diffCommitID != nil }
+                try await app.press("c")
+                try await app.waitUntil("the comment box has focus") { app.responder == .editor }
+                await app.type(comment)
+                try await app.press("esc")
+                try await app.press("g f")
+                try await app.waitUntil("the Files tab shows a file") { app.review?.selectedFile != nil }
+                for _ in 0..<3 { try await app.press("j") }
+                try await app.press("c")
+                try await app.waitUntil("the line comment box has focus") { app.responder == .editor }
+                await app.type(lineComment)
+                try await app.press("esc")
+                try await app.press("S")
+                try await app.waitUntil("Finish Review opens") { app.review?.isFinishingReview == true }
+                await app.type(summary)
+                try await app.press("esc")
+                try await app.waitUntil("the sheet closes") { app.review?.isFinishingReview == false }
+                app.crash()
+            }
+
+            try await app.openFromQueue(testPR)
+            guard let review = app.review else { throw UIScenarioFailure(description: "no review") }
+            try app.expect(review.commentDraft == comment, "the conversation comment is back", app.summary)
+            try app.expect(review.reviewSummary == summary, "the review summary is back", app.summary)
+            guard let draft = review.inlineDraft, case .newThread = draft.target else {
+                throw UIScenarioFailure(description: "the line comment didn't come back: \(app.summary)")
+            }
+            try app.expect(draft.body == lineComment, "the line comment's text is back", draft.body)
+            try await app.waitUntil("the diff loads") { review.diffCommitID != nil && review.postingAccount != nil }
+            try app.expect(
+                review.inlineDraft?.error == nil, "the line comment is still placed, since nothing was pushed",
+                review.inlineDraft?.error ?? "")
+
+            try app.overrideGH([
+                .init(match: ["--method", "POST", "issues/\(testPR)/comments"], status: 0, stdout: "{}", stderr: nil)
+            ])
+            try await app.press("c")
+            try await app.waitUntil("the comment box has focus") { app.responder == .editor }
+            try await app.press("cmd+enter")
+            try await app.waitUntil("the comment posts") { review.commentDraft == "" && review.commentError == nil }
+            let kept = try ReviewModel.unsentStore.load(for: review.pr)
+            try app.expect(
+                kept == UnsentText(lineComment: draft.unsent, reviewSummary: summary),
+                "only the posted comment is cleared from what's kept", "\(kept)")
         }
 
         /// Going back to a PR finds it as it was left, without reloading it.

@@ -46,7 +46,7 @@ These are the parts of the interface where a use error could lead to a hazard in
 | HRUS-3 | The user reaches for `[` `]` `{` `}` and presses `/` by mistake, moving focus to the queue's filter. | HAZ-04 | RC-06 (`/` only in the queue) | FE-4. Fixed and re-checked (V10). |
 | HRUS-4 | In the full-file view, the user comments on a line outside the diff. | HAZ-03 | RC-05 | L:LiveReviewWriteTests (error). The notice wording hasn't been evaluated with the user. |
 | HRUS-5 | In Finish Review, the user means to Comment, but the radio group is left on Approve or set there by a stray key, and they press ⌘↩. | HAZ-05 | RC-07; RC-12 | UI:names-pr-and-account (the sheet names the PR and account). Not yet evaluated with the user. |
-| HRUS-6 | The user writes a long reply, switches to another PR or app, then quits or Maser crashes. | HAZ-07 | RC-09; RC-10 (proposed) | FE-1 (crashes observed). |
+| HRUS-6 | The user writes a long reply, switches to another PR or app, then quits or Maser crashes. | HAZ-07 | RC-09; RC-10 | FE-1 (crashes observed). UI:draft-survives-relaunch (text comes back after a crash). |
 | HRUS-7 | The user reviews at work while `gh` is signed in to their personal account. | HAZ-10 | RC-12 | UI:names-pr-and-account (account shown; a switch is refused). Not yet evaluated with the user. |
 | HRUS-8 | The user reviews a PR, a colleague pushes, and the user submits an approval without reloading. | HAZ-02 | RC-04 | UI:head-moved-blocks-posting (the refusal and refresh). Not yet evaluated with the user. |
 
@@ -69,6 +69,6 @@ Before relying on Maser for review at work, run each HRUS above with the user on
 For each one, record whether the use error happened, and whether the user noticed it before harm. The prerequisites
 are:
 
-- the open risks in the risk file are controlled (RC-04 and RC-12 were built on 2026-11-10);
+- the open risks in the risk file are controlled (RC-04, RC-12 and RC-10 were built on 2026-11-10);
 - the scripted UI scenarios exist, so that what's evaluated by hand is only what scripts can't judge: perception,
   attention, and wording.

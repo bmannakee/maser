@@ -72,12 +72,7 @@ final class ReviewModel {
     /// A line comment or reply being written in the comments pane.
     struct InlineDraft {
         /// What the draft will be posted as.
-        enum Target: Equatable {
-            /// A new review thread on a line or range of lines.
-            case newThread(CommentTarget)
-            /// A reply to an existing thread, with the login of the thread's first commenter.
-            case reply(threadID: String, to: String)
-        }
+        typealias Target = DraftTarget
         var target: Target
         /// The head commit of the diff the target was chosen on; a new thread is only posted while it's still the head.
         var commitID: String?
@@ -94,7 +89,18 @@ final class ReviewModel {
             case let .reply(_, author): "Reply to \(author)"
             }
         }
+
+        /// The part of the draft kept across crashes and quits; nil while it has no text.
+        var unsent: UnsentText.LineComment? {
+            body.isEmpty ? nil : UnsentText.LineComment(target: target, commitID: commitID, body: body)
+        }
     }
+
+    /// Where every review keeps its unsent text: a folder in Application Support named for the app's bundle, so the
+    /// UI scenarios' build keeps its own.
+    static let unsentStore = UnsentTextStore(
+        directory: URL.applicationSupportDirectory.appending(path: Bundle.main.bundleIdentifier ?? "dev.maser.Maser")
+            .appending(path: "Unsent"))
 
     /// The pull request this window reviews.
     let pr: PullRequest
@@ -114,7 +120,11 @@ final class ReviewModel {
 
     // Commenting on the conversation
     /// The Markdown source of the comment being written for the PR's conversation.
-    var commentDraft = ""
+    var commentDraft = "" {
+        didSet {
+            if commentDraft != oldValue { saveUnsent { $0.comment = self.commentDraft } }
+        }
+    }
     private(set) var isPostingComment = false
     /// The message from the last failed attempt to post `commentDraft`.
     private(set) var commentError: String?
@@ -183,7 +193,12 @@ final class ReviewModel {
 
     // Writing a review
     /// The line comment or reply being written, if any.
-    var inlineDraft: InlineDraft?
+    var inlineDraft: InlineDraft? {
+        didSet {
+            let unsent = inlineDraft?.unsent
+            if unsent != oldValue?.unsent { saveUnsent { $0.lineComment = unsent } }
+        }
+    }
     /// Set to ask the comments pane to focus the draft; it clears this once it has.
     var inlineComposerFocusRequest = false
     /// The PR's node ID and the viewer's pending review, once loaded.
@@ -197,19 +212,44 @@ final class ReviewModel {
     /// Whether the Finish Review sheet is showing.
     var isFinishingReview = false
     /// The Markdown summary to submit with the review.
-    var reviewSummary = ""
+    var reviewSummary = "" {
+        didSet {
+            if reviewSummary != oldValue { saveUnsent { $0.reviewSummary = self.reviewSummary } }
+        }
+    }
     /// The verdict to submit the review with.
     var reviewEvent = ReviewEvent.comment
     /// The message from the last failed review action: submitting, discarding, or deleting a draft comment.
     private(set) var reviewError: String?
     private(set) var isSubmittingReview = false
 
-    /// Creates the state for a PR's review; call `load()` to fetch the PR's data.
+    /// Creates the state for a PR's review, with any text left unsent last time; call `load()` to fetch the PR's data.
     ///
     /// - Parameter pr: The pull request to review.
     init(pr: PullRequest) {
         self.pr = pr
         showsFullFiles = ConfigStore.shared.settings.diffView == .full
+        do {
+            let unsent = try Self.unsentStore.load(for: pr)
+            commentDraft = unsent.comment
+            reviewSummary = unsent.reviewSummary
+            inlineDraft = unsent.lineComment.map { InlineDraft(target: $0.target, commitID: $0.commitID, body: $0.body) }
+        } catch {
+            NSLog("Couldn't read the unsent text for %@: %@", pr.url.absoluteString, error.localizedDescription)
+        }
+    }
+
+    /// Saves a change to the PR's unsent text, so it survives a crash or quit.
+    ///
+    /// Called as the user types. A failure is logged and the text stays in memory.
+    ///
+    /// - Parameter change: Sets the part of the text that changed.
+    private func saveUnsent(_ change: (inout UnsentText) -> Void) {
+        do {
+            try Self.unsentStore.update(for: pr, change)
+        } catch {
+            NSLog("Couldn't save the unsent text for %@: %@", pr.url.absoluteString, error.localizedDescription)
+        }
     }
 
     /// The selected file as the Files tab shows it: its hunks, or the whole file.

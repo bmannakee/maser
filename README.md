@@ -49,6 +49,9 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   comment then needs `c` on its line again; the text is kept. Every post button names the account `gh` will post as
   ("Comment as @you"), and Finish Review names the PR too. If `gh` switches accounts while Maser is open, the next post
   is refused and the new account shown, so you never post as an account you weren't shown.
+  Text you haven't posted (a comment, line comment, reply or review summary) is saved as you type and comes back when
+  you open the PR again, even after a crash or quit. It's cleared once posted or discarded; the files are in
+  `~/Library/Application Support/dev.maser.Maser/Unsent`.
   `z a` shows the whole file instead of just the changed hunks (`z R` for every file, `z M` to go back); hunk
   navigation still jumps between the changes. GitHub only takes comments on lines in the diff, so the extra lines are
   for reading.
