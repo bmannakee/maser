@@ -58,6 +58,23 @@ import Testing
         #expect(shown[2].error == "bad query")
     }
 
+    /// A PR is gone only when no section has it any more; one section dropping it, or a failed search, isn't enough.
+    @Test("REQ-WIN-008: Finds PRs that left the queue") func removedPRs() {
+        let before = [
+            QueueSection(search: .reviewRequested, prs: [Self.pr(1), Self.pr(2)]),
+            QueueSection(search: .involving, prs: [Self.pr(2), Self.pr(3)]),
+        ]
+        let after = [
+            QueueSection(search: .reviewRequested, prs: [Self.pr(4)]),
+            // Failed, keeping its last results.
+            QueueSection(search: .involving, prs: [Self.pr(2), Self.pr(3)], error: "HTTP 502"),
+        ]
+        #expect(QueueSection.removedPRs(from: before, to: after) == [Self.pr(1).id])
+        #expect(QueueSection.removedPRs(from: nil, to: after).isEmpty)
+        #expect(QueueSection.removedPRs(from: before, to: before).isEmpty)
+        #expect(QueueSection.removedPRs(from: before, to: []) == Set([1, 2, 3].map { Self.pr($0).id }))
+    }
+
     /// Every filter word must match the title, repository, author or number.
     @Test("REQ-QUE-003: Filters") func filters() {
         let sections = [

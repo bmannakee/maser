@@ -223,6 +223,14 @@ final class ReviewModel {
     private(set) var reviewError: String?
     private(set) var isSubmittingReview = false
 
+    /// Whether the PR left the main window's queue while showing here, kept open because it had unsent text.
+    var leftQueue = false
+
+    /// Whether any comment, line comment, reply or summary has text that hasn't been posted.
+    var hasUnsentText: Bool {
+        !UnsentText(comment: commentDraft, lineComment: inlineDraft?.unsent, reviewSummary: reviewSummary).isEmpty
+    }
+
     /// Creates the state for a PR's review, with any text left unsent last time; call `load()` to fetch the PR's data.
     ///
     /// - Parameter pr: The pull request to review.

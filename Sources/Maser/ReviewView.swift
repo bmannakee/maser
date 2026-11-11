@@ -15,12 +15,26 @@ import SwiftUI
 struct ReviewView: View {
     let model: ReviewModel
 
+    /// The note shown when the PR left the queue but stayed open for its unsent text.
+    static let leftQueueNote =
+        "This PR is no longer in your queue: it may have been merged or closed. It stays open because it has text you haven't posted."
+
     var body: some View {
         @Bindable var model = model
         Group {
             switch model.tab {
             case .overview: OverviewView(model: model)
             case .files: FilesView(model: model)
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if model.leftQueue {
+                Label(Self.leftQueueNote, systemImage: "tray.and.arrow.up")
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(.yellow.opacity(0.15))
+                    .shownText("left-queue", Self.leftQueueNote)
             }
         }
         .navigationTitle(model.pr.title)

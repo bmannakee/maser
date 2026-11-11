@@ -48,6 +48,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-WIN-005 | ⌘O opens any PR by URL in the main window, and opens a main window if none is open. | UN-1 | — | **Gap:** UI:open-by-url. | Implemented |
 | REQ-WIN-006 | A main window with no review open always shows the queue. | UN-1 | — | V-2026-11-03/V11 (cause only, not re-run). **Gap:** UI:empty-window-shows-queue. | Implemented |
 | REQ-WIN-007 | Switching tabs, showing and hiding panes, and opening PRs never crashes the app or stalls its layout. | UN-9 | RC-09 | UI:tab-and-pane-stress; V-2026-11-03/V6, V7 (16 tab switches with comments toggled). | Implemented |
+| REQ-WIN-008 | When a queue refresh drops the PR whose review is showing (merged or closed, say), and it was opened from the queue, the review closes and the queue gets the keys. If the review has unsent text, it stays open instead, with a note that the PR left the queue. A failed search never counts as dropping its PRs. A PR opened by URL is left alone. | UN-1, UN-9 | — | T:PullRequestSearchTests.removedPRs, UI:closed-pr-leaves-pane | Implemented |
 
 ## Overview tab (OVR)
 

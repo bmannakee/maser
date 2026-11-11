@@ -6,6 +6,7 @@
 // are the ones recorded there. See `Tests/UIScenarios/README.md` for running and re-recording them.
 
 #if DEBUG
+    import Foundation
     import MaserCore
 
     /// The scenarios, and the recorded PRs they use.
@@ -24,7 +25,7 @@
         static let all: [UIScenario] = [
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
             queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
-            draftSurvivesRelaunch,
+            draftSurvivesRelaunch, closedPRLeavesPane,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -472,6 +473,47 @@
             try app.expect(
                 kept == UnsentText(lineComment: draft.unsent, reviewSummary: summary),
                 "only the posted comment is cleared from what's kept", "\(kept)")
+        }
+
+        /// A PR that drops out of the queue on a refresh, as a merged one does, closes, unless it has unsent text.
+        static let closedPRLeavesPane = UIScenario(
+            "closed-pr-leaves-pane",
+            "REQ-WIN-008: A PR that leaves the queue closes and the queue gets the keys; with unsent text it stays, with a note"
+        ) { app in
+            let all = app.queuePRs
+            /// Makes every queue search find just these PRs.
+            func searchesFind(_ numbers: Set<Int>) throws -> UIScenarioDriver.GHOverride {
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                let prs = all.filter { !numbers.contains($0.number) }
+                return .init(
+                    match: ["search", "prs"], status: 0, stdout: String(decoding: try encoder.encode(prs), as: UTF8.self),
+                    stderr: nil)
+            }
+
+            try await app.openFromQueue(smallPR)
+            try app.overrideGH([try searchesFind([smallPR])])
+            try await app.press("cmd+0")
+            try await app.press("r")
+            try await app.waitUntil("the PR's review closes and the queue has the keys") {
+                app.review == nil && app.state.queueHasKeys && !app.queuePRs.contains { $0.number == smallPR }
+            }
+
+            try await app.openFromQueue(mainPR)
+            try await app.press("c")
+            try await app.waitUntil("the comment box has focus") { app.responder == .editor }
+            await app.type("Not posted yet.")
+            try await app.press("esc")
+            try app.overrideGH([try searchesFind([smallPR, mainPR])])
+            try await app.press("cmd+0")
+            try await app.press("r")
+            try await app.waitUntil("the review stays, saying it left the queue") {
+                ShownText.values["left-queue"] == ReviewView.leftQueueNote
+            }
+            try app.expect(
+                app.review?.pr.number == mainPR && app.review?.commentDraft == "Not posted yet."
+                    && !app.queuePRs.contains { $0.number == mainPR },
+                "with its text, though the queue dropped it", app.summary)
         }
 
         /// Going back to a PR finds it as it was left, without reloading it.

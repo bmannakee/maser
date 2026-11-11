@@ -35,7 +35,8 @@ on it, shows it and moves the keys to the review. The queue takes the keys back 
 which also brings the main window forward from anywhere, or `e`, which shows and hides it; Esc in the queue goes back to
 the review. `/` filters the queue only while it has the keys; ⌘F works from anywhere. While the queue has the keys, the ones it doesn't use (`c`,
 `g f`, `S`…) still reach the open review. Reviews you've opened stay loaded, so switching between PRs is
-instant. ⌥Return, or Open in New Window in the context menu, opens a PR in a window of its own, to compare two side by
+instant. When a refresh drops the open PR from the queue (merged or closed, say), its review closes, unless it has text
+you haven't posted; then it stays, with a note. ⌥Return, or Open in New Window in the context menu, opens a PR in a window of its own, to compare two side by
 side. ⌘O opens any PR by URL. Each review has tabs:
 
 - **Overview** — title, description, comments and reviews (rendered by GitHub), plus mergeability, review status, CI checks and labels.
