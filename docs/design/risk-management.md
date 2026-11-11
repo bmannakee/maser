@@ -72,7 +72,7 @@ Each row lists:
 
 | ID | Hazard and sequence of events | Harm | Initial | Controls | Residual |
 | --- | --- | --- | --- | --- | --- |
-| HAZ-01 | The diff Maser shows doesn't match the PR: a parse error, a truncated list, a mangled path, or a full-file merge that doesn't fit. The user approves code they didn't actually see. | H1 | S4 P3 **High** | RC-01, RC-02, RC-03 | S4 P1 Medium |
+| HAZ-01 | The diff Maser shows doesn't match the PR: a parse error, a truncated list, a mangled path, a full-file merge that doesn't fit, or lines drawn over one another so part of one is hidden. The user approves code they didn't actually see. | H1 | S4 P3 **High** | RC-01, RC-02, RC-03, RC-21 | S4 P1 Medium |
 | HAZ-02 | The PR's head moves (a new push) after Maser loaded the diff. A line comment posted with old line numbers lands on a different line of the new head, or an approval covers commits the user never saw. | H1, H6 | S4 P3 **High** | RC-04, RC-17 (partial) | S4 P1 Medium |
 | HAZ-03 | The user comments on a line that's only shown in the full-file view. GitHub silently creates nothing, and the user believes they raised the issue. | H6 | S3 P4 **High** | RC-05 | S3 P1 Low |
 | HAZ-04 | A key acts somewhere the user didn't expect. For example, `S`, `c` or Return acts on the open PR while the user is looking at a different, highlighted PR in the queue, or on the wrong pane. Several focus bugs of this kind were found on 2026-11-03 (V8–V10). | H2, H6 | S3 P4 **High** | RC-06, RC-12 (*proposed*) | S3 P2 Medium |
@@ -116,6 +116,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-18 | Config problems are reported in a banner and skipped, never silently applied. Shadowed bindings are reported. | Information for safety | REQ-CFG-002 | Implemented |
 | RC-19 | Live write tests are hard-coded to bmannakee/maser#1, which `AGENTS.md` requires. | Process control | — (I: `LiveReviewWriteTests`) | Implemented |
 | RC-20 | Comment targets are computed from the parsed line numbers on each side, and clipped to one hunk. | Inherent safety by design | REQ-CMT-001 | Implemented |
+| RC-21 | Every diff line is drawn in full: long lines wrap inside their row, and a scenario checks that no line's text leaves its row. Found in use on 2026-11-10, when wrapped lines were drawn partly under the next line. | Inherent safety by design | REQ-DIF-009 | Implemented; UI:long-lines-wrap |
 
 ## Residual risk
 

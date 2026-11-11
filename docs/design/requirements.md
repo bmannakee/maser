@@ -70,6 +70,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-DIF-006 | Switching between hunks and the full file, refreshing, and returning to a PR keep the cursor on the same line, or the nearest one if that line is gone. | UN-5 | — | T:FullFileTests.matchesLinesAcrossViews. **Gap:** UI:cursor-survives-refresh. | Implemented |
 | REQ-DIF-007 | Show Full File doesn't fetch files over 4 MB, and says why. | UN-10 | — | L:LiveFullFileTests.expandsRealFile (limit). | Implemented |
 | REQ-DIF-008 | Review threads on the selected file, including outdated ones and pending drafts, are listed in the comments pane in line order with outdated threads last, and marked at their lines in the diff. Selecting a thread scrolls the diff to its line. | UN-2, UN-4 | — | T:ReviewThreadTests.decodesThreads; L:LiveGitHubTests.loadsRealPullRequest (every current thread maps to a line). **Gap:** UI:thread-markers. | Implemented |
+| REQ-DIF-009 | A diff line too long for the pane wraps inside its own row: the row grows to fit, and no line's text is drawn over another's or hidden under it. | UN-3 | RC-21 | UI:long-lines-wrap | Implemented |
 
 ## Commenting and reviewing (CMT)
 

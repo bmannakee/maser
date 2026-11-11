@@ -7,10 +7,11 @@
 // replays recordings; scenarios can override its answers and read the commands it was sent. Only debug builds have
 // any of this.
 
+import SwiftUI
+
 #if DEBUG
     import AppKit
     import MaserCore
-    import SwiftUI
 
     /// What a scenario can see of a main window besides its `MainWindowState`: the view's own state.
     @MainActor
@@ -188,6 +189,19 @@
                 post(character == "\n" ? KeyChord(.enter) : KeyChord(character))
             }
             await settle()
+        }
+
+        /// Saves a picture of the window as `<name>.png` beside the scenario's result file, for looking at layout.
+        ///
+        /// - Parameter name: The file's name, without the extension.
+        func snapshot(_ name: String) {
+            guard let view = window.contentView, let result = ProcessInfo.processInfo.environment["MASER_UI_RESULT"],
+                let picture = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+            else { return }
+            view.cacheDisplay(in: view.bounds, to: picture)
+            let url = URL(filePath: result).deletingLastPathComponent().appending(path: "\(name).png")
+            try? picture.representation(using: .png, properties: [:])?.write(to: url)
+            step("snapshot: \(url.path())")
         }
 
         /// Posts one chord as a key-down event to the window, or to its sheet if one is showing, as typing would.
@@ -403,4 +417,42 @@
             try JSONEncoder().encode(overrides).write(to: ghState.appending(path: "overrides.json"))
         }
     }
+    /// Where diff rows and their text were drawn, recorded only while a UI scenario runs, so scenarios can check layout.
+    @MainActor
+    enum LayoutProbe {
+        /// Whether rows record their frames: only in a scenario run.
+        static let isEnabled = ProcessInfo.processInfo.environment["MASER_UI_SCENARIO"] != nil
+        /// Each row's frame, by file path and line ID.
+        static var rowFrames: [String: CGRect] = [:]
+        /// Each row's text frame, by file path and line ID.
+        static var textFrames: [String: CGRect] = [:]
+    }
+
 #endif
+
+// Outside `#if DEBUG` so views can call it; release builds return the view unchanged.
+extension View {
+    /// Records this view's frame in `LayoutProbe` while a UI scenario runs; does nothing otherwise.
+    ///
+    /// - Parameters:
+    ///   - key: The row's file path and line ID.
+    ///   - isText: Whether this is the row's text rather than the whole row.
+    /// - Returns: The view, recording its frame when enabled.
+    @ViewBuilder
+    func layoutProbe(_ key: @autoclosure () -> String, isText: Bool) -> some View {
+        #if DEBUG
+            if LayoutProbe.isEnabled {
+                let key = key()
+                onGeometryChange(for: CGRect.self) {
+                    $0.frame(in: .global)
+                } action: { frame in
+                    if isText { LayoutProbe.textFrames[key] = frame } else { LayoutProbe.rowFrames[key] = frame }
+                }
+            } else {
+                self
+            }
+        #else
+            self
+        #endif
+    }
+}
