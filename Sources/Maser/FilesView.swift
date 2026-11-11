@@ -228,6 +228,7 @@ private struct DiffView: View {
                         }
                         ForEach(hunk.lines) { line in
                             DiffLineRow(
+                                path: file.path,
                                 line: line,
                                 marker: markers[line.id],
                                 isCursor: line.id == cursor,
@@ -375,6 +376,8 @@ private struct HunkHeaderRow: View {
 
 /// One line of the diff: old and new line numbers, a gutter icon, the `+`/`-` sign, and the text.
 private struct DiffLineRow: View, Equatable {
+    /// The path of the file the line is in.
+    let path: String
     let line: DiffLine
     /// Whether a current thread is on this line: nil for none, true if one has a draft comment, false otherwise.
     let marker: Bool?
@@ -385,7 +388,7 @@ private struct DiffLineRow: View, Equatable {
 
     /// Whether two rows draw the same: the same line and state, in the same window.
     nonisolated static func == (lhs: DiffLineRow, rhs: DiffLineRow) -> Bool {
-        lhs.line == rhs.line && lhs.marker == rhs.marker && lhs.isCursor == rhs.isCursor
+        lhs.path == rhs.path && lhs.line == rhs.line && lhs.marker == rhs.marker && lhs.isCursor == rhs.isCursor
             && lhs.isHighlighted == rhs.isHighlighted && lhs.model === rhs.model
     }
 
@@ -408,8 +411,10 @@ private struct DiffLineRow: View, Equatable {
                 .frame(width: 14, alignment: .leading)
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutProbe(probeKey, isText: true)
         }
         .padding(.vertical, 1)
+        .layoutProbe(probeKey, isText: false)
         .background(background)
         .overlay {
             if isHighlighted { Color.accentColor.opacity(0.14).allowsHitTesting(false) }
@@ -418,6 +423,9 @@ private struct DiffLineRow: View, Equatable {
             if isCursor { Color.accentColor.frame(width: 3).allowsHitTesting(false) }
         }
     }
+
+    /// The row's key in the UI scenarios' layout probe.
+    private var probeKey: String { "\(path)#\(line.id)" }
 
     /// A thread marker, or on a commentable cursor line without a thread, a button to comment on it.
     @ViewBuilder
@@ -434,7 +442,9 @@ private struct DiffLineRow: View, Equatable {
             .buttonStyle(.plain)
             .help("Comment on this line", .comment)
         } else {
-            Color.clear
+            // A one-line Text, not `Color.clear`: the row aligns on first baselines, and a shape has none, so it would
+            // stretch to a wrapped row's height and push the text down into the next row.
+            Text(" ")
         }
     }
 

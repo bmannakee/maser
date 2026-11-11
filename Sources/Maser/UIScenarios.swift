@@ -17,11 +17,13 @@
         static let smallPR = 13
         /// The closed test PR, the only one live write tests may touch, so comments posted to it are harmless.
         static let testPR = 1
+        /// A merged PR that adds the design docs: Markdown with lines long enough to wrap.
+        static let designDocsPR = 22
 
         /// Every scenario, in the order `scripts/check-ui` runs them.
         static let all: [UIScenario] = [
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
-            queueSearchFails, switchPRsKeepsState, headMovedBlocksPosting, namesPRAndAccount,
+            queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -251,6 +253,36 @@
             try app.expect(
                 searchesAfter - searchesBefore == before.count, "every section searched again",
                 "\(searchesAfter - searchesBefore)")
+        }
+
+        /// Long lines wrap inside their own row, so every line's text is drawn in full and none is hidden under another.
+        static let longLinesWrap = UIScenario(
+            "long-lines-wrap", "REQ-DIF-009: Wrapped diff lines stay in their rows; no line's text overlaps another's"
+        ) { app in
+            try await app.openFromQueue(designDocsPR)
+            try await app.press("g f")
+            try await app.waitUntil("the Files tab shows a file") { app.review?.selectedFile != nil }
+            // The design docs are Markdown with long lines; check the first few files.
+            for index in 1...3 {
+                await app.pause(.milliseconds(500))
+                let path = app.review?.selectedPath ?? ""
+                let rows = LayoutProbe.rowFrames.filter { $0.key.hasPrefix("\(path)#") }
+                var wrapped = 0
+                var outside: [String] = []
+                for (key, row) in rows {
+                    guard let text = LayoutProbe.textFrames[key] else { continue }
+                    // One line of 12 pt monospaced text is about 15 pt tall.
+                    if text.height > 24 { wrapped += 1 }
+                    if text.minY < row.minY - 0.5 || text.maxY > row.maxY + 0.5 {
+                        outside.append("\(key): text \(text.minY)–\(text.maxY), row \(row.minY)–\(row.maxY)")
+                    }
+                }
+                app.step("\(path): \(rows.count) rows, \(wrapped) wrapped")
+                try app.expect(rows.count > 10 && wrapped > 0, "file \(index) has wrapped lines to check", path)
+                try app.expect(
+                    outside.isEmpty, "every line's text is inside its row in \(path)", outside.prefix(3).joined(separator: "; "))
+                try await app.press("]")
+            }
         }
 
         /// A push after the diff loaded stops line comments and reviews from posting, until the diff is refreshed.
