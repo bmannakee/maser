@@ -190,7 +190,7 @@
             await settle()
         }
 
-        /// Posts one chord as a key-down event to the window.
+        /// Posts one chord as a key-down event to the window, or to its sheet if one is showing, as typing would.
         ///
         /// - Parameter chord: The chord.
         private func post(_ chord: KeyChord) {
@@ -212,7 +212,7 @@
             guard
                 let event = NSEvent.keyEvent(
                     with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
-                    windowNumber: window.windowNumber, context: nil, characters: characters,
+                    windowNumber: (window.attachedSheet ?? window).windowNumber, context: nil, characters: characters,
                     charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode)
             else { return }
             NSApp.postEvent(event, atStart: false)
