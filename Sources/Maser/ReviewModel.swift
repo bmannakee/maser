@@ -190,6 +190,8 @@ final class ReviewModel {
     private(set) var reviewContext: ReviewContext?
     /// The head commit the shown diff was loaded at; comments and reviews are posted only while it's still the head.
     private(set) var diffCommitID: String?
+    /// The account `gh` will post as, as last fetched; the comment boxes and Finish Review show it.
+    var postingAccount: String? { reviewContext?.viewerLogin }
     /// Whether the last submit was stopped because new commits were pushed, so the sheet offers a refresh.
     private(set) var reviewHeadMoved = false
     /// Whether the Finish Review sheet is showing.
@@ -436,7 +438,9 @@ final class ReviewModel {
         commentError = nil
         defer { isPostingComment = false }
         do {
-            try await GitHubCLI().addComment(to: pr, body: body)
+            let cli = GitHubCLI()
+            _ = try await checkedContext(cli)
+            try await cli.addComment(to: pr, body: body)
         } catch {
             commentError = error.localizedDescription
             return
@@ -558,12 +562,11 @@ final class ReviewModel {
                 // GitHub puts a new thread on the current head, so its line numbers must come from that commit's diff.
                 guard let seen = draft.commitID else { throw GitHubCLIError.rejected("The diff hasn't loaded yet.") }
                 guard seen == diffCommitID else { throw GitHubCLIError.rejected(Self.placeAgainMessage) }
-                let context = try await cli.reviewContext(for: pr)
-                reviewContext = context
-                try context.requireHead(seen)
+                let context = try await checkedContext(cli, head: seen)
                 let reviewID = try await pendingReviewID(cli, context: context, commitID: seen)
                 try await cli.addReviewThread(on: pr, reviewID: reviewID, target: target, body: body)
             case let .reply(threadID, _):
+                _ = try await checkedContext(cli)
                 try await cli.reply(on: pr, toThread: threadID, body: body)
             }
             inlineDraft = nil
@@ -575,6 +578,27 @@ final class ReviewModel {
             return
         }
         await reloadThreads()
+    }
+
+    /// Fetches the review context just before posting, and checks it still matches what the user was shown.
+    ///
+    /// The fresh context replaces the stored one either way, so after a refusal the views show the current account and
+    /// posting again posts as it.
+    ///
+    /// - Parameters:
+    ///   - cli: The client to fetch with.
+    ///   - head: The commit the post's diff was loaded at, to check the head against; nil for posts that don't depend
+    ///     on line numbers.
+    /// - Returns: The fresh context.
+    /// - Throws: `GitHubCLIError.accountChanged` if `gh`'s account isn't the one shown, `GitHubCLIError.headMoved` if
+    ///   the head moved, or the errors from `reviewContext(for:)`.
+    private func checkedContext(_ cli: GitHubCLI, head: String? = nil) async throws -> ReviewContext {
+        let shown = postingAccount
+        let context = try await cli.reviewContext(for: pr)
+        reviewContext = context
+        try context.requireViewer(shown)
+        if let head { try context.requireHead(head) }
+        return context
     }
 
     /// Returns the ID of the viewer's pending review, starting one pinned to `commitID` if they don't have one.
@@ -633,9 +657,7 @@ final class ReviewModel {
             guard let seen = diffCommitID else { throw GitHubCLIError.rejected("The diff hasn't loaded yet.") }
             let cli = GitHubCLI()
             // Fresh, so a verdict never covers commits pushed after the diff loaded.
-            let context = try await cli.reviewContext(for: pr)
-            reviewContext = context
-            try context.requireHead(seen)
+            let context = try await checkedContext(cli, head: seen)
             try await cli.submitReview(
                 on: pr, context: context, event: reviewEvent,
                 body: reviewSummary.trimmingCharacters(in: .whitespacesAndNewlines), commitID: seen

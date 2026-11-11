@@ -42,13 +42,16 @@ import Testing
         #expect(try ReviewThread.decodeLines(from: Data()).isEmpty)
     }
 
-    /// Decodes the PR's node ID and head commit, with and without a pending review.
-    @Test("REQ-CMT-001: Decodes review context") func decodesReviewContext() throws {
-        let json =
-            #"{"data":{"repository":{"pullRequest":{"id":"PR_1","headRefOid":"abc123","reviews":{"nodes":[{"id":"PRR_9"}]}}}}}"#
+    /// Decodes the PR's node ID, head commit and the viewer's login, with and without a pending review.
+    @Test("REQ-CMT-001, REQ-CMT-009: Decodes review context") func decodesReviewContext() throws {
+        let json = #"""
+            {"data":{"viewer":{"login":"octocat"},
+             "repository":{"pullRequest":{"id":"PR_1","headRefOid":"abc123","reviews":{"nodes":[{"id":"PRR_9"}]}}}}}
+            """#
         #expect(
             try ReviewContext.decode(from: Data(json.utf8))
-                == ReviewContext(pullRequestID: "PR_1", pendingReviewID: "PRR_9", headCommitID: "abc123"))
+                == ReviewContext(
+                    pullRequestID: "PR_1", pendingReviewID: "PRR_9", headCommitID: "abc123", viewerLogin: "octocat"))
         let none = #"{"data":{"repository":{"pullRequest":{"id":"PR_1","headRefOid":"abc123","reviews":{"nodes":[]}}}}}"#
         #expect(try ReviewContext.decode(from: Data(none.utf8)).pendingReviewID == nil)
     }
@@ -117,6 +120,33 @@ import Testing
     }
 }
 
+/// Checking that `gh` posts as the account the user was shown (RC-12).
+@Suite struct PostingAccountTests {
+    let context = ReviewContext(pullRequestID: "PR_1", pendingReviewID: nil, headCommitID: "abc123", viewerLogin: "work-me")
+
+    @Test("REQ-CMT-009: Posts only as the account shown") func postsOnlyAsAccountShown() throws {
+        try context.requireViewer("work-me")
+        for shown in ["home-me", nil] {
+            let error = #expect(throws: GitHubCLIError.self) { try context.requireViewer(shown) }
+            guard case let .accountChanged(errorShown, current) = error else {
+                Issue.record("expected accountChanged, got \(String(describing: error))")
+                continue
+            }
+            #expect(errorShown == shown && current == "work-me")
+        }
+        var unknown = context
+        unknown.viewerLogin = nil
+        #expect(throws: GitHubCLIError.self) { try unknown.requireViewer(nil) }
+    }
+
+    @Test("REQ-CMT-009: The refusal names both accounts") func refusalNamesBothAccounts() {
+        let changed = GitHubCLIError.accountChanged(shown: "home-me", current: "work-me").errorDescription ?? ""
+        #expect(changed.hasPrefix("gh is signed in as @work-me, not @home-me as shown, so nothing was posted."))
+        let unshown = GitHubCLIError.accountChanged(shown: nil, current: "work-me").errorDescription ?? ""
+        #expect(unshown.hasPrefix("gh is signed in as @work-me, so nothing was posted."))
+    }
+}
+
 /// Tests for turning a diff selection into the line or range GitHub attaches a comment to.
 @Suite struct CommentTargetTests {
     /// A file with two hunks: IDs 0 (header) and 1–4, then 5 (header), 6–8 and a no-newline marker (9).
@@ -177,6 +207,16 @@ import Testing
 /// Opt-in, since they need network access and a logged-in `gh`. Run with `MASER_LIVE_TESTS=1 swift test`.
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MASER_LIVE_TESTS"] != nil))
 struct LiveGitHubTests {
+    /// The review context names the account `gh api user` reports, which is who Maser posts as.
+    @Test("REQ-CMT-009: Names gh's account") func namesGHAccount() async throws {
+        let cli = GitHubCLI()
+        let pr = try await cli.pullRequest(url: URL(string: "https://github.com/bmannakee/maser/pull/1")!)
+        let user = try await cli.run(["api", "--hostname", pr.host, "user", "--jq", ".login"])
+        let login = String(decoding: user, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(!login.isEmpty)
+        #expect(try await cli.reviewContext(for: pr).viewerLogin == login)
+    }
+
     /// Loads the diff, overview and threads, and checks that every current thread maps to a line in the parsed diff.
     @Test("REQ-DIF-001, REQ-DIF-008: Loads real pull request") func loadsRealPullRequest() async throws {
         let json = """

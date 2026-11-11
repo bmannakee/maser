@@ -634,6 +634,7 @@ private struct InlineComposer: View {
                     Button(primaryTitle(draft)) {
                         Task { await model.postInlineDraft() }
                     }
+                    .shownText("inline-post-button", primaryTitle(draft))
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
                     .disabled(draft.isPosting || draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -654,16 +655,18 @@ private struct InlineComposer: View {
         }
     }
 
-    /// Returns the post button's title, which says whether the draft will join a pending review.
+    /// Returns the post button's title, which says whether the draft will join a pending review, and as whom.
     ///
     /// - Parameter draft: The draft being written.
-    /// - Returns: "Start a review", "Add to review" or "Reply".
+    /// - Returns: "Start a review", "Add to review" or "Reply", followed by " as @login" once the account is known.
     private func primaryTitle(_ draft: ReviewModel.InlineDraft) -> String {
-        switch draft.target {
-        case .newThread: model.hasPendingReview ? "Add to review" : "Start a review"
-        // GitHub puts replies in your pending review if you have one; otherwise they post right away.
-        case .reply: model.hasPendingReview ? "Add to review" : "Reply"
-        }
+        let action =
+            switch draft.target {
+            case .newThread: model.hasPendingReview ? "Add to review" : "Start a review"
+            // GitHub puts replies in your pending review if you have one; otherwise they post right away.
+            case .reply: model.hasPendingReview ? "Add to review" : "Reply"
+            }
+        return model.postingAccount.map { "\(action) as @\($0)" } ?? action
     }
 }
 

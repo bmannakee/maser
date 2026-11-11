@@ -417,6 +417,15 @@ import SwiftUI
             try JSONEncoder().encode(overrides).write(to: ghState.appending(path: "overrides.json"))
         }
     }
+    /// The text some views show, by name, recorded only while a UI scenario runs, so scenarios can check wording.
+    @MainActor
+    enum ShownText {
+        /// Whether views record their text: only in a scenario run.
+        static let isEnabled = ProcessInfo.processInfo.environment["MASER_UI_SCENARIO"] != nil
+        /// The latest text each named view showed.
+        static var values: [String: String] = [:]
+    }
+
     /// Where diff rows and their text were drawn, recorded only while a UI scenario runs, so scenarios can check layout.
     @MainActor
     enum LayoutProbe {
@@ -432,6 +441,25 @@ import SwiftUI
 
 // Outside `#if DEBUG` so views can call it; release builds return the view unchanged.
 extension View {
+    /// Records the text this view shows in `ShownText` while a UI scenario runs; does nothing otherwise.
+    ///
+    /// - Parameters:
+    ///   - name: What the text is, such as `comment-button`.
+    ///   - text: The text the view shows.
+    /// - Returns: The view, recording its text when enabled.
+    @ViewBuilder
+    func shownText(_ name: String, _ text: String) -> some View {
+        #if DEBUG
+            if ShownText.isEnabled {
+                onChange(of: text, initial: true) { _, text in ShownText.values[name] = text }
+            } else {
+                self
+            }
+        #else
+            self
+        #endif
+    }
+
     /// Records this view's frame in `LayoutProbe` while a UI scenario runs; does nothing otherwise.
     ///
     /// - Parameters:

@@ -104,9 +104,11 @@ private struct CommentComposer: View {
                     if model.isPostingComment {
                         ProgressView().controlSize(.small)
                     }
-                    Button("Comment") {
+                    let title = model.postingAccount.map { "Comment as @\($0)" } ?? "Comment"
+                    Button(title) {
                         Task { await model.postComment() }
                     }
+                    .shownText("comment-button", title)
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
                     .disabled(

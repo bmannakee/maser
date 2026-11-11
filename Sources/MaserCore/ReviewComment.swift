@@ -249,12 +249,15 @@ public struct ReviewContext: Hashable, Sendable {
     public var pendingReviewID: String?
     /// The SHA of the PR's head commit.
     public let headCommitID: String
+    /// The login of the account `gh` is signed in to on the PR's host, which anything posted appears under.
+    public var viewerLogin: String?
 
-    /// The GraphQL query for the PR's node ID, head commit and the viewer's pending review.
+    /// The GraphQL query for the PR's node ID, head commit, the viewer's login and their pending review.
     ///
     /// GitHub returns only the viewer's own pending review, since nobody else's is visible to them.
     static let query = """
         query($owner: String!, $name: String!, $number: Int!) {
+          viewer { login }
           repository(owner: $owner, name: $name) {
             pullRequest(number: $number) { id headRefOid reviews(states: PENDING, first: 1) { nodes { id } } }
           }
@@ -273,6 +276,19 @@ public struct ReviewContext: Hashable, Sendable {
         guard headCommitID == seen else { throw GitHubCLIError.headMoved(seen: seen, current: headCommitID) }
     }
 
+    /// Checks that `gh` is still signed in to the account the user was shown.
+    ///
+    /// Someone may switch accounts with `gh auth switch` while Maser is open, or Maser may not have shown one yet.
+    /// Call this on a freshly fetched context just before posting.
+    ///
+    /// - Parameter shown: The login the user was shown, or nil if none was.
+    /// - Throws: `GitHubCLIError.accountChanged` if the account isn't the one shown.
+    public func requireViewer(_ shown: String?) throws {
+        guard let viewerLogin, viewerLogin == shown else {
+            throw GitHubCLIError.accountChanged(shown: shown, current: viewerLogin)
+        }
+    }
+
     /// Decodes the `gh api graphql` response to `query`.
     ///
     /// - Parameter data: The response's JSON.
@@ -282,7 +298,11 @@ public struct ReviewContext: Hashable, Sendable {
     static func decode(from data: Data) throws -> ReviewContext {
         /// The response's shape, keeping only the fields `ReviewContext` uses.
         struct Response: Decodable {
-            struct Payload: Decodable { let repository: Repository? }
+            struct Payload: Decodable {
+                let viewer: Viewer?
+                let repository: Repository?
+            }
+            struct Viewer: Decodable { let login: String }
             struct Repository: Decodable { let pullRequest: PR? }
             struct PR: Decodable {
                 struct Reviews: Decodable { let nodes: [Node?] }
@@ -293,12 +313,11 @@ public struct ReviewContext: Hashable, Sendable {
             }
             let data: Payload
         }
-        guard let pr = try JSONDecoder().decode(Response.self, from: data).data.repository?.pullRequest else {
-            throw PullRequestOverview.NotFound()
-        }
+        let payload = try JSONDecoder().decode(Response.self, from: data).data
+        guard let pr = payload.repository?.pullRequest else { throw PullRequestOverview.NotFound() }
         return ReviewContext(
             pullRequestID: pr.id, pendingReviewID: pr.reviews.nodes.compactMap(\.self).first?.id,
-            headCommitID: pr.headRefOid)
+            headCommitID: pr.headRefOid, viewerLogin: payload.viewer?.login)
     }
 }
 

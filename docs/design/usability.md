@@ -41,13 +41,13 @@ These are the parts of the interface where a use error could lead to a hazard in
 
 | ID | Scenario | Hazard | Controls | Evaluation |
 | --- | --- | --- | --- | --- |
-| HRUS-1 | The user moves through the queue with `j`/`k`, sees a PR highlighted, then presses `S` or `c` believing it acts on the highlighted PR. It acts on the open PR, which is the same one only if the selection has settled. | HAZ-04 | RC-06; RC-12 (proposed) | V-2026-11-03/V10 (routing). Not yet evaluated with the user. |
+| HRUS-1 | The user moves through the queue with `j`/`k`, sees a PR highlighted, then presses `S` or `c` believing it acts on the highlighted PR. It acts on the open PR, which is the same one only if the selection has settled. | HAZ-04 | RC-06; RC-12 | V-2026-11-03/V10 (routing). Not yet evaluated with the user. |
 | HRUS-2 | After clicking in the sidebar, the user presses `c` to comment. Before 2026-11-03 the queue swallowed it with a beep; afterwards, focus jumped back to the queue mid-comment. | HAZ-04 | RC-06 | FE-2, FE-3. Fixed and re-checked (V8). |
 | HRUS-3 | The user reaches for `[` `]` `{` `}` and presses `/` by mistake, moving focus to the queue's filter. | HAZ-04 | RC-06 (`/` only in the queue) | FE-4. Fixed and re-checked (V10). |
 | HRUS-4 | In the full-file view, the user comments on a line outside the diff. | HAZ-03 | RC-05 | L:LiveReviewWriteTests (error). The notice wording hasn't been evaluated with the user. |
-| HRUS-5 | In Finish Review, the user means to Comment, but the radio group is left on Approve or set there by a stray key, and they press ⌘↩. | HAZ-05 | RC-07; RC-12 (proposed) | Not yet evaluated. |
+| HRUS-5 | In Finish Review, the user means to Comment, but the radio group is left on Approve or set there by a stray key, and they press ⌘↩. | HAZ-05 | RC-07; RC-12 | UI:names-pr-and-account (the sheet names the PR and account). Not yet evaluated with the user. |
 | HRUS-6 | The user writes a long reply, switches to another PR or app, then quits or Maser crashes. | HAZ-07 | RC-09; RC-10 (proposed) | FE-1 (crashes observed). |
-| HRUS-7 | The user reviews at work while `gh` is signed in to their personal account. | HAZ-10 | RC-12 (proposed) | Not yet evaluated. |
+| HRUS-7 | The user reviews at work while `gh` is signed in to their personal account. | HAZ-10 | RC-12 | UI:names-pr-and-account (account shown; a switch is refused). Not yet evaluated with the user. |
 | HRUS-8 | The user reviews a PR, a colleague pushes, and the user submits an approval without reloading. | HAZ-02 | RC-04 | UI:head-moved-blocks-posting (the refusal and refresh). Not yet evaluated with the user. |
 
 ## Formative evaluations
@@ -69,6 +69,6 @@ Before relying on Maser for review at work, run each HRUS above with the user on
 For each one, record whether the use error happened, and whether the user noticed it before harm. The prerequisites
 are:
 
-- the open risks in the risk file are controlled, especially RC-04 and RC-12;
+- the open risks in the risk file are controlled (RC-04 and RC-12 were built on 2026-11-10);
 - the scripted UI scenarios exist, so that what's evaluated by hand is only what scripts can't judge: perception,
   attention, and wording.

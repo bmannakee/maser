@@ -23,7 +23,7 @@
         /// Every scenario, in the order `scripts/check-ui` runs them.
         static let all: [UIScenario] = [
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
-            queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting,
+            queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -196,6 +196,8 @@
             "post-comment", "REQ-OVR-004, REQ-GH-004: Posts a comment with ⌘Return; a failed post shows why and keeps it"
         ) { app in
             try await app.openFromQueue(testPR)
+            // Maser won't post until it has shown which account it posts as.
+            try await app.waitUntil("the account is shown") { app.review?.postingAccount != nil }
             try app.overrideGH([
                 .init(match: ["--method", "POST", "issues/\(testPR)/comments"], status: 0, stdout: "{}", stderr: nil)
             ])
@@ -296,7 +298,7 @@
             let movedHead = UIScenarioDriver.GHOverride(
                 match: ["number=\(testPR)", "headRefOid"], status: 0,
                 stdout:
-                    #"{"data":{"repository":{"pullRequest":{"id":"PR_kwDOVeiRMs8AAAABMJbuaw","headRefOid":"\#(pushed)","reviews":{"nodes":[]}}}}}"#,
+                    #"{"data":{"viewer":{"login":"\#(app.review?.postingAccount ?? "")"},"repository":{"pullRequest":{"id":"PR_kwDOVeiRMs8AAAABMJbuaw","headRefOid":"\#(pushed)","reviews":{"nodes":[]}}}}}"#,
                 stderr: nil)
             try app.overrideGH([movedHead])
             let mutations = { app.ghCalls.filter { $0.args.contains { $0.contains("mutation") } } }
@@ -346,6 +348,73 @@
             try app.expect(
                 started?.args.contains("commit=\(pushed)") == true && seen != pushed,
                 "the review starts pinned to the new head", "\(started?.args ?? [])")
+        }
+
+        /// Everything that posts names the account, Finish Review names the PR, and a switched account isn't posted as
+        /// until it has been shown.
+        static let namesPRAndAccount = UIScenario(
+            "names-pr-and-account",
+            "REQ-CMT-009: Comment boxes and Finish Review name the account and PR; a switched account is shown before posting"
+        ) { app in
+            try await app.openFromQueue(testPR)
+            try await app.waitUntil("the account and diff are loaded") {
+                app.review?.postingAccount != nil && app.review?.diffCommitID != nil
+            }
+            guard let review = app.review, let account = review.postingAccount, let head = review.diffCommitID else {
+                throw UIScenarioFailure(description: "no review")
+            }
+            try await app.press("c")
+            try await app.waitUntil("the comment box has focus") { app.responder == .editor }
+            await app.type("Hello.")
+            try app.expect(
+                ShownText.values["comment-button"] == "Comment as @\(account)", "the Comment button names the account",
+                "\(ShownText.values)")
+
+            // `gh auth switch` to another account while Maser is open.
+            let other = "someone-else"
+            let switched = UIScenarioDriver.GHOverride(
+                match: ["number=\(testPR)", "headRefOid"], status: 0,
+                stdout:
+                    #"{"data":{"viewer":{"login":"\#(other)"},"repository":{"pullRequest":{"id":"\#(review.reviewContext?.pullRequestID ?? "")","headRefOid":"\#(head)","reviews":{"nodes":[]}}}}}"#,
+                stderr: nil)
+            try app.overrideGH([switched])
+            let posts = { app.ghCalls.filter { $0.args.contains("POST") } }
+            try await app.press("cmd+enter")
+            try await app.waitUntil("the post is refused, naming both accounts") {
+                review.commentError?.contains("@\(other), not @\(account)") == true
+            }
+            try app.expect(posts().isEmpty, "nothing was posted", "\(posts().map(\.args))")
+            try app.expect(review.commentDraft == "Hello.", "the text is kept", app.summary)
+            try app.expect(
+                ShownText.values["comment-button"] == "Comment as @\(other)", "the Comment button now names the new account",
+                "\(ShownText.values)")
+
+            try app.overrideGH([
+                switched,
+                .init(match: ["--method", "POST", "issues/\(testPR)/comments"], status: 0, stdout: "{}", stderr: nil),
+            ])
+            try await app.press("cmd+enter")
+            try await app.waitUntil("posting again posts as the account shown") {
+                review.commentDraft == "" && review.commentError == nil && posts().count == 1
+            }
+
+            try await app.press("esc")
+            try await app.press("g f")
+            try await app.waitUntil("the Files tab shows a file") { review.selectedFile != nil }
+            for _ in 0..<3 { try await app.press("j") }
+            try await app.press("c")
+            try await app.waitUntil("the line comment's button names the account") {
+                ShownText.values["inline-post-button"] == "Start a review as @\(other)"
+            }
+            try await app.press("esc")
+            try await app.press("S")
+            try await app.waitUntil("Finish Review opens") { review.isFinishingReview }
+            let names = "\(review.pr.repository.nameWithOwner) #\(review.pr.number): \(review.pr.title)"
+            try await app.waitUntil("Finish Review names the PR and the account") {
+                ShownText.values["finish-review-pr"] == names
+                    && ShownText.values["finish-review-account"] == "Posting as @\(other)"
+            }
+            try await app.press("esc")
         }
 
         /// Going back to a PR finds it as it was left, without reloading it.
