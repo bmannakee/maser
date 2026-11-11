@@ -79,6 +79,8 @@ final class ReviewModel {
             case reply(threadID: String, to: String)
         }
         var target: Target
+        /// The head commit of the diff the target was chosen on; a new thread is only posted while it's still the head.
+        var commitID: String?
         /// The draft's Markdown source.
         var body = ""
         /// The message from the last failed attempt to post the draft.
@@ -186,6 +188,10 @@ final class ReviewModel {
     var inlineComposerFocusRequest = false
     /// The PR's node ID and the viewer's pending review, once loaded.
     private(set) var reviewContext: ReviewContext?
+    /// The head commit the shown diff was loaded at; comments and reviews are posted only while it's still the head.
+    private(set) var diffCommitID: String?
+    /// Whether the last submit was stopped because new commits were pushed, so the sheet offers a refresh.
+    private(set) var reviewHeadMoved = false
     /// Whether the Finish Review sheet is showing.
     var isFinishingReview = false
     /// The Markdown summary to submit with the review.
@@ -308,10 +314,9 @@ final class ReviewModel {
         if filesByPath.isEmpty { filesState = .loading }
         do {
             let cli = GitHubCLI()
-            async let diffs = cli.fileDiffs(for: pr)
+            async let diff = cli.diffAtHead(for: pr)
             async let threads = cli.reviewThreads(for: pr)
-            async let context = cli.reviewContext(for: pr)
-            let (files, allThreads, reviewContext) = try await (diffs, threads, context)
+            let ((files, reviewContext), allThreads) = try await (diff, threads)
 
             preservingCursor {
                 filesByPath = Dictionary(files.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
@@ -319,6 +324,10 @@ final class ReviewModel {
                 filePaths = FileTree.filePaths(in: tree)
                 threadsByPath = Dictionary(grouping: allThreads, by: \.path)
                 self.reviewContext = reviewContext
+                diffCommitID = reviewContext.headCommitID
+                if case .newThread = inlineDraft?.target, inlineDraft?.commitID != diffCommitID {
+                    inlineDraft?.error = Self.placeAgainMessage
+                }
                 // The diff may have changed, so rebuild the whole-file views; contents already fetched are reused.
                 fullFiles = [:]
                 fullFileErrors = [:]
@@ -510,14 +519,19 @@ final class ReviewModel {
         guard inlineDraft?.isPosting != true else { return }
         if var draft = inlineDraft, !draft.body.isEmpty {
             draft.target = target
+            draft.commitID = diffCommitID
             draft.error = nil
             inlineDraft = draft
         } else {
-            inlineDraft = InlineDraft(target: target)
+            inlineDraft = InlineDraft(target: target, commitID: diffCommitID)
         }
         showComments = true
         inlineComposerFocusRequest = true
     }
+
+    /// What a line comment says when the diff it was placed on has been replaced by a newer one.
+    static let placeAgainMessage =
+        "The diff changed since this comment was placed. Press c on the line to place it on the new diff; your text is kept."
 
     /// Throws away the line comment or reply being written.
     func discardInlineDraft() {
@@ -541,7 +555,13 @@ final class ReviewModel {
             let cli = GitHubCLI()
             switch draft.target {
             case let .newThread(target):
-                let reviewID = try await pendingReviewID(cli)
+                // GitHub puts a new thread on the current head, so its line numbers must come from that commit's diff.
+                guard let seen = draft.commitID else { throw GitHubCLIError.rejected("The diff hasn't loaded yet.") }
+                guard seen == diffCommitID else { throw GitHubCLIError.rejected(Self.placeAgainMessage) }
+                let context = try await cli.reviewContext(for: pr)
+                reviewContext = context
+                try context.requireHead(seen)
+                let reviewID = try await pendingReviewID(cli, context: context, commitID: seen)
                 try await cli.addReviewThread(on: pr, reviewID: reviewID, target: target, body: body)
             case let .reply(threadID, _):
                 try await cli.reply(on: pr, toThread: threadID, body: body)
@@ -557,29 +577,19 @@ final class ReviewModel {
         await reloadThreads()
     }
 
-    /// Returns the ID of the viewer's pending review, starting one if they don't have one.
+    /// Returns the ID of the viewer's pending review, starting one pinned to `commitID` if they don't have one.
     ///
-    /// - Parameter cli: The client to make requests with.
+    /// - Parameters:
+    ///   - cli: The client to make requests with.
+    ///   - context: A freshly fetched review context.
+    ///   - commitID: The head commit of the diff the user saw.
     /// - Returns: The pending review's node ID.
-    /// - Throws: `GitHubCLIError` if fetching the review context or starting the review fails.
-    private func pendingReviewID(_ cli: GitHubCLI) async throws -> String {
-        let context = try await currentReviewContext(cli)
+    /// - Throws: `GitHubCLIError` if starting the review fails.
+    private func pendingReviewID(_ cli: GitHubCLI, context: ReviewContext, commitID: String) async throws -> String {
         if let id = context.pendingReviewID { return id }
-        let id = try await cli.startReview(on: pr, pullRequestID: context.pullRequestID)
+        let id = try await cli.startReview(on: pr, pullRequestID: context.pullRequestID, commitID: commitID)
         reviewContext?.pendingReviewID = id
         return id
-    }
-
-    /// Returns the loaded review context, fetching and storing it if there isn't one yet.
-    ///
-    /// - Parameter cli: The client to fetch the context with.
-    /// - Returns: The PR's node ID and the viewer's pending review.
-    /// - Throws: `GitHubCLIError` if fetching the context fails.
-    private func currentReviewContext(_ cli: GitHubCLI) async throws -> ReviewContext {
-        if let reviewContext { return reviewContext }
-        let context = try await cli.reviewContext(for: pr)
-        reviewContext = context
-        return context
     }
 
     /// Deletes one of the viewer's draft comments, then reloads the threads.
@@ -617,16 +627,22 @@ final class ReviewModel {
         guard !isSubmittingReview else { return }
         isSubmittingReview = true
         reviewError = nil
+        reviewHeadMoved = false
         defer { isSubmittingReview = false }
         do {
+            guard let seen = diffCommitID else { throw GitHubCLIError.rejected("The diff hasn't loaded yet.") }
             let cli = GitHubCLI()
-            let context = try await currentReviewContext(cli)
+            // Fresh, so a verdict never covers commits pushed after the diff loaded.
+            let context = try await cli.reviewContext(for: pr)
+            reviewContext = context
+            try context.requireHead(seen)
             try await cli.submitReview(
                 on: pr, context: context, event: reviewEvent,
-                body: reviewSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+                body: reviewSummary.trimmingCharacters(in: .whitespacesAndNewlines), commitID: seen
             )
         } catch {
             reviewError = error.localizedDescription
+            if case GitHubCLIError.headMoved = error { reviewHeadMoved = true }
             if let context = try? await GitHubCLI().reviewContext(for: pr) { reviewContext = context }
             return
         }
@@ -639,6 +655,16 @@ final class ReviewModel {
             try? await Task.sleep(for: .seconds(3))
             await reloadThreads()
         }
+    }
+
+    /// Closes the Finish Review sheet and reloads the PR, after a submit stopped because new commits were pushed.
+    ///
+    /// The summary, verdict and draft comments are kept, so the user can review the new commits and submit again.
+    func refreshAfterHeadMoved() async {
+        isFinishingReview = false
+        reviewError = nil
+        reviewHeadMoved = false
+        await load()
     }
 
     /// Deletes the viewer's pending review and its draft comments, then closes the sheet.
@@ -938,7 +964,7 @@ final class ReviewModel {
             fullFiles[path] = file.fullFile(headText: "")
             return
         }
-        guard let commit = reviewContext?.headCommitID else { return }
+        guard let commit = diffCommitID else { return }
         let key = "\(commit):\(path)"
         if let text = headTexts[key] {
             buildFullFile(file, headText: text)
@@ -952,7 +978,7 @@ final class ReviewModel {
                 let text = try await GitHubCLI().fileContents(of: pr, path: path, commitID: commit)
                 headTexts[key] = text
                 // A refresh may have replaced the diff while this loaded; build against the current one.
-                if let current = filesByPath[path], reviewContext?.headCommitID == commit {
+                if let current = filesByPath[path], diffCommitID == commit {
                     preservingCursor { buildFullFile(current, headText: text) }
                 }
             } catch {

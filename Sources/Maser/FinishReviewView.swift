@@ -59,6 +59,9 @@ struct FinishReviewView: View {
                     .foregroundStyle(.red)
                     .lineLimit(4)
                     .textSelection(.enabled)
+                if model.reviewHeadMoved {
+                    Button("Refresh and Review New Commits") { Task { await model.refreshAfterHeadMoved() } }
+                }
             }
 
             HStack {

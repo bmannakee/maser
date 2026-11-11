@@ -48,7 +48,7 @@ These are the parts of the interface where a use error could lead to a hazard in
 | HRUS-5 | In Finish Review, the user means to Comment, but the radio group is left on Approve or set there by a stray key, and they press ⌘↩. | HAZ-05 | RC-07; RC-12 (proposed) | Not yet evaluated. |
 | HRUS-6 | The user writes a long reply, switches to another PR or app, then quits or Maser crashes. | HAZ-07 | RC-09; RC-10 (proposed) | FE-1 (crashes observed). |
 | HRUS-7 | The user reviews at work while `gh` is signed in to their personal account. | HAZ-10 | RC-12 (proposed) | Not yet evaluated. |
-| HRUS-8 | The user reviews a PR, a colleague pushes, and the user submits an approval without reloading. | HAZ-02 | RC-04 (proposed) | Not yet evaluated. |
+| HRUS-8 | The user reviews a PR, a colleague pushes, and the user submits an approval without reloading. | HAZ-02 | RC-04 | UI:head-moved-blocks-posting (the refusal and refresh). Not yet evaluated with the user. |
 
 ## Formative evaluations
 

@@ -23,7 +23,7 @@
         /// Every scenario, in the order `scripts/check-ui` runs them.
         static let all: [UIScenario] = [
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
-            queueSearchFails, switchPRsKeepsState, longLinesWrap,
+            queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -281,6 +281,71 @@
                     outside.isEmpty, "every line's text is inside its row in \(path)", outside.prefix(3).joined(separator: "; "))
                 try await app.press("]")
             }
+        }
+
+        /// A push after the diff loaded stops line comments and reviews from posting, until the diff is refreshed.
+        static let headMovedBlocksPosting = UIScenario(
+            "head-moved-blocks-posting",
+            "REQ-CMT-007: After a push, a line comment or review isn't posted; after a refresh it's placed on the new diff"
+        ) { app in
+            try await app.openFromQueue(testPR)
+            try await app.waitUntil("the diff loads with its commit") { app.review?.diffCommitID != nil }
+            let seen = app.review?.diffCommitID ?? ""
+            // Someone pushes: from now on GitHub reports a different head.
+            let pushed = String(repeating: "1", count: 40)
+            let movedHead = UIScenarioDriver.GHOverride(
+                match: ["number=\(testPR)", "headRefOid"], status: 0,
+                stdout:
+                    #"{"data":{"repository":{"pullRequest":{"id":"PR_kwDOVeiRMs8AAAABMJbuaw","headRefOid":"\#(pushed)","reviews":{"nodes":[]}}}}}"#,
+                stderr: nil)
+            try app.overrideGH([movedHead])
+            let mutations = { app.ghCalls.filter { $0.args.contains { $0.contains("mutation") } } }
+
+            try await app.press("g f")
+            try await app.waitUntil("the Files tab shows a file") { app.review?.selectedFile != nil }
+            for _ in 0..<3 { try await app.press("j") }
+            try await app.press("c")
+            try await app.waitUntil("the line comment box has focus") { app.responder == .editor }
+            await app.type("Pinned.")
+            try await app.press("cmd+enter")
+            try await app.waitUntil("the comment is refused because the head moved") {
+                app.review?.inlineDraft?.error?.contains("New commits were pushed") == true
+            }
+            try app.expect(app.review?.inlineDraft?.body == "Pinned.", "the comment's text is kept", app.summary)
+            try app.expect(mutations().isEmpty, "nothing was sent to GitHub", "\(mutations().map(\.args))")
+
+            try await app.press("esc")
+            try await app.press("S")
+            try await app.waitUntil("Finish Review opens") { app.review?.isFinishingReview == true }
+            await app.type("Summary.")
+            try await app.press("cmd+enter")
+            try await app.waitUntil("the review is refused because the head moved, with a refresh offered") {
+                app.review?.reviewError?.contains("New commits were pushed") == true && app.review?.reviewHeadMoved == true
+            }
+            try app.expect(mutations().isEmpty, "nothing was sent to GitHub", "\(mutations().map(\.args))")
+            try await app.press("esc")
+            try await app.waitUntil("the sheet closes") { app.review?.isFinishingReview == false }
+
+            try await app.press("r")
+            try await app.waitUntil("the refresh loads the new head") { app.review?.diffCommitID == pushed }
+            try app.expect(
+                app.review?.inlineDraft?.error == ReviewModel.placeAgainMessage, "the comment asks to be placed again",
+                app.summary)
+            try app.overrideGH([
+                movedHead,
+                UIScenarioDriver.GHOverride(
+                    match: ["addPullRequestReviewThread("], status: 0, stdout: "PRRT_scenario\n", stderr: nil),
+                UIScenarioDriver.GHOverride(match: ["addPullRequestReview("], status: 0, stdout: "PRR_scenario\n", stderr: nil),
+            ])
+            try await app.press("c")
+            try app.expect(app.review?.inlineDraft?.error == nil, "c places it on the new diff", app.summary)
+            try await app.waitUntil("the line comment box has focus") { app.responder == .editor }
+            try await app.press("cmd+enter")
+            try await app.waitUntil("the comment posts") { app.review?.inlineDraft == nil }
+            let started = mutations().first { $0.args.contains { $0.contains("addPullRequestReview(") } }
+            try app.expect(
+                started?.args.contains("commit=\(pushed)") == true && seen != pushed,
+                "the review starts pinned to the new head", "\(started?.args ?? [])")
         }
 
         /// Going back to a PR finds it as it was left, without reloading it.
