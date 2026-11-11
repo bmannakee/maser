@@ -40,7 +40,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 
 | ID | Requirement | Need | Control | Verified by | Status |
 | --- | --- | --- | --- | --- | --- |
-| REQ-WIN-001 | The main window shows the queue in a sidebar and the open PR's review beside it. Each PR opened in the window keeps its state: tab, file, cursor and drafts. Going back to one refreshes it only if its data is over 60 s old. | UN-1, UN-10 | — | **Gap:** UI:switch-prs-keeps-state. | Implemented |
+| REQ-WIN-001 | The main window shows the queue in a sidebar and the open PR's review beside it. Each PR opened in the window keeps its state: tab, file, cursor and drafts. Going back to one refreshes it only if its data is over 60 s old. | UN-1, UN-10 | RC-17 | **Gap:** UI:switch-prs-keeps-state. | Implemented |
 | REQ-WIN-002 | The sidebar marks the PR whose review is showing, which may not be the selected one. | UN-5, UN-8 | RC-06 | **Gap:** UI:open-pr-marker (state); visual check by the user. | Implemented |
 | REQ-WIN-003 | Clicking a PR, or pressing Return on it, shows its review and gives the review the keys. The queue gets the keys back only from ⌘0, `g p`, `e`, or the filter box. Moving through the queue with `j`/`k` shows each PR without leaving the queue. | UN-5 | RC-06 | V-2026-11-03/V10. **Gap:** mouse clicks (U: the user, partly); UI:key-routing. | Implemented |
 | REQ-WIN-004 | ⌥Return, or Open in New Window in the context menu, opens a PR in a window of its own. | UN-4 | — | **Gap:** UI:open-in-new-window. | Implemented |
@@ -73,7 +73,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 
 | ID | Requirement | Need | Control | Verified by | Status |
 | --- | --- | --- | --- | --- | --- |
-| REQ-CMT-001 | The user can comment on the cursor line, or on a `V` range within one hunk, on the old or new side. The comment joins the user's pending review, which only they can see until they submit. | UN-4 | — | T:CommentTargetTests.commentableLines, .singleLine, .rangeAcrossSides, .rangeIsClippedToTheCursorsHunk; L:LiveReviewWriteTests.pendingReviewRoundTrip | Implemented |
+| REQ-CMT-001 | The user can comment on the cursor line, or on a `V` range within one hunk, on the old or new side. The comment joins the user's pending review, which only they can see until they submit. | UN-4 | RC-20 | T:CommentTargetTests.commentableLines, .singleLine, .rangeAcrossSides, .rangeIsClippedToTheCursorsHunk; L:LiveReviewWriteTests.pendingReviewRoundTrip | Implemented |
 | REQ-CMT-002 | The user can reply to a thread. A reply joins the pending review if there is one; otherwise it's posted at once, as GitHub does. | UN-4 | — | L:LiveReviewWriteTests.pendingReviewRoundTrip (partly). **Gap:** a reply without a pending review. | Implemented |
 | REQ-CMT-003 | Finish Review submits the pending review with an optional summary and a verdict: Comment, Approve or Request changes. The verdict starts at Comment every time. Submit is disabled when GitHub would reject the review for lacking a summary. | UN-4 | RC-07 | **Gap:** UI:finish-review-defaults (the logic is in the app target, so it has no unit test). | Implemented |
 | REQ-CMT-004 | Discarding a pending review asks for confirmation, naming how many draft comments will be deleted. | UN-9 | RC-08 | I: `FinishReviewView` confirmation dialog. **Gap:** UI:discard-confirms. | Implemented |

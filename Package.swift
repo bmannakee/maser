@@ -5,7 +5,8 @@ let package = Package(
     name: "Maser",
     platforms: [.macOS(.v26)],
     products: [
-        .executable(name: "Maser", targets: ["Maser"])
+        .executable(name: "Maser", targets: ["Maser"]),
+        .executable(name: "maser-trace", targets: ["maser-trace"]),
     ],
     dependencies: [
         .package(url: "https://github.com/dduan/TOMLDecoder", from: "0.4.5")
@@ -22,6 +23,16 @@ let package = Package(
         .testTarget(
             name: "MaserCoreTests",
             dependencies: ["MaserCore"]
+        ),
+        // Traceability checking for docs/design/; a development tool, not part of the app.
+        .target(name: "Traceability"),
+        .executableTarget(
+            name: "maser-trace",
+            dependencies: ["Traceability"]
+        ),
+        .testTarget(
+            name: "TraceabilityTests",
+            dependencies: ["Traceability"]
         ),
     ]
 )

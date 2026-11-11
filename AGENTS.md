@@ -9,8 +9,9 @@ update it here in the same PR.
 ```sh
 swift build                        # debug build
 swift run Maser [PR URL…]          # run; the first URL opens in the main window, the rest in their own
-scripts/check                      # format lint + build + tests; run before every commit
+scripts/check                      # format lint + build + tests + traceability; run before every commit
 scripts/bundle                     # release build wrapped in .build/Maser.app, signed ad hoc
+swift run maser-trace --write      # regenerate docs/design/traceability.md after editing docs/design/
 swift format --in-place --recursive Sources Tests Package.swift   # apply formatting
 ```
 
@@ -30,6 +31,8 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
 | `MaserCore` (library) | Models, parsing, GitHub access, keymap and config logic. Anything that can be unit tested. | Foundation, TOMLDecoder |
 | `Maser` (executable) | SwiftUI views, AppKit glue, window and menu wiring, `@Observable` view models. | MaserCore, SwiftUI, AppKit, WebKit |
 | `MaserCoreTests` | Swift Testing tests for MaserCore. | MaserCore |
+| `Traceability`, `maser-trace` | Development tool: checks the links in `docs/design/` (see its README). Not part of the app. | Foundation |
+| `TraceabilityTests` | Tests for the traceability checker. | Traceability |
 
 Rules:
 
@@ -147,6 +150,8 @@ verification records. See `docs/design/README.md` for the ID scheme.
 - A new requirement says how it will be verified. A risk control that isn't built yet is a `Proposed` requirement
   with an issue.
 - Checks you run by hand or with a one-off script go in a verification record. Prefer making them repeatable tests.
+- `scripts/check` runs `maser-trace`, which fails on a broken link or a stale generated table. Fix the documents it
+  points at, then run `swift run maser-trace --write`.
 
 ## Tests
 
