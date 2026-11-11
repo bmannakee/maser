@@ -46,7 +46,7 @@ import Testing
     }
 
     /// Decodes PR metadata, including team reviewers by name, skipping null reviewers, and a deleted author as `ghost`.
-    @Test func decodesMetadata() throws {
+    @Test("REQ-OVR-001: Decodes metadata") func decodesMetadata() throws {
         let pr = try decoded()
         #expect(pr.number == 7)
         #expect(pr.state == .open)
@@ -64,14 +64,14 @@ import Testing
     }
 
     /// Quotes text line by line, normalizing CRLF, and puts a blank line between the quote and any existing text.
-    @Test func quotingMarkdown() {
+    @Test("REQ-OVR-004: Quoting Markdown") func quotingMarkdown() {
         #expect(Markdown.appendingQuote(of: "one\r\n\ntwo\n", to: "") == "> one\n>\n> two\n\n")
         #expect(Markdown.appendingQuote(of: "b", to: "my reply  \n") == "my reply\n\n> b\n\n")
     }
 
     /// Maps check runs and legacy status contexts to one check type, sorted failures first, with the workflow name or
     /// status description as the detail.
-    @Test func checksMappedAndSortedByUrgency() throws {
+    @Test("REQ-OVR-001: Checks mapped and sorted by urgency") func checksMappedAndSortedByUrgency() throws {
         let pr = try decoded()
         #expect(pr.checksRollup == .failure)
         #expect(pr.checks.map(\.name) == ["ci/legacy", "test", "build", "lint", "label"])
@@ -82,7 +82,9 @@ import Testing
     }
 
     /// Drops pending reviews, and leaves comment-only reviews with no body out of the date-ordered timeline.
-    @Test func timelineSkipsPendingAndBodylessCommentReviews() throws {
+    @Test("REQ-OVR-001: Timeline skips pending and bodyless comment reviews") func timelineSkipsPendingAndBodylessCommentReviews()
+        throws
+    {
         let pr = try decoded()
         #expect(pr.reviews.map(\.id) == ["R1", "R2", "R3", "R4"])  // pending R5 dropped
         #expect(pr.timeline.map(\.id) == ["IC_1", "R2", "R4", "IC_2", "R3"])
@@ -90,7 +92,7 @@ import Testing
     }
 
     /// Gives each reviewer their latest approval or change request, ignoring plain comments that come after it.
-    @Test func reviewerStatusKeepsLatestVerdict() throws {
+    @Test("REQ-OVR-001: Reviewer status keeps latest verdict") func reviewerStatusKeepsLatestVerdict() throws {
         let statuses = try decoded().reviewerStatuses
         // carol's later plain comment doesn't override her change request.
         #expect(
@@ -100,7 +102,7 @@ import Testing
             ])
     }
 
-    @Test func unknownEnumValuesDontBreakDecoding() throws {
+    @Test("REQ-GH-004: Unknown enum values don't break decoding") func unknownEnumValuesDontBreakDecoding() throws {
         let json = Self.response
             .replacingOccurrences(of: #""mergeStateStatus":"BLOCKED""#, with: #""mergeStateStatus":"SOMETHING_NEW""#)
             .replacingOccurrences(of: #""reviewDecision":"CHANGES_REQUESTED""#, with: #""reviewDecision":null"#)
@@ -110,7 +112,7 @@ import Testing
     }
 
     /// Leaves lists that fit in one page complete, and marks the ones whose `totalCount` says there are more.
-    @Test func marksTruncatedLists() throws {
+    @Test("REQ-GH-003: Marks truncated lists") func marksTruncatedLists() throws {
         #expect(try decoded().incompleteLists.isEmpty)
         let json = Self.response
             .replacingOccurrences(of: #""comments":{"nodes""#, with: #""comments":{"totalCount":150,"nodes""#)
@@ -120,7 +122,7 @@ import Testing
     }
 
     /// Replaces a truncated list with every item from its paged query, and marks it complete.
-    @Test func replacesListsWithAllPages() throws {
+    @Test("REQ-GH-003: Replaces lists with all pages") func replacesListsWithAllPages() throws {
         var pr = try decoded()
         pr.incompleteLists = [.comments, .checks]
         let comments = """
@@ -142,7 +144,7 @@ import Testing
     }
 
     /// Each paged query takes `$endCursor` and selects `pageInfo`, as `gh api graphql --paginate` needs.
-    @Test func pagedQueriesPaginate() {
+    @Test("REQ-GH-003: Paged queries paginate") func pagedQueriesPaginate() {
         for list in PullRequestOverview.PagedList.allCases {
             let (query, jq) = PullRequestOverview.pagedQuery(for: list)
             #expect(query.contains("$endCursor: String") && query.contains("after: $endCursor"))
@@ -151,14 +153,14 @@ import Testing
         }
     }
 
-    @Test func missingPullRequestThrows() {
+    @Test("REQ-GH-004: Missing pull request throws") func missingPullRequestThrows() {
         #expect(throws: (any Error).self) {
             try PullRequestOverview.decode(from: Data(#"{"data":{"repository":{"pullRequest":null}}}"#.utf8))
         }
     }
 
     /// Lists a tree's file paths in sidebar order: directories' contents before top-level files.
-    @Test func filePathsInDisplayOrder() {
+    @Test("REQ-DIF-004: File paths in display order") func filePathsInDisplayOrder() {
         let tree = FileTree.build(paths: ["z.txt", "src/b.swift", "src/a.swift"])
         #expect(FileTree.filePaths(in: tree) == ["src/a.swift", "src/b.swift", "z.txt"])
     }

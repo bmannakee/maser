@@ -8,7 +8,7 @@ import Testing
 @Suite struct FileTreeTests {
     /// Sorts directories before files, collapses single-child directory chains, and finds the first file in display
     /// order.
-    @Test func buildsSortedCompactedTree() {
+    @Test("REQ-DIF-004: Builds sorted compacted tree") func buildsSortedCompactedTree() {
         let tree = FileTree.build(paths: [
             "README.md",
             "Sources/MaserCore/Diff.swift",
@@ -30,14 +30,14 @@ import Testing
     }
 
     /// Lists every row depth-first with its depth, for sizing the sidebar to the widest one.
-    @Test func rowsWithDepths() {
+    @Test("REQ-DIF-004: Rows with depths") func rowsWithDepths() {
         let tree = FileTree.build(paths: ["README.md", "Sources/Maser/App.swift", "Sources/MaserCore/Diff.swift"])
         let rows = FileTree.rows(in: tree).map { "\($0.depth) \($0.name)" }
         #expect(rows == ["0 Sources", "1 Maser", "2 App.swift", "1 MaserCore", "2 Diff.swift", "0 README.md"])
         #expect(FileTree.rows(in: []).isEmpty)
     }
 
-    @Test func emptyTree() {
+    @Test("REQ-DIF-004: Empty tree") func emptyTree() {
         #expect(FileTree.build(paths: []).isEmpty)
         #expect(FileTree.firstFilePath(in: []) == nil)
     }

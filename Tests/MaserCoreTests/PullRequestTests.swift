@@ -5,7 +5,7 @@ import Testing
 
 @testable import MaserCore
 
-@Test func decodesGhSearchOutput() throws {
+@Test("REQ-QUE-001: Decodes gh search output") func decodesGhSearchOutput() throws {
     let json = """
         [{"author":{"id":"MDQ6VXNlcjIxODAxMTg=","is_bot":false,"login":"octocat","type":"User","url":"https://github.com/octocat"},
           "isDraft":false,"number":351,"repository":{"name":"broom","nameWithOwner":"tidymodels/broom"},
@@ -23,13 +23,13 @@ import Testing
 }
 
 /// Reads `owner/repo` from PR URLs on any host, including ones with trailing components, and rejects non-PR URLs.
-@Test func nameWithOwnerFromURL() {
+@Test("REQ-GH-006: Name with owner from URL") func nameWithOwnerFromURL() {
     #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://github.com/cli/cli/pull/14858")!) == "cli/cli")
     #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://ghe.example.com/team/app/pull/7/files")!) == "team/app")
     #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://github.com/cli/cli/issues/1")!) == nil)
     #expect(PullRequest.nameWithOwner(fromURL: URL(string: "https://github.com/cli")!) == nil)
 }
 
-@Test func decodesEmptyResult() throws {
+@Test("REQ-GH-004: Decodes empty result") func decodesEmptyResult() throws {
     #expect(try PullRequest.decodeList(from: Data("[]".utf8)).isEmpty)
 }

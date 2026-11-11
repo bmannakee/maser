@@ -43,8 +43,8 @@ struct Fixture {
         """
     var tests = """
         @Suite struct SuiteA {
-            @Test func one() {}
-            @Test func two() {}
+            @Test("REQ-AB-001: One") func one() {}
+            @Test("REQ-AB-001: Two") func two() {}
         }
         """
     var record = "### V1: A check"
@@ -91,7 +91,7 @@ struct Fixture {
     @Test func unknownIDInDocumentsAndTestNames() {
         var fixture = Fixture()
         fixture.risks = fixture.risks.replacingOccurrences(of: "| A harm |", with: "| A harm, see HAZ-09 |")
-        fixture.tests = fixture.tests.replacingOccurrences(of: "@Test func two", with: "@Test(\"REQ-ZZ-001: x\") func two")
+        fixture.tests = fixture.tests.replacingOccurrences(of: "REQ-AB-001: Two", with: "REQ-AB-001, REQ-ZZ-001: Two")
         #expect(fixture.rules == [.unknownID, .unknownID])
     }
 
@@ -113,7 +113,8 @@ struct Fixture {
         var fixture = Fixture()
         fixture.requirements = fixture.requirements.replacingOccurrences(
             of: "T:SuiteA.one, .two", with: "T:SuiteA.one, .three; T:Nowhere; L:SuiteA.one")
-        #expect(fixture.rules == [.unknownTest, .unknownTest, .unknownTest])
+        // SuiteA.two is no longer cited but still claims REQ-AB-001, so the claim check reports it too.
+        #expect(fixture.rules == [.unknownTest, .unknownTest, .unknownTest, .testClaimMismatch])
     }
 
     @Test func wrongTestCount() {
@@ -144,6 +145,34 @@ struct Fixture {
         fixture.risks = fixture.risks.replacingOccurrences(
             of: "| REQ-AB-001 | Implemented |", with: "| REQ-AB-001, REQ-AB-002 | Implemented |")
         #expect(fixture.rules == [.controlLinkMismatch])
+    }
+
+    /// A requirement citing a test whose name doesn't claim it, and a test claiming a requirement that doesn't cite it.
+    @Test func testClaimMismatchBothWays() {
+        var fixture = Fixture()
+        fixture.tests = fixture.tests.replacingOccurrences(of: "REQ-AB-001: Two", with: "REQ-AB-002: Two")
+        #expect(fixture.rules == [.testClaimMismatch, .testClaimMismatch])
+    }
+
+    /// A whole-suite reference cites every test in the suite, so each must claim the requirement.
+    @Test func suiteReferenceCitesEveryTest() {
+        var fixture = Fixture()
+        fixture.requirements = fixture.requirements.replacingOccurrences(of: "T:SuiteA.one, .two", with: "T:SuiteA (all 2)")
+        #expect(fixture.rules == [])
+        fixture.tests = fixture.tests.replacingOccurrences(
+            of: "}\n}", with: "}\n    @Test(\"REQ-AB-002: Three\") func three() {}\n}")
+        fixture.requirements = fixture.requirements.replacingOccurrences(of: "(all 2)", with: "(all 3)")
+        #expect(fixture.rules == [.testClaimMismatch, .testClaimMismatch])
+    }
+
+    /// A product test must claim a requirement; the traceability tool's own tests needn't.
+    @Test func untracedTest() {
+        var fixture = Fixture()
+        fixture.tests = fixture.tests.replacingOccurrences(of: "}\n}", with: "}\n    @Test func helper() {}\n}")
+        #expect(fixture.rules == [.untracedTest])
+        let toolTests = TestIndex(sources: ["Tests/TraceabilityTests/X.swift": "@Suite struct T {\n    @Test func a() {}\n}"])
+        let problems = TraceChecker(documents: fixture.documents, tests: toolTests).problems()
+        #expect(!problems.map(\.rule).contains(.untracedTest))
     }
 
     @Test func controlStatusMismatch() {

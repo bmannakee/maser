@@ -6,7 +6,7 @@ import Testing
 
 /// Tests for `Settings.load(toml:)`.
 @Suite struct SettingsTests {
-    @Test func emptyConfigIsDefaults() throws {
+    @Test("REQ-CFG-005: Empty config is defaults") func emptyConfigIsDefaults() throws {
         let result = try Settings.load(toml: "")
         #expect(result.settings == .defaults)
         #expect(result.settings.diffView == .hunks)
@@ -14,7 +14,7 @@ import Testing
     }
 
     /// Reads the diff view and the `gh` path, alongside key bindings the settings ignore.
-    @Test func readsSettings() throws {
+    @Test("REQ-GH-002, REQ-CFG-005: Reads settings") func readsSettings() throws {
         let result = try Settings.load(
             toml: """
                 [keys.normal]
@@ -32,7 +32,7 @@ import Testing
     }
 
     /// Reports unknown values and keys and keeps the defaults for them; a blank `gh` means search as usual.
-    @Test func reportsProblems() throws {
+    @Test("REQ-CFG-002: Reports problems") func reportsProblems() throws {
         let result = try Settings.load(
             toml: """
                 [diff]
@@ -50,7 +50,7 @@ import Testing
     }
 
     /// The starter config lists the settings commented out, so it loads as the defaults, and uncommented too.
-    @Test func templateHasSettings() throws {
+    @Test("REQ-CFG-003: Template has settings") func templateHasSettings() throws {
         #expect(Keymap.template.contains("# view = \"hunks\""))
         #expect(try Settings.load(toml: Keymap.template).settings == .defaults)
         // Uncomment every setting line, including the multi-line searches example.
@@ -64,7 +64,7 @@ import Testing
     }
 
     /// Picks and orders built-in sections, appends custom searches, and reports bad entries and repeated names.
-    @Test func readsQueue() throws {
+    @Test("REQ-QUE-001, REQ-CFG-002, REQ-CFG-005: Reads queue") func readsQueue() throws {
         let result = try Settings.load(
             toml: """
                 [queue]
@@ -93,7 +93,7 @@ import Testing
     }
 
     /// Without `sections`, the queue has every built-in; an empty list leaves only the custom searches.
-    @Test func queueSectionsDefault() throws {
+    @Test("REQ-QUE-001: Queue sections default") func queueSectionsDefault() throws {
         #expect(Settings.defaults.queueSearches == [.reviewRequested, .yours, .involving])
         let custom = try Settings.load(toml: "[queue]\nsearches = [{ name = \"a\", query = \"repo:o/a\" }]")
         #expect(custom.settings.queueSearches.map(\.name) == ["Review requested", "Yours", "Involving you", "a"])
@@ -101,7 +101,7 @@ import Testing
         #expect(only.settings.queueSearches.map(\.name) == ["a"])
     }
 
-    @Test func wrongTypeThrows() {
+    @Test("REQ-CFG-002: Wrong type throws") func wrongTypeThrows() {
         #expect(throws: (any Error).self) { try Settings.load(toml: "[diff]\nview = 3") }
     }
 }
