@@ -104,7 +104,7 @@ private struct CommentComposer: View {
                     if model.isPostingComment {
                         ProgressView().controlSize(.small)
                     }
-                    Button("Comment") {
+                    Button(model.postingAccount.map { "Comment as @\($0)" } ?? "Comment") {
                         Task { await model.postComment() }
                     }
                     .keyboardShortcut(.return, modifiers: .command)

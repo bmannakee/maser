@@ -46,7 +46,9 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   **Finish Review** (`S`, toolbar) as Comment, Approve or Request changes. Replies join the pending review if you have one;
   otherwise they post immediately (GitHub's rule). If someone pushes after the diff loaded, Maser won't post a line
   comment or submit the review until you refresh (`r`), so nothing lands on a line or commit you haven't seen. A line
-  comment then needs `c` on its line again; the text is kept.
+  comment then needs `c` on its line again; the text is kept. Every post button names the account `gh` will post as
+  ("Comment as @you"), and Finish Review names the PR too. If `gh` switches accounts while Maser is open, the next post
+  is refused and the new account shown, so you never post as an account you weren't shown.
   `z a` shows the whole file instead of just the changed hunks (`z R` for every file, `z M` to go back); hunk
   navigation still jumps between the changes. GitHub only takes comments on lines in the diff, so the extra lines are
   for reading.

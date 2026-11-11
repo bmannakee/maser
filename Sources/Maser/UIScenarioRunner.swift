@@ -190,6 +190,29 @@
             await settle()
         }
 
+        /// The text the window, or its sheet, shows: the labels, titles and string values of its accessibility elements.
+        ///
+        /// - Parameter sheet: Read the window's attached sheet instead of the window.
+        /// - Returns: The texts, in tree order.
+        func visibleText(sheet: Bool = false) -> [String] {
+            var texts: [String] = []
+            /// Collects an element's texts, then its children's.
+            func walk(_ element: Any, depth: Int) {
+                guard depth < 80, let element = element as? NSAccessibilityProtocol else { return }
+                let own = [
+                    element.accessibilityLabel(), element.accessibilityTitle(), element.accessibilityValue() as? String,
+                ]
+                texts += own.compactMap { $0 }.filter { !$0.isEmpty }
+                for child in element.accessibilityChildren() ?? [] { walk(child, depth: depth + 1) }
+            }
+            if sheet {
+                if let attached = window.attachedSheet { walk(attached, depth: 0) }
+            } else {
+                walk(window, depth: 0)
+            }
+            return texts
+        }
+
         /// Posts one chord as a key-down event to the window, or to its sheet if one is showing, as typing would.
         ///
         /// - Parameter chord: The chord.

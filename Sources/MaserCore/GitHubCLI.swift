@@ -23,6 +23,8 @@ public enum GitHubCLIError: Error, LocalizedError {
     case fileTooLarge(path: String, bytes: Int)
     /// The PR's head moved after the diff was loaded, so posting would apply to commits the user hasn't seen.
     case headMoved(seen: String, current: String)
+    /// `gh` is signed in to a different account than the one shown, or none was shown yet.
+    case accountChanged(shown: String?, current: String?)
 
     /// A user-facing message; for `failed`, it includes the error output from `gh`.
     public var errorDescription: String? {
@@ -47,6 +49,13 @@ public enum GitHubCLIError: Error, LocalizedError {
             New commits were pushed since this diff loaded (\(seen.prefix(7)) → \(current.prefix(7))), so nothing was \
             posted. Refresh to review them; your text is kept.
             """
+        case let .accountChanged(shown, current?):
+            """
+            gh is signed in as @\(current)\(shown.map { ", not @\($0) as shown" } ?? ""), so nothing was posted. Post \
+            again to post as @\(current), or switch accounts with gh auth switch; your text is kept.
+            """
+        case .accountChanged(_, nil):
+            "GitHub didn't say which account gh is signed in to, so nothing was posted. Your text is kept."
         }
     }
 }
