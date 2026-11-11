@@ -47,6 +47,8 @@ struct Fixture {
             @Test("REQ-AB-001: Two") func two() {}
         }
         """
+    /// The UI scenario file's source, if any.
+    var scenarios: String?
     var record = "### V1: A check"
     /// Replaces traceability.md as given; `nil` generates it, so it's up to date.
     var traceability: String?
@@ -67,7 +69,7 @@ struct Fixture {
     }
 
     /// The tests.
-    var index: TestIndex { TestIndex(sources: ["Tests/X/SuiteA.swift": tests]) }
+    var index: TestIndex { TestIndex(sources: ["Tests/X/SuiteA.swift": tests], scenarioSource: scenarios) }
 
     /// The rules broken, in order.
     var rules: [Problem.Rule] {
@@ -163,6 +165,29 @@ struct Fixture {
             of: "}\n}", with: "}\n    @Test(\"REQ-AB-002: Three\") func three() {}\n}")
         fixture.requirements = fixture.requirements.replacingOccurrences(of: "(all 2)", with: "(all 3)")
         #expect(fixture.rules == [.testClaimMismatch, .testClaimMismatch])
+    }
+
+    /// UI scenarios follow the same two-way rule as tests, and a gap mustn't list a scenario that exists.
+    @Test func scenarioRules() {
+        var fixture = Fixture()
+        fixture.scenarios = """
+            static let second = UIScenario(
+                "second", "REQ-AB-002: Second"
+            ) { app in }
+            """
+        // REQ-AB-002 still lists it as a gap, so it doesn't cite it.
+        #expect(fixture.rules == [.unknownScenario, .testClaimMismatch])
+
+        fixture.requirements = fixture.requirements.replacingOccurrences(
+            of: "V-2026-11-03/V1. **Gap:** UI:second.", with: "UI:second; V-2026-11-03/V1.")
+        fixture.traceability = nil
+        #expect(fixture.rules == [])
+
+        fixture.scenarios = fixture.scenarios?.replacingOccurrences(of: "REQ-AB-002: Second", with: "Second")
+        #expect(fixture.rules == [.testClaimMismatch, .untracedTest])
+
+        fixture.scenarios = nil
+        #expect(fixture.rules.first == .unknownScenario)
     }
 
     /// A product test must claim a requirement; the traceability tool's own tests needn't.

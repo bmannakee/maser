@@ -42,8 +42,10 @@ public struct Problem: Equatable, Sendable, CustomStringConvertible {
         case staleTraceability = "stale-traceability"
         /// A requirement cites a test whose name doesn't claim it, or a test claims a requirement that doesn't cite it.
         case testClaimMismatch = "test-claim-mismatch"
-        /// A product test's name claims no requirement.
+        /// A product test's name, or a UI scenario's title, claims no requirement.
         case untracedTest = "untraced-test"
+        /// A `UI:` reference names a scenario that doesn't exist, or a planned one names a scenario that does.
+        case unknownScenario = "unknown-scenario"
     }
 
     /// The rule broken.
@@ -77,6 +79,7 @@ struct TraceChecker {
         problems += unmetNeeds()
         problems += untrackedOpenRisks()
         problems += testClaimProblems()
+        problems += scenarioProblems()
         return problems
     }
 
@@ -136,6 +139,60 @@ struct TraceChecker {
         return problems
     }
 
+    /// Scenario references that don't match the scenarios, and mismatched or missing scenario claims.
+    ///
+    /// Scenarios follow the same two-way rule as tests: a requirement that cites `UI:name` must be claimed in the
+    /// scenario's title, and a scenario must claim at least one requirement, each of which cites it.
+    private func scenarioProblems() -> [Problem] {
+        var problems: [Problem] = []
+        let byName = Dictionary(tests.scenarios.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        var cited: [String: Set<String>] = [:]
+        for requirement in documents.items(.requirement) {
+            let cell = VerificationCell(requirement["Verified by"])
+            for name in cell.scenarios {
+                guard let scenario = byName[name] else {
+                    problems.append(
+                        Problem(
+                            rule: .unknownScenario, location: location(requirement),
+                            message: "\(requirement.id) cites UI:\(name), but \(TestIndex.scenarioFile) has no such scenario"))
+                    continue
+                }
+                cited[requirement.id, default: []].insert(name)
+                if !DesignDocuments.ids(in: scenario.title).contains(requirement.id) {
+                    problems.append(
+                        Problem(
+                            rule: .testClaimMismatch, location: location(requirement),
+                            message:
+                                "\(requirement.id) cites UI:\(name), but the scenario's title doesn't claim \(requirement.id) (\(scenario.location))"
+                        ))
+                }
+            }
+            for name in cell.plannedScenarios where byName[name] != nil {
+                problems.append(
+                    Problem(
+                        rule: .unknownScenario, location: location(requirement),
+                        message: "\(requirement.id) lists UI:\(name) as a gap, but the scenario exists; cite it before the Gap"))
+            }
+        }
+        let requirementIDs = Set(documents.items(.requirement).map(\.id))
+        for scenario in tests.scenarios {
+            let claims = DesignDocuments.ids(in: scenario.title).filter { ItemKind(id: $0) == .requirement }
+            if claims.isEmpty {
+                problems.append(
+                    Problem(
+                        rule: .untracedTest, location: scenario.location,
+                        message: "UI scenario \(scenario.name) claims no requirement; start its title with \"REQ-…: \""))
+            }
+            for id in claims where requirementIDs.contains(id) && cited[id]?.contains(scenario.name) != true {
+                problems.append(
+                    Problem(
+                        rule: .testClaimMismatch, location: scenario.location,
+                        message: "UI scenario \(scenario.name) claims \(id), but \(id) doesn't cite UI:\(scenario.name)"))
+            }
+        }
+        return problems
+    }
+
     /// The location of an item's row.
     private func location(_ item: Item) -> Location { Location(file: item.file, line: item.line) }
 
@@ -169,6 +226,14 @@ struct TraceChecker {
                             rule: .unknownID, location: Location(file: file, line: offset + 1),
                             message: "\(id) isn't defined in any design document"))
                 }
+            }
+        }
+        for scenario in tests.scenarios {
+            for id in DesignDocuments.ids(in: scenario.title) where !defined.contains(id) {
+                problems.append(
+                    Problem(
+                        rule: .unknownID, location: scenario.location,
+                        message: "UI scenario \(scenario.name) cites \(id), which isn't defined"))
             }
         }
         for test in tests.tests {

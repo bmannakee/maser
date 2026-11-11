@@ -103,6 +103,19 @@ import Testing
         #expect(VerificationCell("Measured once, by hand.").isEmpty)
     }
 
+    /// Reads `UI:` references, treating those after `Gap` or in a `Planned` cell as scenarios still to write.
+    @Test func readsScenarioReferences() {
+        let cell = VerificationCell("T:A.b; UI:queue-keys. **Gap:** UI:queue-cache.")
+        #expect(cell.scenarios == ["queue-keys"])
+        #expect(cell.plannedScenarios == ["queue-cache"])
+        #expect(
+            VerificationCell("Planned: T for the store, UI:draft-survives-relaunch.").plannedScenarios == [
+                "draft-survives-relaunch"
+            ])
+        #expect(VerificationCell("UI:key-routing").coverage(isProposed: false) == .uiScenarios)
+        #expect(!VerificationCell("UI:key-routing").isEmpty)
+    }
+
     /// Classifies coverage by the strongest verification cited.
     @Test func classifiesCoverage() {
         #expect(VerificationCell("T:A.b").coverage(isProposed: false) == .unitTests)
@@ -130,6 +143,22 @@ import Testing
             """#
         ])
         #expect(index.tests.map { "\($0.suite).\($0.name)" } == ["Real.real"])
+    }
+
+    /// Finds scenarios declared across lines, with the line of their `UIScenario(`.
+    @Test func findsScenarios() {
+        let source = """
+            enum UIScenarios {
+                static let keys = UIScenario(
+                    "queue-keys", "REQ-QUE-007: Queue keys"
+                ) { app in }
+                static let other = UIScenario("other", "REQ-WIN-001: Other") { app in }
+            }
+            """
+        let scenarios = TestIndex(sources: [:], scenarioSource: source).scenarios
+        #expect(scenarios.map(\.name) == ["queue-keys", "other"])
+        #expect(scenarios.map(\.title) == ["REQ-QUE-007: Queue keys", "REQ-WIN-001: Other"])
+        #expect(scenarios.map(\.location.line) == [2, 5])
     }
 
     /// Finds tests in suites and free functions, live suites, display names, and `@Test` on its own line.

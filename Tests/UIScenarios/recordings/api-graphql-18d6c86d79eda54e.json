@@ -1,0 +1,22 @@
+{
+  "args" : [
+    "api",
+    "graphql",
+    "--hostname",
+    "github.com",
+    "--paginate",
+    "--jq",
+    ".data.repository.pullRequest.reviewThreads.nodes[]",
+    "-f",
+    "name=maser",
+    "-f",
+    "owner=bmannakee",
+    "-F",
+    "number=22",
+    "-f",
+    "query=query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {\n  repository(owner: $owner, name: $name) {\n    pullRequest(number: $number) {\n      reviewThreads(first: 100, after: $endCursor) {\n        pageInfo { hasNextPage endCursor }\n        nodes {\n          id path line startLine originalLine diffSide startDiffSide isOutdated isResolved\n          comments(first: 100) { totalCount nodes { id author { login } body createdAt url state } }\n        }\n      }\n    }\n  }\n}"
+  ],
+  "status" : 0,
+  "stderr" : "",
+  "stdout" : ""
+}

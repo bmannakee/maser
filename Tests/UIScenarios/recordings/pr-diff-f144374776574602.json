@@ -1,0 +1,14 @@
+{
+  "args" : [
+    "pr",
+    "diff",
+    "1",
+    "--repo",
+    "github.com/bmannakee/maser",
+    "--color",
+    "never"
+  ],
+  "status" : 0,
+  "stderr" : "",
+  "stdout" : "diff --git a/COMMENT-TEST.md b/COMMENT-TEST.md\nnew file mode 100644\nindex 0000000..104ec0c\n--- /dev/null\n+++ b/COMMENT-TEST.md\n@@ -0,0 +1,7 @@\n+# Commenting test\n+\n+Throwaway file for trying out Maser's Overview comments. This PR will be closed without merging.\n+\n+- Post a comment with ⌘↩\n+- Quote-reply the description\n+- Quote-reply your own comment\ndiff --git a/README.md b/README.md\nindex 9075d22..d8bb481 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,6 +1,6 @@\n # maser\n \n-A native macOS app for reviewing GitHub pull requests.\n+A native macOS app for reviewing GitHub pull requests (test edit for full-file diffs).\n \n Maser talks to GitHub through the [`gh` CLI](https://cli.github.com), so it uses whatever account `gh` is logged in to and never stores credentials itself.\n \n"
+}

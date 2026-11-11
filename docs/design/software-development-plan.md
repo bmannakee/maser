@@ -49,8 +49,8 @@ requires:
 | Detailed design | Doc comments on every type and function, as `AGENTS.md` requires; file header comments |
 | Implementation | Swift 6, strict concurrency; conventions in `AGENTS.md`; formatting enforced by `swift format` |
 | Unit verification | Swift Testing in `MaserCoreTests`; `scripts/check` runs them on every commit |
-| Integration verification | Live tests against GitHub (`MASER_LIVE_TESTS=1`; `MASER_LIVE_WRITE_TESTS=1`, limited to bmannakee/maser#1). The scripted UI harness is planned. |
-| System verification | Scripted UI scenarios (planned); verification records in `docs/verification/` |
+| Integration verification | Live tests against GitHub (`MASER_LIVE_TESTS=1`; `MASER_LIVE_WRITE_TESTS=1`, limited to bmannakee/maser#1). |
+| System verification | Scripted UI scenarios against a fake `gh` (`scripts/check-ui`); verification records in `docs/verification/` |
 | Validation | Use by the intended user against [user-needs.md](user-needs.md), recorded per release |
 | Release | `scripts/bundle` builds `Maser.app`. Planned: a tagged release and a release record listing what was verified, with known anomalies. |
 
@@ -92,7 +92,7 @@ hazard in the risk file, and the PR that fixes it updates the risk file.
 | Unit | `MaserCoreTests` | Every commit (`scripts/check`) |
 | Integration, read | Live read tests | Before merging changes to GitHub access |
 | Integration, write | Live write tests on PR #1 only | Before merging changes to write paths |
-| System (UI) | Scripted scenarios with a fake `gh` (planned) | Every commit, once built |
+| System (UI) | Scripted scenarios with a fake `gh` (`scripts/check-ui`, see `Tests/UIScenarios/README.md`) | Every PR that changes the app, on an unlocked Mac |
 | Validation | Use by the intended user | Before each release |
 
 A requirement that can't be tested automatically says so and names its inspection or manual check.

@@ -1,0 +1,19 @@
+{
+  "args" : [
+    "api",
+    "graphql",
+    "--hostname",
+    "github.com",
+    "-f",
+    "name=maser",
+    "-f",
+    "owner=bmannakee",
+    "-F",
+    "number=1",
+    "-f",
+    "query=query($owner: String!, $name: String!, $number: Int!) {\n  repository(owner: $owner, name: $name) {\n    pullRequest(number: $number) { id headRefOid reviews(states: PENDING, first: 1) { nodes { id } } }\n  }\n}"
+  ],
+  "status" : 0,
+  "stderr" : "",
+  "stdout" : "{\"data\":{\"repository\":{\"pullRequest\":{\"id\":\"PR_kwDOVeiRMs8AAAABMJbuaw\",\"headRefOid\":\"4e5b8e054d5da90dc647db34891d6247c454f495\",\"reviews\":{\"nodes\":[]}}}}}"
+}

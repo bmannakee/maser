@@ -1,0 +1,64 @@
+# UI scenarios
+
+Scripted runs through Maser's UI that check what unit tests can't reach: keys, focus, panes and layout. Each scenario
+runs in a fresh launch of a debug build, against a fake `gh` that replays recorded GitHub responses.
+
+```sh
+scripts/check-ui                      # every scenario
+scripts/check-ui key-routing          # some of them, by name
+scripts/check-ui --record post-comment   # record what's missing, from the real gh (read-only)
+```
+
+Run it before merging a PR that changes the app. It needs an unlocked screen, and each scenario takes over the keyboard
+and brings a window to the front for a few seconds, so leave the Mac alone while it runs. The test app is a separate
+bundle (`dev.maser.Maser.uitests`) with its own settings, so a Maser you're using isn't touched.
+
+## How it works
+
+| Piece | Where | What it does |
+| --- | --- | --- |
+| Scenarios | `Sources/Maser/UIScenarios.swift` | The steps and checks, one `UIScenario` each. Debug builds only. |
+| Runner | `Sources/Maser/UIScenarioRunner.swift` | Starts the scenario named by `MASER_UI_SCENARIO` in the first main window. It presses keys by posting real key events, waits for and checks the window's state, writes `PASS` or `FAIL: …` to `MASER_UI_RESULT`, and exits. |
+| Fake `gh` | `Sources/fake-gh` | Answers each `gh` command from `recordings/`, or from overrides a scenario writes. It logs every command, so a scenario can check what Maser sent. |
+| Config | `config.toml` here | Points `[github] gh` at the fake, and sets the queue's searches to the recorded ones. |
+| Launcher | `scripts/check-ui` | Builds, wraps the debug binary in `.build/MaserUITests.app`, and launches it once per scenario with its own config, `gh` state and log. |
+
+The runner refuses to start unless `[github] gh` is the fake, so a scenario can never post to real GitHub.
+
+Posted key events go through the same path as typing: `KeyRouter`, the menus, and the focused view. Mouse clicks aren't
+simulated, and neither is anything outside the app, such as a link opening the browser.
+
+Menu items that depend on the focused window (Refresh and Filter Pull Requests were checked) stay disabled in the test
+app, even with its window key, so scenarios use the vim-style keys for those commands (`r`, not ⌘R). Menu items that are
+always enabled, such as ⌘0, work. In normal use these items work (checked by hand on 2026-11-10), so this is a limit of the
+test app, not an app bug.
+
+## Writing a scenario
+
+1. Add a `static let` to `UIScenarios` and list it in `all`. Name it in kebab case, and start its title with the
+   requirements it verifies: `UIScenario("queue-keys", "REQ-QUE-007: …") { app in … }`.
+2. Drive it with `app.press("g f")` (keys written as in `config.toml`), `app.type("text")`, and
+   `app.openFromQueue(number)`. Check with `app.expect(condition, "what it means", app.summary)`, or
+   `app.waitUntil("what it means") { condition }` for anything asynchronous.
+3. Make GitHub fail or answer a mutation with `app.overrideGH([...])`, and read what was sent from `app.ghCalls`.
+4. Cite it from each requirement as `UI:name`, before any `Gap`. `maser-trace` checks both directions.
+5. Run it with `--record` once to record any GitHub data it needs, then without, and commit the new recordings.
+
+## Recordings
+
+Each file in `recordings/` is one `gh` command's exact arguments and its output, named by the command and a hash of the
+arguments. They're real responses from bmannakee/maser, recorded with `--record`. Recording runs only read-only commands
+through the real `gh`. The fake refuses to forward mutations, so those always need an override.
+
+A command with no recording fails with "fake-gh: no recording for …", which shows in the scenario's log. Changing the
+arguments Maser sends to `gh` (a new field in a query, say) changes the hash, so after such a change, delete the
+recordings and record them all again with `scripts/check-ui --record`.
+
+The scenarios use PRs #16 and #13 (merged) and #1 (the closed test PR), by number, from the queue searches in
+`config.toml`.
+
+## When a scenario fails
+
+`scripts/check-ui` prints the scenario's steps up to the failure, with the window's state, and the directory with each
+scenario's full log and `gh` call log (`gh/calls.jsonl`). A scenario with no result crashed or hung: look in
+`~/Library/Logs/DiagnosticReports` for a `Maser-*.ips` report.

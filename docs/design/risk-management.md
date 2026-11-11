@@ -104,7 +104,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-06 | Key ownership is explicit. The window tracks whether the queue or the review has the keys, the open PR is marked, vim keys pause while typing, and `/` acts only in the queue. | Protective measure | REQ-WIN-002, REQ-WIN-003, REQ-KEY-002, REQ-KEY-003 | Implemented |
 | RC-07 | The verdict starts at Comment every time and must be chosen explicitly. Submitting takes a button or ⌘↩ in the sheet. | Protective measure | REQ-CMT-003 | Implemented |
 | RC-08 | Discarding a review asks for confirmation, naming the number of drafts it deletes. | Protective measure | REQ-CMT-004 | Implemented |
-| RC-09 | The UI avoids the layouts that loop AppKit's constraint updates (nested split views, an inspector beside the file tree), and a stress scenario checks for it. | Inherent safety by design | REQ-WIN-007 | Implemented; scenario planned |
+| RC-09 | The UI avoids the layouts that loop AppKit's constraint updates (nested split views, an inspector beside the file tree), and a stress scenario checks for it. | Inherent safety by design | REQ-WIN-007 | Implemented; UI:tab-and-pane-stress |
 | RC-10 | Unsent text is saved locally as it's typed, and restored. | Protective measure | REQ-CMT-008 | **Proposed** |
 | RC-11 | GitHub access only through `gh`. Maser never handles the token. | Inherent safety by design | REQ-GH-001 | Implemented |
 | RC-12 | The PR and the account are named wherever Maser posts. | Information for safety | REQ-CMT-009 | **Proposed** |
@@ -125,8 +125,8 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
   Further reduction would mean independent verification of the diff against the GitHub web view, or of `gh` itself,
   which isn't practicable for a client of `gh`. GitHub's own branch protection and other reviewers remain controls on
   H1.
-- **HAZ-04:** Medium until RC-12 names the PR when posting. The key-routing controls (RC-06) are verified only by one
-  scripted run so far, so the UI harness should make that run repeatable.
+- **HAZ-04:** Medium until RC-12 names the PR when posting. The key-routing controls (RC-06) are verified by the repeatable
+  scenarios UI:key-routing, UI:queue-keys and UI:typing-pauses-keys; mouse clicks are still checked only by hand.
 - **HAZ-11:** Medium. A "loaded at" indicator on the Overview would reduce it further. It's recorded as a candidate
   control, not yet a requirement.
 

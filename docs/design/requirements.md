@@ -21,7 +21,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-GH-001 | Maser reads and writes GitHub only by running the user's `gh` client. It never reads, stores, logs or transmits a GitHub token. | UN-8 | RC-11 | I: all GitHub calls go through `GitHubCLI.run` (rule in `AGENTS.md`); no code handles tokens. | Implemented |
 | REQ-GH-002 | Maser finds `gh` in this order: the `[github] gh` setting, then the usual install locations (Homebrew, MacPorts, Nix, `~/.local/bin`, mise and asdf shims), then the user's login shell. The login-shell lookup gives up after 5 s. If `gh` isn't found, every window says so and how to set the path. | UN-7 | RC-13 | T:SettingsTests.readsSettings (the setting only). **Gap:** the search order and the not-found message. | Implemented |
 | REQ-GH-003 | Lists that GitHub returns in pages are fetched in full: conversation comments, reviews, checks, labels, review requests, and the comments in a review thread. | UN-2, UN-3 | RC-02 | T:PullRequestOverviewTests.marksTruncatedLists, .replacesListsWithAllPages, .pagedQueriesPaginate; T:ReviewThreadTests.longThreadsGetTheirRemainingComments; L:LiveGitHubTests.paginatesLongLists | Implemented |
-| REQ-GH-004 | Unexpected GitHub data never crashes Maser. Missing optional fields decode as absent, unknown enum values fall back to a default, and a failed request becomes a message in the window. | UN-2 | RC-14 | T:PullRequestOverviewTests.unknownEnumValuesDontBreakDecoding, .missingPullRequestThrows; T:ReviewThreadTests.emptyOutput; T:PullRequestTests.decodesEmptyResult | Implemented |
+| REQ-GH-004 | Unexpected GitHub data never crashes Maser. Missing optional fields decode as absent, unknown enum values fall back to a default, and a failed request becomes a message in the window. | UN-2 | RC-14 | T:PullRequestOverviewTests.unknownEnumValuesDontBreakDecoding, .missingPullRequestThrows; T:ReviewThreadTests.emptyOutput; T:PullRequestTests.decodesEmptyResult; UI:post-comment (a failed post shows gh's message) | Implemented |
 | REQ-GH-005 | Waiting on `gh` never blocks the user interface. | UN-10 | RC-15 | I: subprocesses run in `@concurrent` functions through the non-blocking `Subprocess` runner. **Gap:** no test. | Implemented |
 | REQ-GH-006 | A PR on a GitHub Enterprise host is read from, and written to, that host. | UN-7 | — | T:PullRequestTests.nameWithOwnerFromURL (parsing only). **Gap:** no request made against a non-github.com host. | Implemented |
 
@@ -32,22 +32,22 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-QUE-001 | The queue shows these sections, in order: Review requested (`review-requested:@me`), Yours (`author:@me`), Involving you (`involves:@me`), then each search in `[queue] searches`. `[queue] sections` picks and orders the built-in sections. A search shows open PRs unless its query picks a state. | UN-1 | — | T:PullRequestSearchTests.ghArguments, .splitsQueryIntoWords; T:PullRequestTests.decodesGhSearchOutput; T:SettingsTests.readsQueue, .queueSectionsDefault; L:LivePullRequestSearchTests.searches | Implemented |
 | REQ-QUE-002 | A PR appears only in the first section that finds it. Sections with no PRs and no error are hidden. Each section lists its PRs most recently updated first. | UN-1 | — | T:PullRequestSearchTests.displayedDeduplicates | Implemented |
 | REQ-QUE-003 | The filter narrows the queue to PRs where every word matches the title, the repository, the author, or the number (`#123` matches exactly). | UN-1 | — | T:PullRequestSearchTests.filters | Implemented |
-| REQ-QUE-004 | A search that fails shows its error in its own section and keeps its last results. The other sections still update. | UN-1 | RC-14 | T:PullRequestSearchTests.displayedDeduplicates (an error section is kept). **Gap:** UI:queue-search-fails. | Implemented |
+| REQ-QUE-004 | A search that fails shows its error in its own section and keeps its last results. The other sections still update. | UN-1 | RC-14 | T:PullRequestSearchTests.displayedDeduplicates (an error section is kept); UI:queue-search-fails. | Implemented |
 | REQ-QUE-005 | A new main window shows the last results at once, and refetches only if they're over 60 s old. Changing the searches in config reloads at once. | UN-10 | — | **Gap:** UI:queue-cache. | Implemented |
 | REQ-QUE-006 | When every section is empty, the queue says which searches it ran and how to add more. | UN-1 | — | **Gap:** UI:queue-empty. | Implemented |
-| REQ-QUE-007 | While the queue has the keys, `j`/`k` move the selection, `]`/`[` jump to the first PR of the next or previous section (skipping empty ones), `g g`/`G` go to the first and last PR, `o` opens the selection on GitHub, and Return opens it. | UN-1, UN-5 | — | T:PullRequestSearchTests.sectionStarts; V-2026-11-03/V10. **Gap:** UI:queue-keys. | Implemented |
+| REQ-QUE-007 | While the queue has the keys, `j`/`k` move the selection, `]`/`[` jump to the first PR of the next or previous section (skipping empty ones), `g g`/`G` go to the first and last PR, `o` opens the selection on GitHub, and Return opens it. | UN-1, UN-5 | — | T:PullRequestSearchTests.sectionStarts; UI:queue-keys; V-2026-11-03/V10. **Gap:** `o` (it opens a browser). | Implemented |
 
 ## Main window (WIN)
 
 | ID | Requirement | Need | Control | Verified by | Status |
 | --- | --- | --- | --- | --- | --- |
-| REQ-WIN-001 | The main window shows the queue in a sidebar and the open PR's review beside it. Each PR opened in the window keeps its state: tab, file, cursor and drafts. Going back to one refreshes it only if its data is over 60 s old. | UN-1, UN-10 | RC-17 | **Gap:** UI:switch-prs-keeps-state. | Implemented |
+| REQ-WIN-001 | The main window shows the queue in a sidebar and the open PR's review beside it. Each PR opened in the window keeps its state: tab, file, cursor and drafts. Going back to one refreshes it only if its data is over 60 s old. | UN-1, UN-10 | RC-17 | UI:switch-prs-keeps-state. | Implemented |
 | REQ-WIN-002 | The sidebar marks the PR whose review is showing, which may not be the selected one. | UN-5, UN-8 | RC-06 | **Gap:** UI:open-pr-marker (state); visual check by the user. | Implemented |
-| REQ-WIN-003 | Clicking a PR, or pressing Return on it, shows its review and gives the review the keys. The queue gets the keys back only from ⌘0, `g p`, `e`, or the filter box. Moving through the queue with `j`/`k` shows each PR without leaving the queue. | UN-5 | RC-06 | V-2026-11-03/V10. **Gap:** mouse clicks (U: the user, partly); UI:key-routing. | Implemented |
+| REQ-WIN-003 | Clicking a PR, or pressing Return on it, shows its review and gives the review the keys. The queue gets the keys back only from ⌘0, `g p`, `e`, or the filter box. Moving through the queue with `j`/`k` shows each PR without leaving the queue. | UN-5 | RC-06 | UI:key-routing; V-2026-11-03/V10. **Gap:** mouse clicks (U: the user, partly). | Implemented |
 | REQ-WIN-004 | ⌥Return, or Open in New Window in the context menu, opens a PR in a window of its own. | UN-4 | — | **Gap:** UI:open-in-new-window. | Implemented |
 | REQ-WIN-005 | ⌘O opens any PR by URL in the main window, and opens a main window if none is open. | UN-1 | — | **Gap:** UI:open-by-url. | Implemented |
 | REQ-WIN-006 | A main window with no review open always shows the queue. | UN-1 | — | V-2026-11-03/V11 (cause only, not re-run). **Gap:** UI:empty-window-shows-queue. | Implemented |
-| REQ-WIN-007 | Switching tabs, showing and hiding panes, and opening PRs never crashes the app or stalls its layout. | UN-9 | RC-09 | V-2026-11-03/V6, V7 (16 tab switches with comments toggled). **Gap:** UI:tab-and-pane-stress. | Implemented |
+| REQ-WIN-007 | Switching tabs, showing and hiding panes, and opening PRs never crashes the app or stalls its layout. | UN-9 | RC-09 | UI:tab-and-pane-stress; V-2026-11-03/V6, V7 (16 tab switches with comments toggled). | Implemented |
 
 ## Overview tab (OVR)
 
@@ -56,7 +56,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-OVR-001 | The Overview shows the PR's title, description, comments and reviews as GitHub renders them, with mergeability, review status by reviewer, checks sorted by urgency, and labels. | UN-2 | RC-02 | T:PullRequestOverviewTests.decodesMetadata, .checksMappedAndSortedByUrgency, .timelineSkipsPendingAndBodylessCommentReviews, .reviewerStatusKeepsLatestVerdict | Implemented |
 | REQ-OVR-002 | Rendered PR content runs no JavaScript of its own. A clicked link, including one marked `target="_blank"`, opens in the default browser. | UN-8 | RC-16 | I: `HTMLView` sets `allowsContentJavaScript = false`, and its `WKUIDelegate` sends new-window links to the browser. **Gap:** UI:link-opens-browser. | Implemented |
 | REQ-OVR-003 | Relative times ("5 minutes ago") are updated every minute. Anything older than 30 days shows its date. | UN-2 | RC-17 | **Gap:** no test. | Implemented |
-| REQ-OVR-004 | The user can post a comment to the conversation, and quote any comment into the draft. | UN-4 | — | T:PullRequestOverviewTests.quotingMarkdown. **Gap:** UI:post-comment (with a fake `gh`). | Implemented |
+| REQ-OVR-004 | The user can post a comment to the conversation, and quote any comment into the draft. | UN-4 | — | T:PullRequestOverviewTests.quotingMarkdown; UI:post-comment. **Gap:** quoting in the UI. | Implemented |
 
 ## Diff and Files tab (DIF)
 
@@ -90,9 +90,9 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | ID | Requirement | Need | Control | Verified by | Status |
 | --- | --- | --- | --- | --- | --- |
 | REQ-KEY-001 | Every user action is a command with a menu shortcut, vim-style keys, or both. No default key sequence is hidden by a shorter one. | UN-5 | — | T:KeymapTests.defaultsMatchSequences, .defaultScrollBindings | Implemented |
-| REQ-KEY-002 | Vim-style keys pause while the user types in a text field or editor. Esc leaves a multi-line editor, and cancels a half-typed sequence. | UN-5 | RC-06 | **Gap:** UI:typing-pauses-keys. | Implemented |
-| REQ-KEY-003 | While the queue has the keys, keys it doesn't use go on to the open review. `/` focuses the filter only while the queue has the keys; ⌘F works from anywhere. | UN-5 | RC-06 | V-2026-11-03/V10. **Gap:** UI:key-routing. | Implemented |
-| REQ-KEY-004 | A comment box opened by a key (`c`, `R`) keeps keyboard focus until the user leaves it. | UN-5 | — | V-2026-11-03/V8. **Gap:** UI:comment-box-keeps-focus. | Implemented |
+| REQ-KEY-002 | Vim-style keys pause while the user types in a text field or editor. Esc leaves a multi-line editor, and cancels a half-typed sequence. | UN-5 | RC-06 | UI:typing-pauses-keys. | Implemented |
+| REQ-KEY-003 | While the queue has the keys, keys it doesn't use go on to the open review. `/` focuses the filter only while the queue has the keys; ⌘F works from anywhere. | UN-5 | RC-06 | UI:key-routing; V-2026-11-03/V10. **Gap:** ⌘F from the review. | Implemented |
+| REQ-KEY-004 | A comment box opened by a key (`c`, `R`) keeps keyboard focus until the user leaves it. | UN-5 | — | UI:comment-box-keeps-focus; V-2026-11-03/V8. **Gap:** `R` (reply). | Implemented |
 | REQ-KEY-005 | Help → Keyboard Shortcuts (`?`) lists the bindings currently in effect, including the user's changes. | UN-5, UN-6 | — | **Gap:** UI:shortcuts-window. | Implemented |
 
 ## Configuration (CFG)

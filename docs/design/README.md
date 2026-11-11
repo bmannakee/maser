@@ -61,7 +61,7 @@ Verification references use these forms:
 | --- | --- |
 | `T:Suite.test` | Unit test in `MaserCoreTests` |
 | `L:Suite.test` | Live test against GitHub (`MASER_LIVE_TESTS` or `MASER_LIVE_WRITE_TESTS`) |
-| `UI:scenario` | Scripted UI scenario. The harness doesn't exist yet, so these are planned. |
+| `UI:scenario` | Scripted UI scenario in `Sources/Maser/UIScenarios.swift`, run by `scripts/check-ui`. After `Gap`, or in a `Planned` cell, one still to write. |
 | `V-…/Vn` | A check in a verification record |
 | `I:` | Inspection of the code or the product |
 | `U:` | Use by the user, recorded in a verification record or a PR |
@@ -84,13 +84,15 @@ prints each problem as `file:line: message [rule]`, and fails if there are any.
 Every test of Maser names the requirements it verifies at the start of its display name, such as
 `@Test("REQ-DIF-002, REQ-DIF-006: Matches lines across views")`, and each of those requirements cites the test. The
 traceability tool's own tests, in `Tests/TraceabilityTests`, verify the tool rather than Maser, so they don't.
+UI scenarios follow the same rule: each one's title starts with the requirements it verifies, such as
+`UIScenario("key-routing", "REQ-WIN-003, REQ-KEY-003: …")`, and those requirements cite `UI:key-routing`.
 
 
 
 | Rule | Fails when |
 | --- | --- |
 | `duplicate-id` | An ID is defined in more than one row. |
-| `unknown-id` | A design document (other than this README), or a test's display name, mentions an ID that isn't defined. |
+| `unknown-id` | A design document (other than this README), a test's display name or a UI scenario's title mentions an ID that isn't defined. |
 | `requirement-without-need` | A requirement names no user need. |
 | `unstated-verification` | A requirement's "Verified by" cell cites nothing (`T:`, `L:`, `V-…`, `I:`, `U:`) and notes no `Gap` or plan. |
 | `unknown-test` | A `T:` or `L:` reference names a suite or test that doesn't exist, or cites a live test as `T:` or an offline one as `L:`. |
@@ -104,8 +106,9 @@ traceability tool's own tests, in `Tests/TraceabilityTests`, verify the tool rat
 | `unmet-need` | No implemented requirement serves a user need. |
 | `untracked-open-risk` | A hazard's residual risk is High, or marked open, but the open risks table doesn't list it. |
 | `stale-traceability` | A generated section of traceability.md is missing or out of date. |
-| `test-claim-mismatch` | A requirement cites a test whose display name doesn't claim the requirement, or a test claims a requirement that doesn't cite it. A whole-suite reference cites every test in the suite. |
-| `untraced-test` | A test outside `Tests/TraceabilityTests` has no requirement ID in its display name. |
+| `test-claim-mismatch` | A requirement cites a test or UI scenario that doesn't claim the requirement, or a test or scenario claims a requirement that doesn't cite it. A whole-suite reference cites every test in the suite. |
+| `untraced-test` | A test outside `Tests/TraceabilityTests` has no requirement ID in its display name, or a UI scenario none in its title. |
+| `unknown-scenario` | A `UI:` reference names a scenario that doesn't exist, or a `Gap` lists one that does (cite it instead). |
 
 The rules about tests are checked against the test functions in the source; they don't run the tests. Whether a cited
 test passes is up to `swift test`, and for live tests, the live runs.

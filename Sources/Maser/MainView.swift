@@ -114,6 +114,14 @@ final class MainWindows {
         }
     }
 
+    /// The window showing a main window state, if it's still open.
+    ///
+    /// - Parameter state: The state.
+    /// - Returns: The window.
+    func window(for state: MainWindowState) -> NSWindow? {
+        windows.keyEnumerator().allObjects.lazy.compactMap { $0 as? NSWindow }.first { windows.object(forKey: $0) === state }
+    }
+
     /// The main window nearest the front that's still open, with its state.
     private func frontmost() -> (NSWindow, MainWindowState)? {
         // Closed SwiftUI windows can linger before they're freed, so only count visible or minimized ones.
@@ -209,6 +217,15 @@ struct MainView: View {
             if let pr = MainWindows.shared.takePending() { state.open(pr) }
             await openLaunchArguments()
         }
+        #if DEBUG
+            .task {
+                // A debug build launched by scripts/check-ui runs a UI scenario in the first main window.
+                await UIScenarioRunner.runIfRequested(
+                    MainWindowProbe(
+                        state: state, selection: { selection },
+                        sections: { queue.sections.map { QueueSection.displayed($0, filter: filter) } ?? [] }))
+            }
+        #endif
         // A new window shows the last results right away and only refetches if they're more than a minute old.
         // Changing the searches in config.toml reloads at once.
         .task(id: ConfigStore.shared.settings.queueSearches) { await queue.refresh(maxAge: 60) }

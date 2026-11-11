@@ -34,5 +34,7 @@ let package = Package(
             name: "TraceabilityTests",
             dependencies: ["Traceability"]
         ),
+        // A stand-in for gh that replays recorded responses, for scripts/check-ui; not part of the app.
+        .executableTarget(name: "fake-gh"),
     ]
 )

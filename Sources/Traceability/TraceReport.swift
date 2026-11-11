@@ -122,7 +122,8 @@ public struct TraceReport: Sendable {
         return [
             "\(documents.items(.need).count) needs", "\(documents.items(.requirement).count) requirements",
             "\(documents.items(.hazard).count) hazards", "\(documents.items(.control).count) controls",
-            "\(tests.tests.count) tests", "\(documents.recordChecks.count) record checks",
+            "\(tests.tests.count) tests", "\(tests.scenarios.count) UI scenarios",
+            "\(documents.recordChecks.count) record checks",
             "\(gaps) requirements with a noted gap",
         ].joined(separator: ", ")
     }
