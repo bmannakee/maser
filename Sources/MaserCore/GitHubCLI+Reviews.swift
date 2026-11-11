@@ -1,8 +1,9 @@
 // The `GitHubCLI` calls for inline review threads and for writing reviews.
 //
 // Everything here goes through GitHub's GraphQL API with `gh api graphql`, because only GraphQL exposes the viewer's
-// pending review and its draft comments. The flow is: `reviewContext(for:)` to find any pending review,
-// `startReview(on:pullRequestID:)` to create one, `addReviewThread` and `reply` to add drafts, then `submitReview` or
+// pending review and its draft comments. The flow is: `diffAtHead(for:)` to load the diff with the commit it shows,
+// `reviewContext(for:)` to check the head hasn't moved and find any pending review, `startReview` to create one pinned
+// to that commit, `addReviewThread` and `reply` to add drafts, then `submitReview` or
 // `discardReview`.
 
 import Foundation
@@ -44,19 +45,62 @@ extension GitHubCLI {
         return try ReviewContext.decode(from: data)
     }
 
+    /// Loads the PR's diff together with the review context, making sure both are from the same head commit.
+    ///
+    /// `gh pr diff` always serves the current head and doesn't say which commit that is, so the head is read before
+    /// and after the diff. If a push lands in between, the load is retried.
+    ///
+    /// - Parameters:
+    ///   - pr: The pull request to load.
+    ///   - attempts: How many times to try before giving up.
+    /// - Returns: The diff, and the context whose `headCommitID` is the commit the diff shows.
+    /// - Throws: `GitHubCLIError.rejected` if the head keeps moving, or the errors from `fileDiffs(for:)` and
+    ///   `reviewContext(for:)`.
+    @concurrent
+    public func diffAtHead(for pr: PullRequest, attempts: Int = 3) async throws -> (files: [FileDiff], context: ReviewContext) {
+        for _ in 0..<attempts {
+            let before = try await reviewContext(for: pr)
+            let files = try await fileDiffs(for: pr)
+            let after = try await reviewContext(for: pr)
+            if before.headCommitID == after.headCommitID { return (files, after) }
+        }
+        throw GitHubCLIError.rejected("The PR kept changing while its diff loaded. Refresh to try again.")
+    }
+
+    /// The mutation that starts a pending review, pinned to a commit.
+    static let startReviewMutation = """
+        mutation($pr: ID!, $commit: GitObjectID) {
+          addPullRequestReview(input: {pullRequestId: $pr, commitOID: $commit}) { pullRequestReview { id } }
+        }
+        """
+
+    /// The variables for `startReviewMutation`.
+    ///
+    /// - Parameters:
+    ///   - pullRequestID: The PR's GraphQL node ID.
+    ///   - commitID: The head commit of the diff the user saw.
+    /// - Returns: The `-f` string variables.
+    static func startReviewVariables(pullRequestID: String, commitID: String) -> [String: String] {
+        ["pr": pullRequestID, "commit": commitID]
+    }
+
     /// Starts a pending review, visible only to the viewer until it's submitted.
+    ///
+    /// The review is pinned to `commitID`, so submitting it later covers that commit, not whatever was pushed since.
+    /// New threads still land on the PR's current head (GitHub ignores the review's commit for them), so check the head
+    /// with `ReviewContext.requireHead(_:)` before adding one.
     ///
     /// - Parameters:
     ///   - pr: The pull request to review, used for its host.
     ///   - pullRequestID: The PR's GraphQL node ID, from `ReviewContext.pullRequestID`.
+    ///   - commitID: The head commit of the diff the user saw.
     /// - Returns: The new review's node ID.
     /// - Throws: `GitHubCLIError.failed` if `gh` fails, for example when the viewer already has a pending review.
     @concurrent
-    public func startReview(on pr: PullRequest, pullRequestID: String) async throws -> String {
+    public func startReview(on pr: PullRequest, pullRequestID: String, commitID: String) async throws -> String {
         let data = try await graphQL(
-            """
-            mutation($pr: ID!) { addPullRequestReview(input: {pullRequestId: $pr}) { pullRequestReview { id } } }
-            """, host: pr.host, jq: ".data.addPullRequestReview.pullRequestReview.id", strings: ["pr": pullRequestID])
+            Self.startReviewMutation, host: pr.host, jq: ".data.addPullRequestReview.pullRequestReview.id",
+            strings: Self.startReviewVariables(pullRequestID: pullRequestID, commitID: commitID))
         return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -112,39 +156,62 @@ extension GitHubCLI {
             """, host: pr.host, strings: ["thread": threadID, "body": body])
     }
 
+    /// The mutation and variables that submit a review.
+    ///
+    /// A pending review is submitted as it is: it was pinned to a commit when it started. A review without one is created
+    /// pinned to `commitID`.
+    ///
+    /// - Parameters:
+    ///   - context: The PR's node ID and pending review.
+    ///   - event: The verdict.
+    ///   - body: The summary; empty to send none.
+    ///   - commitID: The head commit of the diff the user saw.
+    /// - Returns: The GraphQL document and its `-f` string variables.
+    static func submitReviewRequest(
+        context: ReviewContext, event: ReviewEvent, body: String, commitID: String
+    ) -> (query: String, strings: [String: String]) {
+        var strings = ["event": event.rawValue]
+        if !body.isEmpty { strings["body"] = body }
+        if let reviewID = context.pendingReviewID {
+            strings["review"] = reviewID
+            return (
+                """
+                mutation($review: ID!, $event: PullRequestReviewEvent!, $body: String) {
+                  submitPullRequestReview(input: {pullRequestReviewId: $review, event: $event, body: $body}) { pullRequestReview { id } }
+                }
+                """, strings
+            )
+        }
+        strings["pr"] = context.pullRequestID
+        strings["commit"] = commitID
+        return (
+            """
+            mutation($pr: ID!, $commit: GitObjectID, $event: PullRequestReviewEvent!, $body: String) {
+              addPullRequestReview(input: {pullRequestId: $pr, commitOID: $commit, event: $event, body: $body}) { pullRequestReview { id } }
+            }
+            """, strings
+        )
+    }
+
     /// Submits the viewer's review with a verdict.
     ///
     /// With a pending review, this submits it along with its draft comments. Without one, it posts a new review that has
-    /// only the verdict and summary.
+    /// only the verdict and summary, pinned to `commitID`.
     ///
     /// - Parameters:
     ///   - pr: The pull request being reviewed, used for its host.
     ///   - context: The PR's node ID and pending review, from `reviewContext(for:)`.
     ///   - event: The verdict.
     ///   - body: The review summary's Markdown source; empty to submit without one.
+    ///   - commitID: The head commit of the diff the user saw.
     /// - Throws: `GitHubCLIError.failed` if `gh` fails, for example when GitHub requires a summary for the verdict or
     ///   when the viewer tries to approve or request changes on their own PR.
     @concurrent
-    public func submitReview(on pr: PullRequest, context: ReviewContext, event: ReviewEvent, body: String) async throws {
-        var strings = ["event": event.rawValue]
-        if !body.isEmpty { strings["body"] = body }
-        if let reviewID = context.pendingReviewID {
-            strings["review"] = reviewID
-            _ = try await graphQL(
-                """
-                mutation($review: ID!, $event: PullRequestReviewEvent!, $body: String) {
-                  submitPullRequestReview(input: {pullRequestReviewId: $review, event: $event, body: $body}) { pullRequestReview { id } }
-                }
-                """, host: pr.host, strings: strings)
-        } else {
-            strings["pr"] = context.pullRequestID
-            _ = try await graphQL(
-                """
-                mutation($pr: ID!, $event: PullRequestReviewEvent!, $body: String) {
-                  addPullRequestReview(input: {pullRequestId: $pr, event: $event, body: $body}) { pullRequestReview { id } }
-                }
-                """, host: pr.host, strings: strings)
-        }
+    public func submitReview(
+        on pr: PullRequest, context: ReviewContext, event: ReviewEvent, body: String, commitID: String
+    ) async throws {
+        let request = Self.submitReviewRequest(context: context, event: event, body: body, commitID: commitID)
+        _ = try await graphQL(request.query, host: pr.host, strings: request.strings)
     }
 
     /// Deletes a pending review and all its draft comments.

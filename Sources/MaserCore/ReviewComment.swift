@@ -261,6 +261,18 @@ public struct ReviewContext: Hashable, Sendable {
         }
         """
 
+    /// Checks that the PR's head is still the commit the user's diff was loaded at.
+    ///
+    /// GitHub places a new review thread on the PR's current head, whatever commit its review is pinned to, so a line
+    /// number from an older diff could land on a different line. Call this on a freshly fetched context just before
+    /// posting.
+    ///
+    /// - Parameter seen: The head commit of the diff the user saw.
+    /// - Throws: `GitHubCLIError.headMoved` if the head is a different commit.
+    public func requireHead(_ seen: String) throws {
+        guard headCommitID == seen else { throw GitHubCLIError.headMoved(seen: seen, current: headCommitID) }
+    }
+
     /// Decodes the `gh api graphql` response to `query`.
     ///
     /// - Parameter data: The response's JSON.
