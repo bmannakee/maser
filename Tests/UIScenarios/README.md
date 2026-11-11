@@ -30,7 +30,8 @@ simulated, and neither is anything outside the app, such as a link opening the b
 
 Menu items that depend on the focused window (Refresh and Filter Pull Requests were checked) stay disabled in the test
 app, even with its window key, so scenarios use the vim-style keys for those commands (`r`, not ⌘R). Menu items that are
-always enabled, such as ⌘0, work.
+always enabled, such as ⌘0, work. In normal use these items work (checked by hand on 2026-11-10), so this is a limit of the
+test app, not an app bug.
 
 ## Writing a scenario
 
