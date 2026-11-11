@@ -7,10 +7,11 @@
 // replays recordings; scenarios can override its answers and read the commands it was sent. Only debug builds have
 // any of this.
 
+import SwiftUI
+
 #if DEBUG
     import AppKit
     import MaserCore
-    import SwiftUI
 
     /// What a scenario can see of a main window besides its `MainWindowState`: the view's own state.
     @MainActor
@@ -188,29 +189,6 @@
                 post(character == "\n" ? KeyChord(.enter) : KeyChord(character))
             }
             await settle()
-        }
-
-        /// The text the window, or its sheet, shows: the labels, titles and string values of its accessibility elements.
-        ///
-        /// - Parameter sheet: Read the window's attached sheet instead of the window.
-        /// - Returns: The texts, in tree order.
-        func visibleText(sheet: Bool = false) -> [String] {
-            var texts: [String] = []
-            /// Collects an element's texts, then its children's.
-            func walk(_ element: Any, depth: Int) {
-                guard depth < 80, let element = element as? NSAccessibilityProtocol else { return }
-                let own = [
-                    element.accessibilityLabel(), element.accessibilityTitle(), element.accessibilityValue() as? String,
-                ]
-                texts += own.compactMap { $0 }.filter { !$0.isEmpty }
-                for child in element.accessibilityChildren() ?? [] { walk(child, depth: depth + 1) }
-            }
-            if sheet {
-                if let attached = window.attachedSheet { walk(attached, depth: 0) }
-            } else {
-                walk(window, depth: 0)
-            }
-            return texts
         }
 
         /// Posts one chord as a key-down event to the window, or to its sheet if one is showing, as typing would.
@@ -426,4 +404,35 @@
             try JSONEncoder().encode(overrides).write(to: ghState.appending(path: "overrides.json"))
         }
     }
+    /// The text some views show, by name, recorded only while a UI scenario runs, so scenarios can check wording.
+    @MainActor
+    enum ShownText {
+        /// Whether views record their text: only in a scenario run.
+        static let isEnabled = ProcessInfo.processInfo.environment["MASER_UI_SCENARIO"] != nil
+        /// The latest text each named view showed.
+        static var values: [String: String] = [:]
+    }
+
 #endif
+
+// Outside `#if DEBUG` so views can call it; release builds return the view unchanged.
+extension View {
+    /// Records the text this view shows in `ShownText` while a UI scenario runs; does nothing otherwise.
+    ///
+    /// - Parameters:
+    ///   - name: What the text is, such as `comment-button`.
+    ///   - text: The text the view shows.
+    /// - Returns: The view, recording its text when enabled.
+    @ViewBuilder
+    func shownText(_ name: String, _ text: String) -> some View {
+        #if DEBUG
+            if ShownText.isEnabled {
+                onChange(of: text, initial: true) { _, text in ShownText.values[name] = text }
+            } else {
+                self
+            }
+        #else
+            self
+        #endif
+    }
+}

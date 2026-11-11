@@ -194,6 +194,8 @@
             "post-comment", "REQ-OVR-004, REQ-GH-004: Posts a comment with ⌘Return; a failed post shows why and keeps it"
         ) { app in
             try await app.openFromQueue(testPR)
+            // Maser won't post until it has shown which account it posts as.
+            try await app.waitUntil("the account is shown") { app.review?.postingAccount != nil }
             try app.overrideGH([
                 .init(match: ["--method", "POST", "issues/\(testPR)/comments"], status: 0, stdout: "{}", stderr: nil)
             ])
@@ -333,8 +335,8 @@
             try await app.waitUntil("the comment box has focus") { app.responder == .editor }
             await app.type("Hello.")
             try app.expect(
-                app.visibleText().contains("Comment as @\(account)"), "the Comment button names the account",
-                "\(app.visibleText().filter { $0.contains("Comment") })")
+                ShownText.values["comment-button"] == "Comment as @\(account)", "the Comment button names the account",
+                "\(ShownText.values)")
 
             // `gh auth switch` to another account while Maser is open.
             let other = "someone-else"
@@ -352,8 +354,8 @@
             try app.expect(posts().isEmpty, "nothing was posted", "\(posts().map(\.args))")
             try app.expect(review.commentDraft == "Hello.", "the text is kept", app.summary)
             try app.expect(
-                app.visibleText().contains("Comment as @\(other)"), "the Comment button now names the new account",
-                "\(app.visibleText().filter { $0.contains("Comment") })")
+                ShownText.values["comment-button"] == "Comment as @\(other)", "the Comment button now names the new account",
+                "\(ShownText.values)")
 
             try app.overrideGH([
                 switched,
@@ -365,12 +367,21 @@
             }
 
             try await app.press("esc")
+            try await app.press("g f")
+            try await app.waitUntil("the Files tab shows a file") { review.selectedFile != nil }
+            for _ in 0..<3 { try await app.press("j") }
+            try await app.press("c")
+            try await app.waitUntil("the line comment's button names the account") {
+                ShownText.values["inline-post-button"] == "Start a review as @\(other)"
+            }
+            try await app.press("esc")
             try await app.press("S")
             try await app.waitUntil("Finish Review opens") { review.isFinishingReview }
-            let sheet = app.visibleText(sheet: true)
             let names = "\(review.pr.repository.nameWithOwner) #\(review.pr.number): \(review.pr.title)"
-            try app.expect(sheet.contains(names), "Finish Review names the PR", "\(sheet)")
-            try app.expect(sheet.contains("Posting as @\(other)"), "Finish Review names the account", "\(sheet)")
+            try await app.waitUntil("Finish Review names the PR and the account") {
+                ShownText.values["finish-review-pr"] == names
+                    && ShownText.values["finish-review-account"] == "Posting as @\(other)"
+            }
             try await app.press("esc")
         }
 

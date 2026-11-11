@@ -41,6 +41,9 @@ test app, not an app bug.
    `app.openFromQueue(number)`. Check with `app.expect(condition, "what it means", app.summary)`, or
    `app.waitUntil("what it means") { condition }` for anything asynchronous.
 3. Make GitHub fail or answer a mutation with `app.overrideGH([...])`, and read what was sent from `app.ghCalls`.
+   To check wording, a view records the text it shows with `.shownText("name", text)` (only during a scenario), and the
+   scenario reads `ShownText.values["name"]`. SwiftUI doesn't put most of the review's views in the accessibility tree,
+   so reading the screen that way doesn't work.
 4. Cite it from each requirement as `UI:name`, before any `Gap`. `maser-trace` checks both directions.
 5. Run it with `--record` once to record any GitHub data it needs, then without, and commit the new recordings.
 

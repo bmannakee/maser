@@ -624,6 +624,7 @@ private struct InlineComposer: View {
                     Button(primaryTitle(draft)) {
                         Task { await model.postInlineDraft() }
                     }
+                    .shownText("inline-post-button", primaryTitle(draft))
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
                     .disabled(draft.isPosting || draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

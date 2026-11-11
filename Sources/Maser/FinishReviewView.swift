@@ -22,10 +22,14 @@ struct FinishReviewView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Finish your review").font(.title3.bold())
                 // Named here because the queue's selection and the open PR can differ (HAZ-04, HAZ-05).
-                Text("\(model.pr.repository.nameWithOwner) #\(model.pr.number): \(model.pr.title)")
+                let prName = "\(model.pr.repository.nameWithOwner) #\(model.pr.number): \(model.pr.title)"
+                Text(prName)
                     .lineLimit(2)
-                Text(model.postingAccount.map { "Posting as @\($0)" } ?? "Checking which account gh will post as…")
+                    .shownText("finish-review-pr", prName)
+                let account = model.postingAccount.map { "Posting as @\($0)" } ?? "Checking which account gh will post as…"
+                Text(account)
                     .foregroundStyle(.secondary)
+                    .shownText("finish-review-account", account)
                 Text(pendingDescription).foregroundStyle(.secondary)
             }
 
