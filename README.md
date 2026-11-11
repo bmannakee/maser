@@ -44,7 +44,9 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   Move the line cursor with `j`/`k` (or click the line numbers), select a range with `V` (or shift-click), and press `c` to comment;
   `R` replies to the selected thread. Line comments collect in a pending review, visible only to you, until you
   **Finish Review** (`S`, toolbar) as Comment, Approve or Request changes. Replies join the pending review if you have one;
-  otherwise they post immediately (GitHub's rule).
+  otherwise they post immediately (GitHub's rule). If someone pushes after the diff loaded, Maser won't post a line
+  comment or submit the review until you refresh (`r`), so nothing lands on a line or commit you haven't seen. A line
+  comment then needs `c` on its line again; the text is kept.
   `z a` shows the whole file instead of just the changed hunks (`z R` for every file, `z M` to go back); hunk
   navigation still jumps between the changes. GitHub only takes comments on lines in the diff, so the extra lines are
   for reading.

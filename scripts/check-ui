@@ -17,7 +17,9 @@ if [ "${1:-}" = "--record" ]; then
 fi
 scenarios="$*"
 if [ -z "$scenarios" ]; then
-    scenarios="$(sed -n 's/^ *"\([a-z0-9-]*\)", "REQ-.*/\1/p' Sources/Maser/UIScenarios.swift)"
+    # The first quoted name after each `= UIScenario(`, on the same line or the next.
+    scenarios="$(awk '/= UIScenario\(/ { want = 1 } want && match($0, /"[a-z0-9-]+"/) {
+        print substr($0, RSTART + 1, RLENGTH - 2); want = 0 }' Sources/Maser/UIScenarios.swift)"
 fi
 
 # A locked screen leaves loginwindow frontmost, and then no app can become active.

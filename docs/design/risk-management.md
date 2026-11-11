@@ -73,7 +73,7 @@ Each row lists:
 | ID | Hazard and sequence of events | Harm | Initial | Controls | Residual |
 | --- | --- | --- | --- | --- | --- |
 | HAZ-01 | The diff Maser shows doesn't match the PR: a parse error, a truncated list, a mangled path, or a full-file merge that doesn't fit. The user approves code they didn't actually see. | H1 | S4 P3 **High** | RC-01, RC-02, RC-03 | S4 P1 Medium |
-| HAZ-02 | The PR's head moves (a new push) after Maser loaded the diff. A line comment posted with old line numbers lands on a different line of the new head, or an approval covers commits the user never saw. Maser neither pins the commit nor warns. | H1, H6 | S4 P3 **High** | RC-04 (*proposed*), RC-17 (partial) | **S4 P3 High: open** |
+| HAZ-02 | The PR's head moves (a new push) after Maser loaded the diff. A line comment posted with old line numbers lands on a different line of the new head, or an approval covers commits the user never saw. | H1, H6 | S4 P3 **High** | RC-04, RC-17 (partial) | S4 P1 Medium |
 | HAZ-03 | The user comments on a line that's only shown in the full-file view. GitHub silently creates nothing, and the user believes they raised the issue. | H6 | S3 P4 **High** | RC-05 | S3 P1 Low |
 | HAZ-04 | A key acts somewhere the user didn't expect. For example, `S`, `c` or Return acts on the open PR while the user is looking at a different, highlighted PR in the queue, or on the wrong pane. Several focus bugs of this kind were found on 2026-11-03 (V8–V10). | H2, H6 | S3 P4 **High** | RC-06, RC-12 (*proposed*) | S3 P2 Medium |
 | HAZ-05 | The wrong verdict is submitted, such as Approve instead of Comment, or on the wrong PR. | H2, H1 | S4 P2 Medium | RC-07, RC-12 (*proposed*) | S4 P1 Medium |
@@ -99,7 +99,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-01 | The diff parser is verified against the diff shapes GitHub produces: renames, binary files, the no-newline marker, quoted paths. | Inherent safety by design | REQ-DIF-001 | Implemented |
 | RC-02 | Every paged list is fetched in full, and truncation is detected rather than shown as complete. | Inherent safety by design | REQ-GH-003, REQ-OVR-001 | Implemented |
 | RC-03 | A full file is merged only if its contents match the diff; otherwise Maser shows an error. | Protective measure | REQ-DIF-002 | Implemented |
-| RC-04 | Comments and reviews are pinned to the head commit the user saw, with a warning and a reload when the head has moved. | Protective measure | REQ-CMT-007 | **Proposed** |
+| RC-04 | Comments and reviews are posted only for the head commit of the diff the user saw: reviews are pinned to it, and the head is checked just before each new line comment and submit, refusing with a refresh when it has moved. | Protective measure | REQ-CMT-007 | Implemented |
 | RC-05 | Expanded lines can't take comments, and say why. A comment GitHub doesn't create is shown as an error. | Protective measure | REQ-DIF-003, REQ-CMT-005 | Implemented |
 | RC-06 | Key ownership is explicit. The window tracks whether the queue or the review has the keys, the open PR is marked, vim keys pause while typing, and `/` acts only in the queue. | Protective measure | REQ-WIN-002, REQ-WIN-003, REQ-KEY-002, REQ-KEY-003 | Implemented |
 | RC-07 | The verdict starts at Comment every time and must be chosen explicitly. Submitting takes a button or ⌘↩ in the sheet. | Protective measure | REQ-CMT-003 | Implemented |
@@ -125,6 +125,11 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
   Further reduction would mean independent verification of the diff against the GitHub web view, or of `gh` itself,
   which isn't practicable for a client of `gh`. GitHub's own branch protection and other reviewers remain controls on
   H1.
+- **HAZ-02:** Medium because the harm is Critical, even at Improbable. GitHub places a new line comment on the PR's
+  current head whatever commit its review is pinned to (found by L:LiveReviewWriteTests.reviewIsPinnedToCommitSeen), so
+  RC-04 checks the head immediately before each post. A push in the second between that check and the post isn't
+  caught. A review started at an older commit is submitted for that commit, which covers less than the user saw, not
+  more.
 - **HAZ-04:** Medium until RC-12 names the PR when posting. The key-routing controls (RC-06) are verified by the repeatable
   scenarios UI:key-routing, UI:queue-keys and UI:typing-pauses-keys; mouse clicks are still checked only by hand.
 - **HAZ-11:** Medium. A "loaded at" indicator on the Overview would reduce it further. It's recorded as a candidate
@@ -134,13 +139,13 @@ The open risks need further controls before Maser is relied on for review at wor
 
 | Hazard | Residual | Needs | Issue |
 | --- | --- | --- | --- |
-| HAZ-02 | High | RC-04: pin comments and reviews to the commit seen, and warn when the head has moved | #18 |
 | HAZ-07 | Medium | RC-10: keep unsent text across crashes and quits | #19 |
 | HAZ-10 (and HAZ-04, HAZ-05) | Medium | RC-12: name the PR and account when posting | #20 |
 | HAZ-12 | Low (observation) | Timeouts on `gh` calls, which have none today, so a hung `gh` loads forever | #21 |
 
-**Overall residual risk:** not yet acceptable for use at work, because HAZ-02 is High. It is acceptable for personal
-use, where reviews carry less weight, provided the user reloads before submitting.
+**Overall residual risk:** no residual risk is High since RC-04 (2026-11-10). Before Maser is relied on for review at
+work, the open Medium risks above need their controls: RC-12 for HAZ-10 and RC-10 for HAZ-07. It is acceptable for
+personal use.
 
 ## Production and post-production
 

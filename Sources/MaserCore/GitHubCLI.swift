@@ -21,6 +21,8 @@ public enum GitHubCLIError: Error, LocalizedError {
     case rejected(String)
     /// A file was too big to show in full.
     case fileTooLarge(path: String, bytes: Int)
+    /// The PR's head moved after the diff was loaded, so posting would apply to commits the user hasn't seen.
+    case headMoved(seen: String, current: String)
 
     /// A user-facing message; for `failed`, it includes the error output from `gh`.
     public var errorDescription: String? {
@@ -40,6 +42,11 @@ public enum GitHubCLIError: Error, LocalizedError {
             message
         case let .fileTooLarge(path, bytes):
             "\(path) is too large to show in full (\(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)))."
+        case let .headMoved(seen, current):
+            """
+            New commits were pushed since this diff loaded (\(seen.prefix(7)) → \(current.prefix(7))), so nothing was \
+            posted. Refresh to review them; your text is kept.
+            """
         }
     }
 }

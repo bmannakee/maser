@@ -79,6 +79,44 @@ import Testing
     }
 }
 
+/// Pinning comments and reviews to the commit whose diff the user saw (RC-04).
+@Suite struct CommitPinningTests {
+    let context = ReviewContext(
+        pullRequestID: "PR_1", pendingReviewID: nil, headCommitID: "4e5b8e054d5da90dc647db34891d6247c454f495")
+
+    @Test("REQ-CMT-007: Posting is refused once the head has moved") func refusesAfterHeadMoved() throws {
+        try context.requireHead("4e5b8e054d5da90dc647db34891d6247c454f495")
+        let error = #expect(throws: GitHubCLIError.self) { try context.requireHead("4a3f86d") }
+        guard case let .headMoved(seen, current) = error else {
+            Issue.record("expected headMoved, got \(String(describing: error))")
+            return
+        }
+        #expect(seen == "4a3f86d" && current == context.headCommitID)
+        let message = GitHubCLIError.headMoved(seen: "4a3f86d1f098", current: "4e5b8e054d5d").errorDescription ?? ""
+        #expect(message.contains("4a3f86d → 4e5b8e0") && message.contains("your text is kept"))
+    }
+
+    @Test("REQ-CMT-007: A new review is pinned to the commit seen") func startPinsCommit() {
+        let strings = GitHubCLI.startReviewVariables(pullRequestID: "PR_1", commitID: "4a3f86d")
+        #expect(strings == ["pr": "PR_1", "commit": "4a3f86d"])
+        #expect(GitHubCLI.startReviewMutation.contains("commitOID: $commit"))
+    }
+
+    @Test("REQ-CMT-007: A verdict without a pending review is pinned to the commit seen") func submitPinsCommit() {
+        let request = GitHubCLI.submitReviewRequest(context: context, event: .approve, body: "", commitID: "4a3f86d")
+        #expect(request.strings == ["pr": "PR_1", "commit": "4a3f86d", "event": "APPROVE"])
+        #expect(request.query.contains("addPullRequestReview(input: {pullRequestId: $pr, commitOID: $commit"))
+    }
+
+    @Test("REQ-CMT-007: A pending review is submitted as pinned when it started") func submitPendingReview() {
+        var pending = context
+        pending.pendingReviewID = "PRR_9"
+        let request = GitHubCLI.submitReviewRequest(context: pending, event: .comment, body: "Looks good", commitID: "4a3f86d")
+        #expect(request.strings == ["review": "PRR_9", "event": "COMMENT", "body": "Looks good"])
+        #expect(request.query.contains("submitPullRequestReview"))
+    }
+}
+
 /// Tests for turning a diff selection into the line or range GitHub attaches a comment to.
 @Suite struct CommentTargetTests {
     /// A file with two hunks: IDs 0 (header) and 1–4, then 5 (header), 6–8 and a no-newline marker (9).
@@ -204,7 +242,8 @@ struct LiveGitHubTests {
 /// Tests that write to GitHub, on the closed test PR `bmannakee/maser#1`.
 ///
 /// They create a pending review, visible only to you, then delete it. Run with `MASER_LIVE_WRITE_TESTS=1 swift test`.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["MASER_LIVE_WRITE_TESTS"] != nil))
+/// They run one at a time, because GitHub allows only one pending review per user per PR.
+@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["MASER_LIVE_WRITE_TESTS"] != nil))
 struct LiveReviewWriteTests {
     /// Runs a pending review through its whole life, checking GitHub's state after each step.
     ///
@@ -223,8 +262,10 @@ struct LiveReviewWriteTests {
         var context = try await cli.reviewContext(for: pr)
         if let stale = context.pendingReviewID {
             try await cli.discardReview(on: pr, reviewID: stale)
+            context.pendingReviewID = nil
         }
-        let reviewID = try await cli.startReview(on: pr, pullRequestID: context.pullRequestID)
+        let reviewID = try await cli.startReview(
+            on: pr, pullRequestID: context.pullRequestID, commitID: context.headCommitID)
         context.pendingReviewID = reviewID
         let started = try await cli.reviewContext(for: pr)
         #expect(started == context)
@@ -259,5 +300,56 @@ struct LiveReviewWriteTests {
         let finalContext = try await cli.reviewContext(for: pr)
         #expect(remaining.isEmpty)
         #expect(finalContext.pendingReviewID == nil)
+    }
+
+    /// Pins a review to PR #1's first commit, and checks what GitHub records.
+    ///
+    /// The review keeps the older commit, but a thread added to it lands on the PR's head. That's why Maser checks the
+    /// head before each new thread instead of relying on the review's commit.
+    @Test("REQ-CMT-007: A review is pinned to the commit seen; new threads land on the head")
+    func reviewIsPinnedToCommitSeen() async throws {
+        let cli = GitHubCLI()
+        let pr = try await cli.pullRequest(url: URL(string: "https://github.com/bmannakee/maser/pull/1")!)
+        let older = "4a3f86d1f0981128efd0a35f624f863f89384f2e"
+        var (_, context) = try await cli.diffAtHead(for: pr)
+        #expect(context.headCommitID != older)
+        if let stale = context.pendingReviewID {
+            try await cli.discardReview(on: pr, reviewID: stale)
+            context.pendingReviewID = nil
+        }
+
+        let reviewID = try await cli.startReview(on: pr, pullRequestID: context.pullRequestID, commitID: older)
+        do {
+            let target = CommentTarget(path: "COMMENT-TEST.md", side: .right, line: 1, startSide: nil, startLine: nil)
+            try await cli.addReviewThread(on: pr, reviewID: reviewID, target: target, body: "pinning")
+            let data = try await cli.graphQL(
+                """
+                query($review: ID!) {
+                  node(id: $review) { ... on PullRequestReview { commit { oid } comments(first: 5) { nodes { commit { oid } } } } }
+                }
+                """, host: pr.host, strings: ["review": reviewID])
+            /// The parts of the response the test reads.
+            struct Response: Decodable {
+                struct Payload: Decodable { let node: Review }
+                struct Review: Decodable {
+                    struct Commit: Decodable { let oid: String }
+                    struct Comments: Decodable { let nodes: [Comment] }
+                    struct Comment: Decodable { let commit: Commit }
+                    let commit: Commit
+                    let comments: Comments
+                }
+                let data: Payload
+            }
+            let review = try JSONDecoder().decode(Response.self, from: data).data.node
+            #expect(review.commit.oid == older)
+            #expect(review.comments.nodes.map(\.commit.oid) == [context.headCommitID])
+
+            let current = try await cli.reviewContext(for: pr)
+            #expect(throws: GitHubCLIError.self) { try current.requireHead(older) }
+        } catch {
+            try await cli.discardReview(on: pr, reviewID: reviewID)
+            throw error
+        }
+        try await cli.discardReview(on: pr, reviewID: reviewID)
     }
 }
