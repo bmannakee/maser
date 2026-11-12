@@ -11,6 +11,8 @@ Each requirement lists:
 - **Status:**
   - `Implemented`: built and in `main`.
   - `Proposed`: a risk control not built yet. It has an issue, and its hazard's residual risk depends on it.
+  - `Planned`: part of a feature not built yet, with an issue. It's a design input, drafted before the feature is
+    built; its "Verified by" cell says how it will be verified.
 
 Reference forms are explained in [README.md](README.md#identifiers).
 
@@ -86,6 +88,36 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-CMT-007 | Line comments and reviews are posted only for the head commit of the diff the user saw. The diff and that commit are loaded together, and a load during a push is retried. A review is pinned to the commit (`commitOID`). Just before a new line comment or a submit, Maser checks the PR's head; if it has moved, nothing is posted, the text is kept, and Maser says to refresh. A line comment placed on an older diff must be placed again after the refresh. | UN-3, UN-8 | RC-04 | T:CommitPinningTests, L:LiveReviewWriteTests.reviewIsPinnedToCommitSeen, UI:head-moved-blocks-posting | Implemented |
 | REQ-CMT-008 | Unsent text, meaning the conversation comment, line comment or reply drafts, and the review summary, survives a crash or quit and is restored when the PR is opened again. It is saved as it's typed, and each part is cleared once it's posted or discarded. | UN-9 | RC-10 | T:UnsentTextTests, UI:draft-survives-relaunch | Implemented |
 | REQ-CMT-009 | Every place that posts names the GitHub account it will post as: the comment boxes' post buttons ("Comment as @login") and Finish Review, which also names the PR (repository, number and title). The account is read from GitHub at each load and again just before each post; if it isn't the one shown, nothing is posted, the text is kept, and the new account is shown, so posting again posts as it. | UN-8 | RC-12 | T:ReviewThreadTests.decodesReviewContext, T:PostingAccountTests, L:LiveGitHubTests.namesGHAccount, UI:names-pr-and-account | Implemented |
+
+## Review agent (AGT)
+
+Planned (#32). The design is in [review-agent.md](review-agent.md).
+
+| ID | Requirement | Need | Control | Verified by | Status |
+| --- | --- | --- | --- | --- | --- |
+| REQ-AGT-001 | The review has an Agent pane with a conversation about the open PR. The user types a message and the agent's reply streams in. Each PR has its own conversation, which survives a quit and can be cleared. Stop interrupts a reply. | UN-11 | — | Planned: UI:agent-conversation, against a fake `claude` that replays recordings. | Planned (#32) |
+| REQ-AGT-002 | Maser runs the agent by starting the user's own `claude` CLI headless (`--print`, stream-json in and out). It never reads, stores or sends an Anthropic credential. `claude` is found as `gh` is (`[agent] claude`, then the usual install locations). If it's missing or signed out, the pane says so and how to fix it. | UN-11, UN-14 | RC-22 | Planned: T for the command line Maser builds; I: no code handles a credential. | **Proposed** (#32) |
+| REQ-AGT-003 | The agent's tools are fixed by Maser. It gets only `Read`, `Grep` and `Glob`, limited to its checkout, and Maser's own tools: the PR's context (description, diff, threads), adding a review comment, and drawing on the canvas. It gets no shell, no web, no file writes and no other MCP servers (`--tools`, `--strict-mcp-config`). Settings, hooks, agents and MCP servers from the PR's repository are never loaded (`--setting-sources` excludes project and local). | UN-14 | RC-22 | Planned: T for the command line; a live test in a checkout with a planted `.claude/settings.json` hook, which must not run. | **Proposed** (#32) |
+| REQ-AGT-004 | The agent reads a checkout of the PR's head commit that Maser keeps for it in its own Application Support folder. Maser makes it from the user's local clone, used only as a read-only object source, when one is found, and otherwise fetches it with `gh`. Maser never runs a git command that writes to the user's clone. | UN-11, UN-14 | RC-23 | Planned: T for the git commands planned, in a temporary repository; I: no write commands target the user's clone. | **Proposed** (#32) |
+| REQ-AGT-005 | The agent is off for a PR unless `[agent] allow` names the PR's owner (`bmannakee`), owner and host (`github.example.com/team`) or host (`github.example.com`). Otherwise the pane says why, and names the setting to change. The pane always shows what the agent can read: the repository, commit and checkout path. | UN-14 | RC-24 | Planned: T for matching; UI:agent-off-until-allowed. | **Proposed** (#32) |
+| REQ-AGT-006 | A conversation is about one commit, the head of the diff the user loaded. When a refresh finds a new head, the pane marks the conversation and its diagrams as about the older commit, and a new message moves the checkout to the new head first, telling the agent what changed. | UN-11 | RC-25 | Planned: T for the commit bookkeeping; UI:agent-follows-head. | **Proposed** (#32) |
+| REQ-AGT-007 | The agent's only GitHub write is adding a line comment to the viewer's pending review, through the same path as the user's comments: on a line in the diff, for the commit it saw (REQ-CMT-007), as the account shown (REQ-CMT-009). Maser records which comments the agent added, shows them with an Agent badge, and counts them in Finish Review. Submitting with agent comments the user hasn't opened asks first, naming how many. | UN-13 | RC-26 | Planned: T for the record of agent comments; UI:agent-comments-marked; a live write test adding a comment to bmannakee/maser#1 and removing it. | **Proposed** (#32) |
+| REQ-AGT-008 | The agent can't submit, approve, request changes, reply to threads, resolve them, post to the conversation, or delete or edit comments. None of its tools does any of these. | UN-8, UN-14 | RC-22 | Planned: a unit test that the tool list names no other write; I: Maser's tool handlers. | **Proposed** (#32) |
+| REQ-AGT-009 | Each turn has a spending cap, `[agent] max_budget_usd` (`--max-budget-usd`). The pane shows each turn's cost and the conversation's total. | UN-11 | — | Planned: T for the setting and the command line. | Planned (#32) |
+| REQ-AGT-010 | Everything the agent does is shown in the conversation as it happens: each file it reads, search it runs, comment it adds and diagram it draws, with the inputs. | UN-11, UN-14 | RC-27 | Planned: UI:agent-conversation (tool calls listed). | **Proposed** (#32) |
+
+## Canvas (CNV)
+
+Planned (#32).
+
+| ID | Requirement | Need | Control | Verified by | Status |
+| --- | --- | --- | --- | --- | --- |
+| REQ-CNV-001 | A canvas beside the conversation shows the diagrams the agent draws. Each PR keeps its diagrams, newest first, and any can be opened again, zoomed, panned, or shown in a window of its own. | UN-12 | — | Planned: UI:canvas-shows-diagram. | Planned (#32) |
+| REQ-CNV-002 | Diagrams are declarative: Mermaid or Graphviz DOT source, which Maser checks and renders with bundled copies of their libraries. The canvas is a web view with no network access whose only script is the bundled renderer. It never runs script or HTML from the agent. | UN-12, UN-14 | RC-28 | Planned: T for checking diagram source; UI:canvas-rejects-script (a diagram carrying script or a remote link is refused, and nothing loads). | **Proposed** (#32) |
+| REQ-CNV-003 | Each diagram element may cite its source as a path and line range at the commit. Maser checks every citation against the checkout, flags any that don't resolve, and labels a diagram that cites nothing as unsourced. Choosing an element opens its lines: in the Files tab when they're in the diff, otherwise read-only from the checkout. | UN-12, UN-3 | RC-29 | Planned: T for resolving citations; UI:canvas-follows-citation. | **Proposed** (#32) |
+| REQ-CNV-004 | The agent marks elements as added, removed or changed. Maser checks each mark against the diff: an element marked changed whose cited lines the PR doesn't touch, or one citing changed lines that isn't marked, is flagged on the canvas. | UN-12, UN-3 | RC-29 | Planned: T for the check against a parsed diff. | **Proposed** (#32) |
+| REQ-CNV-005 | Every agent reply and diagram is labeled as the agent's, with the commit it describes. Nothing the agent does changes review state: it doesn't mark files viewed, resolve threads, or set the verdict. | UN-12, UN-3 | RC-30 | Planned: UI:canvas-shows-diagram (label and commit); I: no agent tool changes review state. | **Proposed** (#32) |
+| REQ-CNV-006 | The keyboard reaches the agent and canvas: commands to focus the conversation box, show or hide the pane, move between diagrams, and follow the selected element's citation. | UN-5 | — | Planned: UI:agent-keys. | Planned (#32) |
 
 ## Keyboard (KEY)
 

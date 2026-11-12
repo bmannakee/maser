@@ -8,6 +8,11 @@ Modeled on IEC 62304 §5.1. Draft 1, 2026-11-03.
 shows a PR's conversation, status and changes, and lets the user comment on lines, reply to threads, and submit a
 review with a verdict. It does everything through the user's own `gh` command-line client.
 
+**Planned (#32): a review agent.** A conversation with an agent about the open PR, which can read the PR's repository,
+add comments to the user's pending review, and draw diagrams of the change on a canvas. It runs through the user's own
+`claude` command-line client, as GitHub access runs through `gh`. The agent's output is an aid to reading the change,
+not a substitute for it: the diff stays the thing reviewed. See [review-agent.md](review-agent.md).
+
 **Intended user:** one experienced software engineer, the author, who works mostly from the keyboard with vim-style
 keys. See [usability.md](usability.md) for the full use specification.
 
@@ -70,6 +75,10 @@ itself. PR descriptions follow `AGENTS.md`:
 | TOMLDecoder | 0.4.5 (`Package.resolved`) | Parsing `config.toml` | Decode errors surface as `TOMLError`; the config banner reports them (`REQ-CFG-002`). |
 | SwiftUI and AppKit | macOS 26 / 27 SDKs | UI | Layout loops crashed the app when split views were nested, or with an inspector beside the file tree (`HAZ-07`, V5–V7). Focus doesn't always move when asked (V9). |
 | WebKit | macOS SDK | Rendering the conversation HTML | Untrusted content. Page JavaScript is disabled (`REQ-OVR-002`). |
+| Claude Code (`claude`), planned | 2.1.322 at home; work version unknown | The review agent (#32): the agent loop, file tools, the model connection and its login | Its command-line options and stream-json output can change; pinned by checking the version and by a fake for the UI scenarios. Loads settings and hooks from the working directory unless told not to (`HAZ-23`). |
+| Claude models, planned | Whatever `claude` is set to use | The agent's answers, comments and diagrams | Output can be wrong or steered by the content it reads (`HAZ-18`, `HAZ-20`). |
+| Mermaid and Graphviz (Viz.js), planned | To be chosen and pinned | Rendering diagrams on the canvas (#32) | Parser bugs and script in diagram source (`HAZ-24`). Bundled, never fetched. |
+| git, planned | Xcode command-line tools | The agent's checkout (#32) | Must never write to the user's clone (`HAZ-22`). |
 | Swift toolchain | 6.2 minimum; 6.4 at home | Build | The work Mac's version is unknown, so the minimum is checked by building against `swift-tools-version: 6.2`. |
 
 ## Configuration management
