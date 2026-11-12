@@ -15,6 +15,8 @@ import SwiftUI
 final class MainWindowState {
     /// The PR in the detail column, if any.
     private(set) var openPR: PullRequest?
+    /// Whether `openPR` was opened from the queue, rather than by URL, so it should close when it leaves the queue.
+    private var openedFromQueue = false
     /// The review of every PR shown in this window so far, kept so going back to one doesn't reload it.
     private var reviews: [PullRequest.ID: ReviewModel] = [:]
     /// Whether the sidebar is showing.
@@ -35,10 +37,32 @@ final class MainWindowState {
     ///   - pr: The pull request to show.
     ///   - takeKeys: Whether the review gets the keys. False while moving through the queue with keys, which shows
     ///     each PR without leaving the queue.
-    func open(_ pr: PullRequest, takeKeys: Bool = true) {
+    ///   - fromQueue: Whether it was chosen in the queue; such a PR closes when it leaves the queue.
+    func open(_ pr: PullRequest, takeKeys: Bool = true, fromQueue: Bool) {
         if reviews[pr.id] == nil { reviews[pr.id] = ReviewModel(pr: pr) }
         openPR = pr
+        openedFromQueue = fromQueue
+        if fromQueue { reviews[pr.id]?.leftQueue = false }
         if takeKeys { queueHasKeys = false }
+    }
+
+    /// Lets go of PRs that a queue refresh found gone, such as ones merged or closed.
+    ///
+    /// The open PR closes if it came from the queue, so the window doesn't keep showing a review that's over, and the
+    /// queue gets the keys. If its review has unsent text it stays open instead, marked as having left the queue, so
+    /// the text isn't hidden. Other reviews of gone PRs are dropped; any unsent text in them is saved (RC-10).
+    ///
+    /// - Parameter ids: The PRs that left the queue.
+    func queueDropped(_ ids: Set<PullRequest.ID>) {
+        for id in ids where id != openPR?.id { reviews[id] = nil }
+        guard let pr = openPR, openedFromQueue, ids.contains(pr.id), let review = reviews[pr.id] else { return }
+        if review.hasUnsentText {
+            review.leftQueue = true
+        } else {
+            openPR = nil
+            reviews[pr.id] = nil
+            queueHasKeys = true
+        }
     }
 
     /// Shows the sidebar and gives the queue the keys.
@@ -107,7 +131,7 @@ final class MainWindows {
     func show(_ pr: PullRequest, openWindow: OpenWindowAction) {
         if let (window, state) = frontmost() {
             bringForward(window)
-            state.open(pr)
+            state.open(pr, fromQueue: false)
         } else {
             pending = pr
             openWindow(id: MainView.windowID)
@@ -211,10 +235,17 @@ struct MainView: View {
             else { return }
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
-            state.open(pr, takeKeys: false)
+            state.open(pr, takeKeys: false, fromQueue: true)
+        }
+        // A PR merged or closed since the last refresh leaves the queue; don't keep showing it.
+        .onChange(of: queue.sections) { old, new in
+            let gone = QueueSection.removedPRs(from: old, to: new)
+            guard !gone.isEmpty else { return }
+            selection.subtract(gone)
+            state.queueDropped(gone)
         }
         .task {
-            if let pr = MainWindows.shared.takePending() { state.open(pr) }
+            if let pr = MainWindows.shared.takePending() { state.open(pr, fromQueue: false) }
             await openLaunchArguments()
         }
         #if DEBUG
@@ -353,7 +384,7 @@ struct MainView: View {
         if newWindow {
             prs.forEach { openWindow(value: $0) }
         } else if let pr = prs.first {
-            state.open(pr)
+            state.open(pr, fromQueue: true)
             focus = nil
         }
     }
@@ -389,7 +420,7 @@ struct MainView: View {
             if let pr = try? await cli.pullRequest(url: url) { prs.append(pr) }
         }
         guard let first = prs.first else { return }
-        state.open(first)
+        state.open(first, fromQueue: false)
         focus = nil
         prs.dropFirst().forEach { openWindow(value: $0) }
     }

@@ -148,6 +148,19 @@ extension QueueSection {
         let current = starts.last { $0 <= index } ?? 0
         return starts.last { $0 < current }
     }
+
+    /// Finds the PRs a refresh took out of the queue, such as ones merged or closed since the last load.
+    ///
+    /// A search that fails keeps its last results, so a failure never makes a PR look gone.
+    ///
+    /// - Parameters:
+    ///   - old: The sections before the refresh; `nil` before the first load.
+    ///   - new: The sections after it.
+    /// - Returns: The IDs of PRs in some section before and in none after.
+    public static func removedPRs(from old: [QueueSection]?, to new: [QueueSection]?) -> Set<PullRequest.ID> {
+        let ids = { (sections: [QueueSection]?) in Set((sections ?? []).flatMap { $0.prs ?? [] }.map(\.id)) }
+        return ids(old).subtracting(ids(new))
+    }
 }
 
 extension PullRequest {
