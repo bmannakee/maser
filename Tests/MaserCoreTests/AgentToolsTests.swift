@@ -221,12 +221,18 @@ struct LiveAgentTests {
         process.standardInput = input
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
+        // waitUntilExit needs a run loop, which a test's thread doesn't have; hear about the exit instead.
+        let (exited, exit) = AsyncStream<Void>.makeStream()
+        process.terminationHandler = { _ in
+            exit.yield()
+            exit.finish()
+        }
         try process.run()
         input.fileHandleForWriting.write(
             Data(AgentCommandLine.messageLine("Call pr_context, then reply with only the word that starts with MARKER.").utf8))
         try input.fileHandleForWriting.close()
         let data = try await Task.detached { try output.fileHandleForReading.readToEnd() ?? Data() }.value
-        process.waitUntilExit()
+        for await _ in exited { break }
 
         let events = String(decoding: data, as: UTF8.self).split(separator: "\n").flatMap { AgentEvent.decode(String($0)) }
         let started = events.compactMap { event -> AgentEvent.Session? in

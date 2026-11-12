@@ -491,7 +491,7 @@ final class AgentSession {
             selectedElement = nil
             showsCanvas = true
             save()
-            return AgentTools.Reply(text: drawn.replyText)
+            return AgentTools.Reply(text: drawn.replyText(renderedIDs: rendering.ids))
         } catch {
             return AgentTools.Reply(text: "The diagram wasn't shown: \(error.localizedDescription)", isError: true)
         }

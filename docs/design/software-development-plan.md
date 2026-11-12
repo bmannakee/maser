@@ -103,6 +103,7 @@ hazard in the risk file, and the PR that fixes it updates the risk file.
 | Integration, read | Live read tests | Before merging changes to GitHub access |
 | Integration, write | Live write tests on PR #1 only | Before merging changes to write paths |
 | Integration, agent | Live agent tests with the user's `claude` (`MASER_LIVE_AGENT_TESTS=1`) | Before merging changes to how the agent is run |
+| Evaluation, agent | The agent's accuracy on PRs with known answers (`MASER_LIVE_AGENT_EVAL=1`), recorded in `docs/verification/` | Before relying on the agent to review regulated software, and after changing its prompt, tools or model |
 | System (UI) | Scripted scenarios with a fake `gh` (`scripts/check-ui`, see `Tests/UIScenarios/README.md`) | Every PR that changes the app, on an unlocked Mac |
 | Validation | Use by the intended user | Before each release |
 

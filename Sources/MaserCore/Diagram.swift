@@ -215,12 +215,57 @@ public enum DiagramGrounding {
                     problems.append("is marked \(element.change?.rawValue ?? "") but the PR doesn't change \(text)")
                 }
             case .unchanged?, nil:
-                if touchesAdded { problems.append("cites lines the PR changes but isn't marked as changed") }
+                if touchesAdded,
+                    !Self.survivesEdits(element.id, lines: citation.lines, in: files.first { $0.path == citation.path })
+                {
+                    problems.append("cites lines the PR changes but isn't marked as changed")
+                }
             case .removed?:
                 break
             }
             return ElementFinding(id: element.id, problems: problems)
         }
+    }
+
+    /// Whether an element on edited lines was left alone by the edit: its name is on each added line it cites, and on a
+    /// removed line of the same hunk.
+    ///
+    /// One line can hold several elements, such as an enum's cases, and an edit to one of them doesn't change the
+    /// others. Found by the 2026-11-12 evaluation, where unchanged states on an edited enum line were flagged.
+    ///
+    /// - Parameters:
+    ///   - id: The element's name.
+    ///   - lines: The lines it cites, at the head.
+    ///   - file: The file's diff.
+    /// - Returns: True if every added line it cites still names it, as a removed line in that hunk did.
+    static func survivesEdits(_ id: String, lines: ClosedRange<Int>, in file: FileDiff?) -> Bool {
+        guard let file else { return false }
+        for hunk in file.hunks where !hunk.isExpansion {
+            let removedText = hunk.lines.filter { $0.kind == .deletion }.map(\.text)
+            for line in hunk.lines where line.kind == .addition && line.newLine.map(lines.contains) == true {
+                guard names(id, in: line.text), removedText.contains(where: { names(id, in: $0) }) else { return false }
+            }
+        }
+        return true
+    }
+
+    /// Whether text names an identifier as a whole word.
+    ///
+    /// - Parameters:
+    ///   - id: The identifier.
+    ///   - text: The text.
+    /// - Returns: True if `id` occurs with no letter, digit or underscore on either side.
+    static func names(_ id: String, in text: String) -> Bool {
+        guard !id.isEmpty else { return false }
+        let isWord = { (character: Character) in character.isLetter || character.isNumber || character == "_" }
+        var search = text[...]
+        while let range = search.range(of: id) {
+            let before = range.lowerBound == text.startIndex ? nil : text[text.index(before: range.lowerBound)]
+            let after = range.upperBound == text.endIndex ? nil : text[range.upperBound]
+            if !(before.map(isWord) ?? false) && !(after.map(isWord) ?? false) { return true }
+            search = text[range.upperBound...]
+        }
+        return false
     }
 
     /// Counts a file's lines in the checkout, refusing paths that lead outside it.

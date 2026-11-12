@@ -71,9 +71,14 @@ public enum AgentTools {
                                 "properties": [
                                     "id": [
                                         "type": "string",
-                                        "description": "A state's or node's name in the source, or edgeN for the Nth transition.",
+                                        "description":
+                                            "A state's or node's name in the source; or edgeN for an arrow, numbered from edge0 in the order arrows appear in the source, counting a [*] start arrow.",
                                     ],
-                                    "citation": ["type": "string", "description": "path:start-end at the head commit."],
+                                    "citation": [
+                                        "type": "string",
+                                        "description":
+                                            "path:start-end at the head commit. For an element marked removed, its old lines: the left-side numbers in pr_context's diff.",
+                                    ],
                                     "change": ["type": "string", "enum": ["added", "removed", "changed", "unchanged"]],
                                 ],
                                 "required": ["id"],
