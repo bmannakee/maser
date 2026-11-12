@@ -31,7 +31,7 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
 
 | Target | What goes there | May import |
 | --- | --- | --- |
-| `MaserCore` (library) | Models, parsing, GitHub access, keymap and config logic. Anything that can be unit tested. | Foundation, TOMLDecoder |
+| `MaserCore` (library) | Models, parsing, GitHub access, keymap and config logic, the review agent's logic and diagram rendering. Anything that can be unit tested. | Foundation, TOMLDecoder, JavaScriptCore (only to run the vendored Pele, `Vendor/pele`) |
 | `Maser` (executable) | SwiftUI views, AppKit glue, window and menu wiring, `@Observable` view models. | MaserCore, SwiftUI, AppKit, WebKit |
 | `MaserCoreTests` | Swift Testing tests for MaserCore. | MaserCore |
 | `Traceability`, `maser-trace` | Development tool: checks the links in `docs/design/` (see its README). Not part of the app. | Foundation |
