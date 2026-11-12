@@ -10,7 +10,7 @@ scripts/check-ui --record post-comment   # record what's missing, from the real 
 ```
 
 Run it before merging a PR that changes the app. It needs an unlocked screen, and each scenario takes over the keyboard
-and brings a window to the front for a few seconds, so leave the Mac alone while it runs. The test app is a separate
+and brings a window to the front for a few seconds, so leave the Mac alone while it runs. The script holds the display awake with `caffeinate` for the run, so the screen can't lock partway through, but it can't unlock one that is already locked. The test app is a separate
 bundle (`dev.maser.Maser.uitests`) with its own settings, so a Maser you're using isn't touched.
 
 ## How it works

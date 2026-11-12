@@ -8,6 +8,13 @@
 # touch a Maser you're using. --record sends commands that have no recording to the real gh, read-only, and saves
 # what it prints in Tests/UIScenarios/recordings. See Tests/UIScenarios/README.md.
 set -eu
+
+# Keep the display awake and the Mac from sleeping for the whole run, so the screen doesn't lock partway through.
+# This can't unlock a screen that is already locked; the check below still stops in that case.
+if [ -z "${MASER_CHECK_UI_AWAKE:-}" ]; then
+    MASER_CHECK_UI_AWAKE=1 exec caffeinate -dimsu "$0" "$@"
+fi
+
 cd "$(dirname "$0")/.."
 
 record=""
