@@ -80,10 +80,12 @@ Made with the user on 2026-11-12, in the review of #33.
   - `add_review_comment`: path, line or range, side, body. It runs the user's own posting path: `ReviewModel`'s head
     and account checks, and the comment target rules. Maser appends the attribution line; the agent can't leave it out.
   - `show_diagram`: format (`mermaid` or `dot`), source, title, and per-element citations and change marks.
-- **The checkout** (`AgentCheckout`, MaserCore). Maser keeps a bare clone per repository in Application Support. It
-  borrows objects from the user's local clone, opened read-only through git's alternates, and otherwise fetches with
-  `gh repo clone`. It checks out the head commit as a detached worktree with `core.symlinks=false`, so a link in the PR
-  arrives as a plain file holding its target's path, and makes its files read-only. Where a local
+- **The checkout** (`AgentCheckout`, MaserCore). Maser keeps a bare cache per repository in Application Support. It
+  fetches the commit from the user's local clone, which only reads it (git runs `upload-pack` there), and otherwise
+  from GitHub with `gh auth git-credential` as the credential helper for that one command. Fetching rather than
+  borrowing objects through git's alternates keeps the cache whole if the user's clone is cleaned up. It checks out the head commit as a detached worktree with `core.symlinks=false`, so a link in the PR
+  arrives as a plain file holding its target's path, with hooks off (a global post-checkout hook would run in the PR's
+  code), and makes its files read-only. Where a local
   clone lives comes from `[agent] repositories` (folders to search), matched by remote URL.
 - **Rendering** happens outside any page. Maser runs a bundled [Pele](https://github.com/obsidianmd/pele) (MIT, from
   Obsidian) in JavaScriptCore, which needs no DOM (V-2026-11-12/V9), with `links: false`, `images: false` and its size
