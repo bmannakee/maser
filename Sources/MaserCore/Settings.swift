@@ -1,8 +1,8 @@
 // The non-key settings in `config.toml`.
 //
 // Alongside the key bindings (see `Keymap`), the config file has a few plain settings: how the Files tab shows a file
-// at first, where `gh` is when the app can't find it, and the review queue's sections. `Settings.load(toml:)` reads them, falling back to defaults
-// and reporting problems the same way the keymap does.
+// at first, where `gh` is when the app can't find it, the review queue's sections, and the review agent's settings.
+// `Settings.load(toml:)` reads them, falling back to defaults and reporting problems the same way the keymap does.
 
 import Foundation
 import TOMLDecoder
@@ -23,6 +23,8 @@ public struct Settings: Equatable, Sendable {
     public var ghPath: String?
     /// The review queue's sections, in order: the built-ins `[queue] sections` picks, then `[queue] searches`.
     public var queueSearches = PullRequestSearch.builtIns.map(\.value)
+    /// The review agent's settings; the `[agent]` table.
+    public var agent = AgentSettings()
 
     /// The settings used when the config doesn't set them.
     public static let defaults = Settings()
@@ -38,7 +40,7 @@ public struct Settings: Equatable, Sendable {
         public let problems: [String]
     }
 
-    /// Reads the `[diff]`, `[github]` and `[queue]` tables from a config file.
+    /// Reads the `[diff]`, `[github]`, `[queue]` and `[agent]` tables from a config file.
     ///
     /// Unknown keys in those tables are reported; other tables are left to `Keymap.load(toml:)`.
     ///
@@ -79,6 +81,10 @@ public struct Settings: Equatable, Sendable {
         }
         if let queue = file.queue {
             settings.queueSearches = queueSearches(from: queue, problems: &problems)
+        }
+        if let agent = file.agent {
+            settings.agent = agent.settings
+            problems += agent.problems
         }
         return LoadResult(settings: settings, problems: problems)
     }
@@ -129,6 +135,78 @@ public struct Settings: Equatable, Sendable {
         let diff: [String: String]?
         let github: [String: String]?
         let queue: QueueTable?
+        let agent: AgentTable?
+    }
+
+    /// The `[agent]` table, read key by key so a wrong value is reported rather than failing the whole file.
+    private struct AgentTable: Decodable {
+        /// The settings read, starting from the defaults.
+        var settings = AgentSettings()
+        /// A message for each unknown key or bad value.
+        var problems: [String] = []
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: Keymap.AnyKey.self)
+            for key in container.allKeys.sorted(by: { $0.stringValue < $1.stringValue }) {
+                let name = "[agent] \(key.stringValue)"
+                switch key.stringValue {
+                case "claude":
+                    if let path = try? container.decode(String.self, forKey: key) {
+                        let trimmed = path.trimmingCharacters(in: .whitespaces)
+                        settings.claudePath = trimmed.isEmpty ? nil : trimmed
+                    } else {
+                        problems.append("\(name): expected a path in quotes")
+                    }
+                case "allow":
+                    if let entries = try? container.decode([String].self, forKey: key) {
+                        for entry in entries {
+                            if let rule = AgentSettings.AllowRule(entry) {
+                                settings.allow.append(rule)
+                            } else {
+                                problems.append(
+                                    "\(name): \"\(entry)\" isn't an owner (\"my-org\"), a host (\"github.example.com\") or a host and owner (\"github.example.com/my-org\")"
+                                )
+                            }
+                        }
+                    } else {
+                        problems.append("\(name): expected a list of owners or hosts, such as [\"my-org\"]")
+                    }
+                case "model":
+                    if let model = try? container.decode(String.self, forKey: key) {
+                        let trimmed = model.trimmingCharacters(in: .whitespaces)
+                        settings.model = trimmed.isEmpty ? nil : trimmed
+                    } else {
+                        problems.append("\(name): expected a model name in quotes, such as \"claude-opus-5-5\"")
+                    }
+                case "effort":
+                    let value = try? container.decode(String.self, forKey: key)
+                    if let effort = value.flatMap(AgentSettings.Effort.init(rawValue:)) {
+                        settings.effort = effort
+                    } else {
+                        let choices = AgentSettings.Effort.allCases.map { "\"\($0.rawValue)\"" }.joined(separator: ", ")
+                        problems.append("\(name): expected one of \(choices)")
+                    }
+                case "max_budget_usd":
+                    // TOML writes 2 and 2.0 differently; accept either.
+                    let amount =
+                        (try? container.decode(Double.self, forKey: key))
+                        ?? (try? container.decode(Int.self, forKey: key)).map(Double.init)
+                    if let amount, amount > 0 {
+                        settings.maxBudgetUSD = amount
+                    } else {
+                        problems.append("\(name): expected an amount in dollars above 0, such as 2.5")
+                    }
+                case "repositories":
+                    if let folders = try? container.decode([String].self, forKey: key) {
+                        settings.repositories = folders.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                    } else {
+                        problems.append("\(name): expected a list of folders, such as [\"~/dev\"]")
+                    }
+                default:
+                    problems.append("[agent] unknown setting \"\(key.stringValue)\"")
+                }
+            }
+        }
     }
 
     /// The `[queue]` table: which built-in sections to show, and custom searches.
@@ -173,6 +251,17 @@ public struct Settings: Equatable, Sendable {
         #   { name = "maser", query = "repo:bmannakee/maser" },
         #   { name = "Needs review", query = "org:my-org label:\\"needs review\\"" },
         # ]
+
+        # The review agent (planned), which runs your own claude command-line tool. It's off for every PR until
+        # allow names the PR's owner, a host, or a host and owner. Allow only code its owner lets you send to the
+        # model provider.
+        [agent]
+        # allow = ["my-name", "github.example.com/my-org"]
+        # claude = "/opt/homebrew/bin/claude"
+        # model = "claude-opus-5-5"
+        # effort = "high"
+        # max_budget_usd = 2.0
+        # repositories = ["~/dev"]
 
         """
 }

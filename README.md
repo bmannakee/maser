@@ -127,6 +127,12 @@ with TOML escapes: `query = "label:\"needs review\""`. Hover a section's heading
 
 Maser looks for `gh` in Homebrew, MacPorts, Nix, `~/.local/bin` and mise or asdf shims, then asks your login shell. Set `[github] gh` if it's somewhere else.
 
+The review agent (planned, #32; not usable yet) will be configured in `[agent]`. It runs your own `claude` and is off
+for every PR until `allow` names the PR's owner (`"my-name"`, on github.com), a host (`"github.example.com"`) or a host
+and owner (`"github.example.com/my-org"`). Allow only code whose owner lets you send it to the model provider. The other
+settings are `claude` (its path), `model`, `effort` (`low` to `max`), `max_budget_usd` (per turn; default 2) and
+`repositories` (folders holding your clones). See [docs/design/review-agent.md](docs/design/review-agent.md).
+
 Keys are characters (`j`, `J` for shift+j, `?`), named keys (`up`, `down`, `left`, `right`, `enter`, `tab`, `space`, `esc`, `backspace`, `delete`, `pageup`, `pagedown`, `home`, `end`), optionally with `ctrl+`, `opt+`, `shift+`, `cmd+` (menu shortcuts only). Binding keys to a command takes them away from whatever had them by default. Esc cancels a half-typed sequence.
 
 To debug bindings: `/usr/bin/log stream --predicate 'subsystem == "dev.maser"' --level debug`.
