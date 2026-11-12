@@ -20,6 +20,8 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
   allows `.macOS(.v26)`. Keep both minimums there: managed Macs may stay on macOS 26. A newer API needs an
   `if #available` check with a macOS 26 fallback.
 - `MASER_LIVE_TESTS=1 swift test` also runs read-only tests against real GitHub through `gh`.
+- `MASER_LIVE_AGENT_TESTS=1 swift test` runs the review agent's live tests with your own `claude` (after `swift build`,
+  for the helper). They spend a few cents of model use each.
 - `MASER_LIVE_WRITE_TESTS=1 swift test` writes to GitHub. It only touches the closed test PR bmannakee/maser#1
   and cleans up after itself. Write tests must never target any other PR.
 - Products land in `.build/out` (`.build/debug` is a symlink). For a truly clean build, `rm -rf .build`.
@@ -35,6 +37,7 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
 | `Traceability`, `maser-trace` | Development tool: checks the links in `docs/design/` (see its README). Not part of the app. | Foundation |
 | `TraceabilityTests` | Tests for the traceability checker. | Traceability |
 | `fake-gh` | Development tool: a stand-in for `gh` that replays `Tests/UIScenarios/recordings`, for the UI scenarios. | Foundation |
+| `maser-agent-tools` | The review agent's MCP helper, which `claude` starts; it forwards tool calls to Maser's socket. Shipped in the app bundle. | MaserCore, Foundation |
 
 Rules:
 
