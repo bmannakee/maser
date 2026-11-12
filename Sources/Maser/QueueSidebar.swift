@@ -261,7 +261,7 @@ private struct PullRequestRow: View {
         .padding(.leading, 6)
         .overlay(alignment: .leading) {
             // Marks the PR the detail column shows, which may not be the selected one.
-            if isOpen { Capsule().fill(Color.accentColor).frame(width: 3) }
+            if isOpen { Capsule().fill(Color.Brand.ruby).frame(width: 3) }
         }
     }
 }

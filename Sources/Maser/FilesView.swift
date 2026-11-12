@@ -148,8 +148,8 @@ private struct FileRow: View {
     /// The icon's color for the file's status.
     private var color: Color {
         switch file?.status {
-        case .added: .green
-        case .deleted: .red
+        case .added: Color.Brand.addInk
+        case .deleted: Color.Brand.delInk
         case .renamed: .orange
         case .modified, nil: .secondary
         }
@@ -381,7 +381,7 @@ private struct HunkHeaderRow: View {
             .padding(.vertical, 4)
             .padding(.leading, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.accentColor.opacity(0.08))
+            .background(Color.Brand.ruby.opacity(0.08))
     }
 }
 
@@ -428,10 +428,10 @@ private struct DiffLineRow: View, Equatable {
         .layoutProbe(probeKey, isText: false)
         .background(background)
         .overlay {
-            if isHighlighted { Color.accentColor.opacity(0.14).allowsHitTesting(false) }
+            if isHighlighted { Color.Brand.ruby.opacity(0.14).allowsHitTesting(false) }
         }
         .overlay(alignment: .leading) {
-            if isCursor { Color.accentColor.frame(width: 3).allowsHitTesting(false) }
+            if isCursor { Color.Brand.ruby.frame(width: 3).allowsHitTesting(false) }
         }
     }
 
@@ -443,12 +443,12 @@ private struct DiffLineRow: View, Equatable {
     private var gutterIcon: some View {
         if let pending = marker {
             Image(systemName: pending ? "text.bubble" : "text.bubble.fill")
-                .foregroundStyle(pending ? Color.orange : Color.accentColor)
+                .foregroundStyle(pending ? Color.Brand.beamInk : Color.Brand.ruby)
         } else if isCursor, line.commentSide != nil {
             Button {
                 model.startComment()
             } label: {
-                Image(systemName: "plus.bubble").foregroundStyle(Color.accentColor)
+                Image(systemName: "plus.bubble").foregroundStyle(Color.Brand.ruby)
             }
             .buttonStyle(.plain)
             .help("Comment on this line", .comment)
@@ -490,11 +490,11 @@ private struct DiffLineRow: View, Equatable {
         }
     }
 
-    /// The row's tint: green for additions, red for deletions.
+    /// The row's wash: green for additions, orange-red for deletions.
     private var background: Color {
         switch line.kind {
-        case .addition: .green.opacity(0.15)
-        case .deletion: .red.opacity(0.15)
+        case .addition: Color.Brand.addWash
+        case .deletion: Color.Brand.delWash
         case .context, .noNewlineMarker: .clear
         }
     }
@@ -623,7 +623,7 @@ private struct InlineComposer: View {
                     .background(.background, in: RoundedRectangle(cornerRadius: 6))
                     .overlay {
                         RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(focused ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: focused ? 2 : 1)
+                            .strokeBorder(focused ? Color.Brand.ruby : Color.secondary.opacity(0.35), lineWidth: focused ? 2 : 1)
                     }
                     .frame(height: 130)
                     .focused($focused)
@@ -631,7 +631,7 @@ private struct InlineComposer: View {
 
                 if let error = draft.error {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.Brand.delInk)
                         .font(.callout)
                         .lineLimit(3)
                         .textSelection(.enabled)
@@ -692,7 +692,7 @@ private struct ThreadView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Text(location).font(.caption.bold()).foregroundStyle(.secondary)
-                if thread.isPending { Tag(text: "Pending", color: .orange) }
+                if thread.isPending { Tag(text: "Pending", color: Color.Brand.beamInk) }
                 if thread.isResolved { Tag(text: "Resolved", color: .secondary) }
                 Spacer()
                 Button("Reply", systemImage: "arrowshape.turn.up.left") {
@@ -719,7 +719,7 @@ private struct ThreadView: View {
                         }
                         Text("\(comment.createdAt, style: .relative) ago").foregroundStyle(.secondary)
                         if comment.isPending {
-                            if !thread.isPending { Tag(text: "Pending", color: .orange) }
+                            if !thread.isPending { Tag(text: "Pending", color: Color.Brand.beamInk) }
                             Spacer()
                             Button("Delete draft", systemImage: "trash") {
                                 Task { await model.deletePendingComment(comment) }

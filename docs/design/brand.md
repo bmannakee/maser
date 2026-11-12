@@ -5,8 +5,10 @@ maser's name, logo and colors, and how the interface uses them. Draft 1, 2026-11
 The browsable version, with live previews, is the "maser brand" design system artifact. This file is the copy that
 travels with the code; `Sources/Maser/Brand.swift` mirrors its color table.
 
-**Status:** the icon is in the app bundle (REQ-PLT-004). The colors are defined in `Brand.swift` but no view uses them
-yet; the views still use the system accent color.
+**Status:** the icon is in the app bundle (REQ-PLT-004). The views take the accent, the pending amber, the diff washes
+and the error and success colors from `Brand.swift`, and each window is tinted ruby. Still on system colors: text and
+backgrounds (`ink`, `paper`, `chrome` are defined but unused), the PR state pill, warnings, and the notices with a
+yellow background.
 
 ## The idea
 
@@ -42,7 +44,7 @@ Everything else is quiet, so the beam is the brightest thing on screen.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `ruby` | `#C2255C` | `#FF6B9A` | The accent: cursor rule, primary button, focus ring, open-PR marker, links. |
+| `ruby` | `#C2255C` | `#FF6B9A` | The accent: cursor bar, primary button, focus ring, open-PR marker, links. |
 | `rubyStrong` | `#A01A48` | `#FF9DBB` | Ruby text on `rubyWash`: the cursor line's number. |
 | `rubyWash` | `#F9DCE7` | `#4A1A2E` | Fill of the cursor line and selected rows. |
 | `onRuby` | `#FFFFFF` | `#2B0A16` | Text on a `ruby` fill. |
@@ -75,7 +77,12 @@ or `ink`; `controlBorder` is 3.5:1, enough for a control boundary.
 - **Diff colors keep their meaning.** Deletions are orange-red, shifted away from ruby. Added and deleted lines keep
   their sign under the cursor, and the cursor keeps its rule, so no state depends on hue alone.
 - **Agent output is neutral:** `ink` on `paper`, labeled as the agent's. Never ruby.
-- **GitHub's colors stay GitHub's:** label colors and the rendered conversation are shown as given.
+- **GitHub's colors stay GitHub's:** label colors, the PR state pill and the rendered conversation are shown as given.
+- **The line cursor** is a 3 pt `ruby` bar at the line's leading edge with a ruby tint over the line. The tint lies
+  over the line's own wash, so an added or deleted line under the cursor still reads as one.
+- **Warnings have no token yet.** Blocked, behind, review required, checks pending, renamed files and the unsourced
+  diagram note use the system orange. Open question: system orange sits close to the pending amber, so either
+  warnings need their own hue or the two meanings need different shapes.
 
 ## Type, spacing and shape
 

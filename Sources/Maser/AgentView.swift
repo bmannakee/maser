@@ -25,7 +25,7 @@ struct AgentView: View {
                         .font(.callout)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
-                        .background(.yellow.opacity(0.15))
+                        .background(Color.Brand.beamWash)
                         .shownText("agent-stale", note)
                 }
                 HStack(spacing: 0) {
@@ -155,7 +155,7 @@ private struct AgentEntryView: View {
             Text(text)
                 .textSelection(.enabled)
                 .padding(8)
-                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .background(Color.Brand.rubyWash, in: RoundedRectangle(cornerRadius: 8))
                 .frame(maxWidth: .infinity, alignment: .trailing)
         case let .agent(text):
             Text(Self.markdown(text))
@@ -168,7 +168,7 @@ private struct AgentEntryView: View {
                 isError ? "Turn failed (\(reason ?? "error")) · \(String(format: "$%.2f", cost))" : String(format: "$%.2f", cost)
             )
             .font(.caption.monospacedDigit())
-            .foregroundStyle(isError ? .red : .secondary)
+            .foregroundStyle(isError ? Color.Brand.delInk : .secondary)
         case let .notice(text):
             Label(text, systemImage: "info.circle")
                 .font(.callout)
@@ -202,14 +202,14 @@ private struct AgentToolView: View {
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: icon)
-                        .foregroundStyle(use.isRefused || use.isError ? .red : .secondary)
+                        .foregroundStyle(use.isRefused || use.isError ? Color.Brand.delInk : .secondary)
                     Text(name).bold()
                     Text(use.input)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     if use.isRefused {
-                        Text("refused").foregroundStyle(.red)
+                        Text("refused").foregroundStyle(Color.Brand.delInk)
                     }
                 }
                 .font(.callout.monospaced())
@@ -242,7 +242,7 @@ private struct AgentComposer: View {
                 .background(.background, in: RoundedRectangle(cornerRadius: 6))
                 .overlay {
                     RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(focused ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: focused ? 2 : 1)
+                        .strokeBorder(focused ? Color.Brand.ruby : Color.secondary.opacity(0.35), lineWidth: focused ? 2 : 1)
                 }
                 .overlay(alignment: .topLeading) {
                     if agent.draft.isEmpty {
@@ -265,7 +265,7 @@ private struct AgentComposer: View {
                     Text("Answering…").foregroundStyle(.secondary).shownText("agent-status", "answering")
                 case let .failed(message):
                     Label(message, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.Brand.delInk)
                         .lineLimit(3)
                         .textSelection(.enabled)
                         .shownText("agent-status", message)

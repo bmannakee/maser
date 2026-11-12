@@ -31,7 +31,7 @@ struct OpenPullRequestView: View {
                 .frame(width: 420)
                 .onSubmit(open)
             if let error {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error).font(.caption).foregroundStyle(Color.Brand.delInk)
             }
             HStack {
                 if isLoading { ProgressView().controlSize(.small) }

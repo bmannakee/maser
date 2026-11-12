@@ -41,7 +41,7 @@ struct FinishReviewView: View {
                 .overlay {
                     RoundedRectangle(cornerRadius: 6)
                         .strokeBorder(
-                            summaryFocused ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: summaryFocused ? 2 : 1)
+                            summaryFocused ? Color.Brand.ruby : Color.secondary.opacity(0.35), lineWidth: summaryFocused ? 2 : 1)
                 }
                 .overlay(alignment: .topLeading) {
                     if model.reviewSummary.isEmpty {
@@ -65,7 +65,7 @@ struct FinishReviewView: View {
 
             if let error = model.reviewError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.Brand.delInk)
                     .lineLimit(4)
                     .textSelection(.enabled)
                 if model.reviewHeadMoved {
