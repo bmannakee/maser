@@ -82,7 +82,9 @@ public struct TraceReport: Sendable {
             var seen: Set<String> = []
             for control in controls.compactMap({ byID[$0] }) {
                 for id in DesignDocuments.ids(in: control["Requirements"]) where seen.insert(id).inserted {
-                    requirements.append(byID[id]?.isProposed == true ? "\(id) (proposed)" : id)
+                    let item = byID[id]
+                    requirements.append(
+                        item?.isPlanned == true ? "\(id) (planned)" : item?.isProposed == true ? "\(id) (proposed)" : id)
                 }
             }
             let harms = DesignDocuments.ids(in: hazard["Harm"]).filter { ItemKind(id: $0) == .harm }

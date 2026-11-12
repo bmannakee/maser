@@ -229,6 +229,24 @@ struct Fixture {
         #expect(fixture.rules == [.unmetNeed])
     }
 
+    /// A planned need, served only by planned requirements, isn't unmet; a planned requirement needs an issue.
+    @Test func plannedNeedsAndRequirements() {
+        var fixture = Fixture()
+        fixture.needs += """
+
+
+            | ID | Need | Why | Status |
+            | --- | --- | --- | --- |
+            | UN-2 | Later | Soon | Planned (#7) |
+            """
+        fixture.requirements += "\n| REQ-AB-004 | Fourth | UN-2 | — | Planned: T for it. | Planned (#7) |"
+        #expect(fixture.rules.isEmpty)
+        #expect(fixture.documents.items(.requirement).last?.isProposed == true)
+
+        fixture.requirements = fixture.requirements.replacingOccurrences(of: "| Planned (#7) |", with: "| Planned |")
+        #expect(fixture.rules == [.proposedWithoutIssue])
+    }
+
     @Test func untrackedOpenRisk() {
         var fixture = Fixture()
         fixture.risks = fixture.risks.replacingOccurrences(of: "| HAZ-02 | Medium | RC-02 | #5 |", with: "")

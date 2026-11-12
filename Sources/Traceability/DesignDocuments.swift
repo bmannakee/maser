@@ -70,8 +70,10 @@ struct Item: Equatable, Sendable {
     /// - Parameter heading: The column heading, exactly as written.
     subscript(heading: String) -> String { fields[heading] ?? "" }
 
-    /// Whether the item's status says it's proposed rather than built.
-    var isProposed: Bool { self["Status"].contains("Proposed") }
+    /// Whether the item isn't built yet: its status says `Proposed` (a risk control) or `Planned` (a new feature).
+    var isProposed: Bool { isPlanned || self["Status"].contains("Proposed") }
+    /// Whether the item's status says it's a planned feature, or for a need, one that planned features will serve.
+    var isPlanned: Bool { self["Status"].contains("Planned") }
 }
 
 /// A place in a document, for reporting problems.

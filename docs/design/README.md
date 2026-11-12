@@ -23,6 +23,7 @@ these documents in the same PR.
 | [requirements.md](requirements.md) | IEC 62304 §5.2 | Software requirements, each traced to a need and a verification |
 | [risk-management.md](risk-management.md) | ISO 14971 | Harms, hazards, risk estimates, controls and residual risk |
 | [usability.md](usability.md) | IEC 62366-1 | Use specification, user interface characteristics tied to safety, hazard-related use scenarios, evaluations |
+| [review-agent.md](review-agent.md) | Design (planned feature) | The review agent and canvas: architecture, decisions, open questions, verification plan |
 | [traceability.md](traceability.md) | Traceability | Needs → requirements → verification, hazards → controls, and the gaps |
 | [../verification/](../verification/) | Verification records | Dated records of verification runs |
 
@@ -51,6 +52,8 @@ The requirement areas are:
 | `OVR` | Overview tab |
 | `DIF` | Diff and Files tab |
 | `CMT` | Commenting and reviewing |
+| `AGT` | Review agent (planned) |
+| `CNV` | Canvas for the agent's diagrams (planned) |
 | `KEY` | Keyboard |
 | `CFG` | Configuration |
 | `PLT` | Platform and packaging |
@@ -98,12 +101,12 @@ UI scenarios follow the same rule: each one's title starts with the requirements
 | `unknown-test` | A `T:` or `L:` reference names a suite or test that doesn't exist, or cites a live test as `T:` or an offline one as `L:`. |
 | `wrong-test-count` | A whole-suite reference says `(all N)` but the suite has a different number of tests. |
 | `unknown-record-check` | A `V-YYYY-MM-DD/Vn` reference has no matching `### Vn:` heading in that day's record. |
-| `proposed-without-issue` | A `Proposed` requirement's status doesn't name an issue, such as `(#18)`. |
+| `proposed-without-issue` | A `Proposed` or `Planned` requirement's status doesn't name an issue, such as `(#18)`. |
 | `control-link-mismatch` | A requirement names a control that doesn't list it, or a control lists a requirement that doesn't name it. |
 | `control-status-mismatch` | A control is marked `Proposed` but all its requirements are implemented, or the reverse. |
 | `unused-control` | No hazard uses a control. |
 | `incomplete-hazard` | A hazard has no harm or no control. |
-| `unmet-need` | No implemented requirement serves a user need. |
+| `unmet-need` | No implemented requirement serves a user need, unless the need's status is `Planned`. |
 | `untracked-open-risk` | A hazard's residual risk is High, or marked open, but the open risks table doesn't list it. |
 | `stale-traceability` | A generated section of traceability.md is missing or out of date. |
 | `test-claim-mismatch` | A requirement cites a test or UI scenario that doesn't claim the requirement, or a test or scenario claims a requirement that doesn't cite it. A whole-suite reference cites every test in the suite. |

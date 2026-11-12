@@ -8,17 +8,22 @@ Modeled on IEC 62304 §5.1. Draft 1, 2026-11-03.
 shows a PR's conversation, status and changes, and lets the user comment on lines, reply to threads, and submit a
 review with a verdict. It does everything through the user's own `gh` command-line client.
 
-**Intended user:** one experienced software engineer, the author, who works mostly from the keyboard with vim-style
-keys. See [usability.md](usability.md) for the full use specification.
+**Planned (#32): a review agent.** A conversation with an agent about the open PR, which can read the PR's repository,
+add comments to the user's pending review, and draw diagrams of the change on a canvas. It runs through the user's own
+`claude` command-line client, as GitHub access runs through `gh`. The agent's output is an aid to reading the change,
+not a substitute for it: the diff stays the thing reviewed. See [review-agent.md](review-agent.md).
+
+**Intended users:** experienced software engineers who work mostly from the keyboard with vim-style keys. See
+[usability.md](usability.md) for the full use specification.
 
 **Intended use environment:**
 
-- The user's personal Mac: macOS 27.
-- An enterprise-managed work Mac: macOS 26, with only the Xcode command-line tools, and no unsigned or quarantined
-  apps.
+- Personal Macs: macOS 26 or later.
+- Macs managed by an organization: macOS 26, possibly with only the Xcode command-line tools, and no unsigned or
+  quarantined apps.
 - github.com, and potentially GitHub Enterprise hosts.
 
-**Why it matters:** at work, Maser will be used to review software that may itself be regulated. A review decision
+**Why it matters:** Maser may be used to review software that is itself regulated. A review decision
 made on wrong or incomplete information can let a defect through. Code review isn't the only control on that software,
 but Maser should not weaken it. This is the main source of harm in the [risk file](risk-management.md).
 
@@ -29,7 +34,7 @@ but Maser should not weaken it. This is the main source of harm in the [risk fil
 IEC 62304 classifies by the worst harm that a failure of the software could contribute to, after external risk
 controls. Maser can't injure anyone directly. A failure could, however, contribute to a defect in reviewed software
 going unnoticed, as described in `H1` in the risk file. Other controls on that software lie outside Maser: other
-reviewers, testing, and the work organization's own quality system.
+reviewers, testing, and the quality system of the organization that owns it.
 
 On a strict reading that makes Maser Class A. It is treated as **Class B** to practice the extra activities Class B
 requires:
@@ -65,12 +70,16 @@ itself. PR descriptions follow `AGENTS.md`:
 
 | Item | Version | Use | Known risks and how they're handled |
 | --- | --- | --- | --- |
-| GitHub CLI (`gh`) | 2.102.1 at home; work version unknown | All GitHub access, authentication and the token | Output format changes break decoding. Handled by decoding defensively (`REQ-GH-004`), live tests, and showing failures as messages. |
+| GitHub CLI (`gh`) | 2.102.1 on the development Mac; others vary | All GitHub access, authentication and the token | Output format changes break decoding. Handled by decoding defensively (`REQ-GH-004`), live tests, and showing failures as messages. |
 | GitHub GraphQL and REST APIs | — | Data and mutations | Quiet failures. A comment on a line outside the diff returns a null thread (`HAZ-03`). Lists are capped (`HAZ-14`). |
 | TOMLDecoder | 0.4.5 (`Package.resolved`) | Parsing `config.toml` | Decode errors surface as `TOMLError`; the config banner reports them (`REQ-CFG-002`). |
 | SwiftUI and AppKit | macOS 26 / 27 SDKs | UI | Layout loops crashed the app when split views were nested, or with an inspector beside the file tree (`HAZ-07`, V5–V7). Focus doesn't always move when asked (V9). |
 | WebKit | macOS SDK | Rendering the conversation HTML | Untrusted content. Page JavaScript is disabled (`REQ-OVR-002`). |
-| Swift toolchain | 6.2 minimum; 6.4 at home | Build | The work Mac's version is unknown, so the minimum is checked by building against `swift-tools-version: 6.2`. |
+| Claude Code (`claude`), planned | 2.1.322 on the development Mac; others vary | The review agent (#32): the agent loop, file tools, the model connection and its login | Its command-line options and stream-json output can change; pinned by checking the version and by a fake for the UI scenarios. Loads settings and hooks from the working directory unless told not to (`HAZ-23`). |
+| Claude models, planned | Whatever `claude` is set to use | The agent's answers, comments and diagrams | Output can be wrong or steered by the content it reads (`HAZ-18`, `HAZ-20`). |
+| Pele (Mermaid) and Viz.js (Graphviz), planned | To be chosen and pinned | Rendering diagrams on the canvas (#32) | Parser bugs and script in diagram source (`HAZ-24`). Bundled, never fetched. |
+| git, planned | Xcode command-line tools | The agent's checkout (#32) | Must never write to the user's clone (`HAZ-22`). |
+| Swift toolchain | 6.2 minimum; 6.4 on the development Mac | Build | Managed Macs may have an older toolchain, so the minimum is checked by building against `swift-tools-version: 6.2`. |
 
 ## Configuration management
 

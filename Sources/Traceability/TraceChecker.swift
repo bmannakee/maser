@@ -279,7 +279,9 @@ struct TraceChecker {
                 problems.append(
                     Problem(
                         rule: .proposedWithoutIssue, location: here,
-                        message: "\(requirement.id) is Proposed but its status names no issue, such as (#18)"))
+                        message:
+                            "\(requirement.id) is \(requirement.isPlanned ? "Planned" : "Proposed") but its status names no issue, such as (#18)"
+                    ))
             }
 
             for controlID in DesignDocuments.ids(in: requirement["Control"]) {
@@ -377,10 +379,10 @@ struct TraceChecker {
         }
     }
 
-    /// User needs that no implemented requirement serves.
+    /// User needs that no implemented requirement serves, except planned ones.
     private func unmetNeeds() -> [Problem] {
         let implemented = documents.items(.requirement).filter { !$0.isProposed }
-        return documents.items(.need).compactMap { need in
+        return documents.items(.need).filter { !$0.isPlanned }.compactMap { need in
             guard !implemented.contains(where: { DesignDocuments.ids(in: $0["Need"]).contains(need.id) }) else { return nil }
             return Problem(rule: .unmetNeed, location: location(need), message: "no implemented requirement serves \(need.id)")
         }
