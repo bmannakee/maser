@@ -91,6 +91,6 @@ risk as well as for coverage.
 
 1. **More UI scenarios:** the planned ones for risk controls first: UI:finish-review-defaults (RC-07),
    UI:discard-confirms (RC-08), UI:link-opens-browser (RC-16), UI:open-pr-marker (RC-06).
-2. **Review agent (#32):** design inputs drafted on 2026-11-12 (UN-11 to UN-14, AGT and CNV, HAZ-18 to HAZ-25,
-   RC-22 to RC-30). Next is the spike in [review-agent.md](review-agent.md#increments), recorded in
-   `docs/verification/`, before any product code.
+2. **Review agent (#32):** design inputs drafted, and the spike done, on 2026-11-12
+   ([record](../verification/2026-11-12-agent-spike/README.md)). Next is increment 2 in
+   [review-agent.md](review-agent.md#increments): the conversation.

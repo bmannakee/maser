@@ -50,15 +50,28 @@ Made with the user on 2026-11-12, in the review of #33.
 - **`AgentSession`** (app, `@MainActor @Observable`), one per PR. It owns the conversation and keeps one `claude`
   process per conversation, sending user messages as stream-json and reading events back: text, tool calls, results
   and cost. It resumes a conversation after a relaunch with `--resume <session-id>`.
-- **The command line** is built in MaserCore (`AgentCommandLine`), so it can be unit tested:
-  `--print --input-format stream-json --output-format stream-json --verbose`, `--tools Read,Grep,Glob`,
-  `--strict-mcp-config --mcp-config <maser's only>`, `--setting-sources user` (never `project` or `local`, which would
-  load the PR's `.claude/` settings and hooks), `--permission-mode` set so nothing outside the tool list can be
-  approved, `--model`, `--effort`, `--max-budget-usd`, `--append-system-prompt` with Maser's instructions, and the checkout as the working
-  directory. These options exist in `claude` 2.1.322. What each actually does is checked in the spike.
+- **The command line** is built in MaserCore (`AgentCommandLine`), so it can be unit tested. Checked in the
+  [spike](../verification/2026-11-12-agent-spike/README.md) with `claude` 2.1.322:
+  - `--print --input-format stream-json --output-format stream-json --verbose`;
+  - `--tools Read,Grep,Glob`: the only built-in tools;
+  - `--strict-mcp-config --mcp-config <Maser's only>`: no other MCP servers, and none of the account's claude.ai
+    connectors, which `claude` otherwise loads (V-2026-11-12/V1);
+  - `--setting-sources user`: never `project` or `local`, which load the PR's `.claude/` hooks; the user's own global
+    `CLAUDE.md` still applies, the PR's doesn't (V-2026-11-12/V3);
+  - `--permission-mode dontAsk --allowedTools` naming only Maser's three tools. The file tools must not be in the allow
+    list: allowed by name, they read anywhere the user can. Left out, `claude` lets them read inside the working
+    directory and refuses everything else, symlinks included (V-2026-11-12/V5);
+  - `--model`, `--effort`, `--max-budget-usd`, `--append-system-prompt` with Maser's instructions, and the checkout as
+    the working directory.
+
+  `--safe-mode` would drop Maser's MCP server too, and `--bare` needs an API key, so neither is used.
+- **Turns.** `AgentSession` writes a message only after the previous `result` event; messages written together become
+  one turn. `total_cost_usd` is the session's running total, even across a resume, so a turn's cost is the difference
+  from the previous result.
 - **`maser-agent-tools`** is a small executable in the app bundle. `claude` starts it as a stdio MCP server, and it
   forwards each call to the running Maser over a Unix socket. The socket lives in a per-session folder that only the
-  user can read, and each call carries a per-session token. Maser listens on no network port.
+  user can read, made with `mktemp -d` because a socket path can be at most 104 bytes (V-2026-11-12/V8). Each call
+  carries a per-session token. Maser listens on no network port.
 - **The whole PR, not one commit.** "The head commit" names the PR's state: the checkout is the repository at the
   head, and the diff is the whole PR from the merge base, every commit in it, as the Files tab shows it.
 - **Maser's tools** (the only ones besides file reading):
@@ -69,17 +82,19 @@ Made with the user on 2026-11-12, in the review of #33.
   - `show_diagram`: format (`mermaid` or `dot`), source, title, and per-element citations and change marks.
 - **The checkout** (`AgentCheckout`, MaserCore). Maser keeps a bare clone per repository in Application Support. It
   borrows objects from the user's local clone, opened read-only through git's alternates, and otherwise fetches with
-  `gh repo clone`. It checks out the head commit as a detached worktree and makes its files read-only. Where a local
+  `gh repo clone`. It checks out the head commit as a detached worktree with `core.symlinks=false`, so a link in the PR
+  arrives as a plain file holding its target's path, and makes its files read-only. Where a local
   clone lives comes from `[agent] repositories` (folders to search), matched by remote URL.
-- **The canvas** is a `WKWebView` with JavaScript on but only for the bundled renderers: [Pele](https://github.com/obsidianmd/pele)
-  (MIT, from Obsidian) for Mermaid, and Viz.js for DOT. Pele suits untrusted source: it ignores `click` callbacks,
-  escapes label text rather than rendering HTML, can turn links and images off (`links: false`, `images: false`),
-  and rejects oversized source and output. Its layout differs from Mermaid's own, which doesn't matter here.
-  Its `render()` returns SVG text, so if it runs in JavaScriptCore without a page, the canvas could show the SVG with
-  no script at all. A content
-  security policy allows no network and no inline or remote script, and pages navigate nowhere. Diagram source goes in
-  as data and is checked first: no HTML labels, no `click` callbacks, no links. Each rendered element reports its ID,
-  so Maser can draw citation and change-mark flags over it and open its lines when it's chosen.
+- **Rendering** happens outside any page. Maser runs a bundled [Pele](https://github.com/obsidianmd/pele) (MIT, from
+  Obsidian) in JavaScriptCore, which needs no DOM (V-2026-11-12/V9), with `links: false`, `images: false` and its size
+  limits. Before that, Maser refuses source containing `click`, `href` or `url(`, so none of it reaches the SVG even
+  as text (V-2026-11-12/V10). Pele strips HTML from labels and refuses remote styles itself. Viz.js for DOT is to be
+  tried the same way. Bundled versions are pinned, at least two weeks after release.
+- **The canvas** is a `WKWebView` showing that SVG with page JavaScript off and a content security policy that allows
+  no network; it navigates nowhere. Choosing an element and drawing citation and change-mark flags use Maser's own
+  script in an isolated content world, not the page's (to confirm when built). Elements are identified by Pele's IDs:
+  a state by its name in the source, a transition as `edgeN` in source order. Those IDs aren't prefixed, so each
+  diagram gets a page of its own.
 
 ## The grounding check (RC-29)
 
@@ -108,7 +123,8 @@ and why the evaluation below measures it.
 
 Each one is a PR that updates these documents, as usual.
 
-1. **Spike** (a verification record, no product code). Run `claude` headless with the planned command line. Record the
+1. **Spike** (a verification record, no product code). Done 2026-11-12:
+   [record](../verification/2026-11-12-agent-spike/README.md). Run `claude` headless with the planned command line. Record the
    stream-json event shapes. Confirm that a planted project hook and MCP server don't run, and that the stdio-to-socket
    helper works. Record the `claude` version tested, as the minimum. Render sample state machines with Pele: check that
    its SVG gives each element an ID from the diagram source (needed to flag citations), and whether `render()` works

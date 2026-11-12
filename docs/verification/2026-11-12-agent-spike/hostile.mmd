@@ -1,0 +1,5 @@
+flowchart LR
+    A["<img src=x onerror=alert(1)>Start"] --> B[<b>Bold</b>]
+    click A callback "javascript:alert(2)"
+    click B "javascript:alert(3)"
+    click A href "https://evil.example/x"
