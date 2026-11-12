@@ -139,6 +139,37 @@ import Testing
         #expect(missing.first { $0.id == "edge7" }?.problems.contains("isn't in the drawn diagram") == true)
     }
 
+    /// An edit to one case of an enum line doesn't make the others changed; a line rewritten without a name does.
+    @Test("REQ-CNV-004: Elements an edit left alone on a shared line aren't flagged") func sharedLines() throws {
+        let checkout = try Self.checkout()
+        defer { try? FileManager.default.removeItem(at: checkout) }
+        try "enum Light { case red, green, yellow }\nlet x = 1\n".write(
+            to: checkout.appending(path: "Light.swift"), atomically: true, encoding: .utf8)
+        let files = DiffParser.parse(
+            """
+            diff --git a/Light.swift b/Light.swift
+            --- a/Light.swift
+            +++ b/Light.swift
+            @@ -1,2 +1,2 @@
+            -enum Light { case red, green, yellow, flashing }
+            -let x = 0
+            +enum Light { case red, green, yellow }
+            +let x = 1
+            """)
+        let diagram = Diagram(
+            title: "Light", format: .mermaid, source: "stateDiagram-v2\n  red --> green",
+            elements: [
+                .init(id: "red", citation: "Light.swift:1", change: .unchanged), .init(id: "green", citation: "Light.swift:1"),
+                .init(id: "ed", citation: "Light.swift:1"), .init(id: "x", citation: "Light.swift:2"),
+                .init(id: "red", citation: "Light.swift:1-2"),
+            ])
+        let problems = DiagramGrounding.check(diagram, checkout: checkout, files: files).map(\.problems.count)
+        // red and green survive the edit, and x is still declared on its edited line; "ed" is only part of a word; red
+        // over both lines includes one that doesn't name it.
+        #expect(problems == [0, 0, 1, 0, 1])
+        #expect(DiagramGrounding.names("red", in: "case red, green") && !DiagramGrounding.names("ed", in: "case red"))
+    }
+
     @Test("REQ-CNV-003: A citation can't lead outside the checkout through a symlink") func symlinkCitation() throws {
         let checkout = try Self.checkout()
         defer { try? FileManager.default.removeItem(at: checkout) }

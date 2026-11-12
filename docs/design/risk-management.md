@@ -90,9 +90,9 @@ Each row lists:
 | HAZ-15 | Development: a live write test posts to a real PR other than the test PR. | H2 | S3 P2 Medium | RC-19 | S3 P1 Low |
 | HAZ-16 | A mistake in `config.toml` silently changes or removes bindings, so keys act unexpectedly (leading to HAZ-04). | H2 | S3 P3 Medium | RC-18 | S3 P1 Low |
 | HAZ-17 | A line comment is attached to the wrong line or side, because a cursor line is mapped to GitHub's line numbers incorrectly, for example for a range across hunks or sides. | H6 | S3 P3 Medium | RC-01, RC-20 | S3 P1 Low |
-| HAZ-18 | The agent misdescribes the change. A diagram leaves out a state or transition, shows a changed part as unchanged, or invents code that isn't there. The user relies on it instead of the diff and approves a defect. | H1 | S4 P3 **High** | RC-29, RC-30, RC-25 | S4 P2 Medium, pending the accuracy evaluation |
+| HAZ-18 | The agent misdescribes the change. A diagram leaves out a state or transition, shows a changed part as unchanged, or invents code that isn't there. The user relies on it instead of the diff and approves a defect. | H1 | S4 P3 **High** | RC-29, RC-30, RC-25 | S4 P2 Medium |
 | HAZ-19 | A comment the agent added to the pending review is wrong, misleading or misplaced, and the user submits it without reading it. It appears under their name. | H2, H6 | S3 P3 Medium | RC-26, RC-04, RC-12 | S3 P1 Low |
-| HAZ-20 | Text in the PR, its comments, or the repository's files steers the agent (prompt injection): to misdescribe the change, add misleading comments, or reveal data, such as files outside the checkout or the user's connected services (mail, documents), which `claude` loads by default. | H1, H2, H7 | S4 P3 **High** | RC-22, RC-26, RC-27, RC-29 | S4 P2 Medium, pending the accuracy evaluation |
+| HAZ-20 | Text in the PR, its comments, or the repository's files steers the agent (prompt injection): to misdescribe the change, add misleading comments, or reveal data, such as files outside the checkout or the user's connected services (mail, documents), which `claude` loads by default. | H1, H2, H7 | S4 P3 **High** | RC-22, RC-26, RC-27, RC-29 | S4 P2 Medium |
 | HAZ-21 | Code from an organization that hasn't approved it is sent to the model provider through the agent. | H7 | S3 P3 Medium | RC-24 | S3 P1 Low |
 | HAZ-22 | The agent, or Maser preparing its checkout, changes the user's own clone or pushes: local work is lost, or a push appears under their name. | H3, H2 | S3 P2 Medium | RC-23, RC-22 | S3 P1 Low |
 | HAZ-23 | Settings, hooks, agents or MCP servers from the PR's repository load into the agent and run code on the user's Mac. A PR can be written to attack its reviewer. | H4 | S4 P3 **High** | RC-22 | S4 P1 Medium |
@@ -171,8 +171,8 @@ The open risks need further controls before Maser is relied on to review regulat
 | --- | --- | --- | --- |
 | HAZ-12 | Low (observation) | Timeouts on `gh` calls, which have none today, so a hung `gh` loads forever | #21 |
 
-**The review agent (#32)** is being built in increments. The conversation was built on 2026-11-12, with RC-22 to RC-25
-and RC-27, so HAZ-21, HAZ-22, HAZ-23 and HAZ-25 now carry real residual risks:
+**The review agent (#32)** was built in increments on 2026-11-12. The conversation came first, with RC-22 to RC-25 and
+RC-27:
 
 - **HAZ-21:** Low. The agent stays off until the user names the owner, and the tab names the setting and the
   condition (UI:agent-off-until-allowed). It still relies on the user knowing the owner's policy.
@@ -189,23 +189,26 @@ The canvas was built the same day, with RC-28 to RC-30:
 - **HAZ-24:** Medium because the harm is Critical. Unsafe source is refused before rendering, Pele runs outside any
   page with links and images off, and the canvas shows the SVG with page JavaScript off, no network, and every
   navigation refused (UI:canvas-rejects-script, T:DiagramTests.sourceProblems).
-- **HAZ-18:** controls built; the estimate of P2 still waits on the accuracy evaluation (see below).
+- **HAZ-18:** controls built; for the estimate, see below.
 
 The agent's comments were built the same day, with RC-26:
 
 - **HAZ-19:** Low. An agent comment goes in through the user's own posting path (head, account, a line in the diff),
   says on GitHub that an agent drafted it and with which model, is badged in the comments pane, and Finish Review
   asks before submitting any the user hasn't opened (UI:agent-comments-marked).
-- **HAZ-20:** controls built; like HAZ-18, its estimate waits on the accuracy evaluation, which includes injection.
+- **HAZ-20:** controls built; for the estimate, see below.
 
-Two hazards started High:
+Three hazards started High:
 
-- **HAZ-18** (the agent misdescribes the change): the defining risk of the feature, since a convincing diagram invites
-  the user to stop reading the diff. RC-29 checks what can be checked mechanically, citations and change marks, but
-  not whether a diagram is complete. The target of P2 also rests on an evaluation of the agent's accuracy on PRs with
-  known answers, and on the usability evaluation of HRUS-9.
-- **HAZ-20** and **HAZ-23** (a PR written to attack its reviewer): RC-22 removes the agent's means to act on the Mac
-  or the network, and settings from the PR are never loaded. What's left is the agent's words, which RC-26, RC-27 and
+- **HAZ-18** (the agent misdescribes the change): Medium, at P2. The defining risk of the feature, since a convincing
+  diagram invites the user to stop reading the diff. RC-29 checks what can be checked mechanically, citations and
+  change marks, but not whether a diagram is complete. The evaluation of 2026-11-12 (V-2026-11-12/V13) found 6 of 6
+  diagrams right on the first drawing, after fixing two things it found in Maser's instructions to the agent. Its cases
+  are small, so it supports P2 (Remote), not P1. HRUS-9, whether the user notices a wrong diagram, is still to be
+  evaluated with the user.
+- **HAZ-20** and **HAZ-23** (a PR written to attack its reviewer): Medium. The evaluation's injected instruction was
+  resisted in 3 of 3 runs, and reported to the user each time (V-2026-11-12/V13), as in the spike (V-2026-11-12/V7).
+  RC-22 removes the agent's means to act on the Mac or the network, and settings from the PR are never loaded. What's left is the agent's words, which RC-26, RC-27 and
   RC-29 put in front of the user rather than acting on them.
 
 The agent's comments carry the user's name on GitHub, so each one also says that an agent drafted it, naming the
@@ -213,10 +216,10 @@ model (decided 2026-11-12). Colleagues reading the review can weigh it according
 unread. Conversations are kept in `claude`'s own session store under the user's home folder. That is accepted for this
 iteration (H7), and will be revisited if Maser gains other users.
 
-**Overall residual risk,** for the features built so far: no residual risk is High since RC-04 (2026-11-10), and every
-control proposed for them was built by RC-10 on the same day. Before Maser is relied on to review regulated software,
-the usability evaluation needs to be run. It is acceptable for other use. The review agent's risks are open until it's
-built (see above).
+**Overall residual risk:** no residual risk is High. Since RC-04 (2026-11-10) none is for the review features, and
+since the review agent was built and evaluated (2026-11-12) none is for the agent. Before Maser, or its agent, is relied
+on to review regulated software, the usability evaluation (HRUS-1 to HRUS-12) needs to be run with the user. It is
+acceptable for other use.
 
 ## Production and post-production
 

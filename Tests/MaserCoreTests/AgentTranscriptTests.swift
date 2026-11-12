@@ -63,3 +63,27 @@ import Testing
         #expect(try store.load(for: pr) == AgentTranscript())
     }
 }
+
+/// Tests for what the agent is told after drawing.
+@Suite struct AgentDiagramReplyTests {
+    /// A diagram with one element the drawing lacks, and one citing nothing.
+    static func drawn(_ findings: [ElementFinding], cited: Bool = true) -> AgentDiagram {
+        AgentDiagram(
+            diagram: Diagram(
+                title: "Door", format: .mermaid, source: "stateDiagram-v2\n  a --> b",
+                elements: [.init(id: "edge1", citation: cited ? "x:1" : nil)]),
+            commit: "abc", svg: "<svg/>", findings: findings)
+    }
+
+    @Test("REQ-CNV-004: The agent is told what was flagged, and the drawing's IDs when an element isn't among them")
+    func reply() {
+        let missing = Self.drawn([ElementFinding(id: "edge1", problems: ["isn't in the drawn diagram"])])
+        let text = missing.replyText(renderedIDs: ["a", "b", "edge0", "root_start"])
+        #expect(text.contains("- edge1 isn't in the drawn diagram"))
+        #expect(text.hasSuffix("The drawing's element IDs are: a, b, edge0, root_start."))
+
+        let clean = Self.drawn([ElementFinding(id: "edge1", problems: [])])
+        #expect(clean.replyText(renderedIDs: ["a"]) == "Shown on the user's canvas as \"Door\".")
+        #expect(Self.drawn([], cited: false).replyText.contains("unsourced"))
+    }
+}

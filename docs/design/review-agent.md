@@ -137,7 +137,8 @@ Each one is a PR that updates these documents, as usual.
 3. **Canvas:** the renderers, checking, citations and change marks (REQ-CNV-001 to 006). Built 2026-11-12 (#39, #40),
    Mermaid only: DOT waits for a need.
 4. **Comments:** `add_review_comment`, badges, and the Finish Review question (REQ-AGT-007, 008). Built 2026-11-12.
-5. **Evaluation:** the accuracy set, run before the agent is relied on to review regulated software.
+5. **Evaluation:** the accuracy set, run before the agent is relied on to review regulated software. Built 2026-11-12
+   (`AgentEvaluationTests`), with three cases: a transition added, a state removed, and an injected instruction.
 
 ## Open questions
 

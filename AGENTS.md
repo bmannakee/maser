@@ -21,7 +21,9 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
   `if #available` check with a macOS 26 fallback.
 - `MASER_LIVE_TESTS=1 swift test` also runs read-only tests against real GitHub through `gh`.
 - `MASER_LIVE_AGENT_TESTS=1 swift test` runs the review agent's live tests with your own `claude` (after `swift build`,
-  for the helper). They spend a few cents of model use each.
+  for the helper). They spend a few cents of model use each. `MASER_LIVE_AGENT_EVAL=1` runs the agent's accuracy
+  evaluation instead (about $1; `MASER_LIVE_AGENT_EVAL_RUNS` sets the runs per case); record its results in
+  `docs/verification/`.
 - `MASER_LIVE_WRITE_TESTS=1 swift test` writes to GitHub. It only touches the closed test PR bmannakee/maser#1
   and cleans up after itself. Write tests must never target any other PR.
 - Products land in `.build/out` (`.build/debug` is a symlink). For a truly clean build, `rm -rf .build`.

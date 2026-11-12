@@ -147,7 +147,13 @@ public struct AgentDiagram: Codable, Hashable, Identifiable, Sendable {
     public var flagged: [ElementFinding] { findings.filter { !$0.problems.isEmpty } }
 
     /// What the agent is told after drawing: that it's shown, and anything flagged, so it can correct it.
-    public var replyText: String {
+    public var replyText: String { replyText(renderedIDs: nil) }
+
+    /// What the agent is told after drawing, listing the drawing's own IDs when some element isn't among them.
+    ///
+    /// - Parameter renderedIDs: The element IDs the rendered SVG has, if known.
+    /// - Returns: The reply.
+    public func replyText(renderedIDs: Set<String>?) -> String {
         var lines = ["Shown on the user's canvas as \"\(diagram.title)\"."]
         if isUnsourced {
             lines.append(
@@ -157,6 +163,9 @@ public struct AgentDiagram: Codable, Hashable, Identifiable, Sendable {
         if !flagged.isEmpty {
             lines.append("Maser flagged these elements to the user; check them and draw again if they're wrong:")
             lines += flagged.map { "- \($0.id) \($0.problems.joined(separator: "; "))" }
+            if let renderedIDs, flagged.contains(where: { $0.problems.contains("isn't in the drawn diagram") }) {
+                lines.append("The drawing's element IDs are: \(renderedIDs.sorted().joined(separator: ", ")).")
+            }
         }
         return lines.joined(separator: "\n")
     }
