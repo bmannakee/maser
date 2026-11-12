@@ -4,7 +4,7 @@ Modeled on IEC 62304 §5.1. Draft 1, 2026-11-03.
 
 ## Scope and intended use
 
-**Maser is a native macOS app for reviewing GitHub pull requests.** It lists the PRs needing the user's attention,
+**maser is a native macOS app for reviewing GitHub pull requests.** It lists the PRs needing the user's attention,
 shows a PR's conversation, status and changes, and lets the user comment on lines, reply to threads, and submit a
 review with a verdict. It does everything through the user's own `gh` command-line client.
 
@@ -23,20 +23,20 @@ not a substitute for it: the diff stays the thing reviewed. See [review-agent.md
   quarantined apps.
 - github.com, and potentially GitHub Enterprise hosts.
 
-**Why it matters:** Maser may be used to review software that is itself regulated. A review decision
+**Why it matters:** maser may be used to review software that is itself regulated. A review decision
 made on wrong or incomplete information can let a defect through. Code review isn't the only control on that software,
-but Maser should not weaken it. This is the main source of harm in the [risk file](risk-management.md).
+but maser should not weaken it. This is the main source of harm in the [risk file](risk-management.md).
 
 ## Software safety classification
 
 **Class B, for practice.**
 
 IEC 62304 classifies by the worst harm that a failure of the software could contribute to, after external risk
-controls. Maser can't injure anyone directly. A failure could, however, contribute to a defect in reviewed software
-going unnoticed, as described in `H1` in the risk file. Other controls on that software lie outside Maser: other
+controls. maser can't injure anyone directly. A failure could, however, contribute to a defect in reviewed software
+going unnoticed, as described in `H1` in the risk file. Other controls on that software lie outside maser: other
 reviewers, testing, and the quality system of the organization that owns it.
 
-On a strict reading that makes Maser Class A. It is treated as **Class B** to practice the extra activities Class B
+On a strict reading that makes maser Class A. It is treated as **Class B** to practice the extra activities Class B
 requires:
 
 - architectural design documentation;
@@ -59,7 +59,7 @@ requires:
 | Validation | Use by the intended user against [user-needs.md](user-needs.md), recorded per release |
 | Release | `scripts/bundle` builds `Maser.app`. Planned: a tagged release and a release record listing what was verified, with known anomalies. |
 
-Every change goes through a branch and a PR. Nothing is committed to `main` directly. Review usually happens in Maser
+Every change goes through a branch and a PR. Nothing is committed to `main` directly. Review usually happens in maser
 itself. PR descriptions follow `AGENTS.md`:
 
 - **Summary**
@@ -77,7 +77,7 @@ itself. PR descriptions follow `AGENTS.md`:
 | WebKit | macOS SDK | Rendering the conversation HTML | Untrusted content. Page JavaScript is disabled (`REQ-OVR-002`). |
 | Claude Code (`claude`), planned | 2.1.322 on the development Mac; others vary | The review agent (#32): the agent loop, file tools, the model connection and its login | Its command-line options and stream-json output can change; pinned by checking the version and by a fake for the UI scenarios. By default it loads hooks, MCP servers and `CLAUDE.md` from the working directory, and the account's connectors; allowed by name, its file tools read anywhere (`HAZ-20`, `HAZ-23`, V-2026-11-12/V1, V5). |
 | Claude models, planned | Whatever `claude` is set to use | The agent's answers, comments and diagrams | Output can be wrong or steered by the content it reads (`HAZ-18`, `HAZ-20`). |
-| Pele (Mermaid) | 1.12.0, vendored in `Vendor/pele` with its npm integrity and SHA-256, which a test checks | Rendering the agent's Mermaid diagrams to SVG, in JavaScriptCore (#32) | Young and fast-moving (a release every few days in October 2026), so a version is pinned at least two weeks after release. Parser bugs and script in diagram source (`HAZ-24`): Maser refuses unsafe source first, and renders outside any page. Layout differs from Mermaid's own. |
+| Pele (Mermaid) | 1.12.0, vendored in `Vendor/pele` with its npm integrity and SHA-256, which a test checks | Rendering the agent's Mermaid diagrams to SVG, in JavaScriptCore (#32) | Young and fast-moving (a release every few days in October 2026), so a version is pinned at least two weeks after release. Parser bugs and script in diagram source (`HAZ-24`): maser refuses unsafe source first, and renders outside any page. Layout differs from Mermaid's own. |
 | Viz.js (Graphviz), planned | Not chosen | DOT diagrams (#32) | 5 MB of WebAssembly; deferred until a need for DOT appears. | Rendering diagrams on the canvas (#32) | Parser bugs and script in diagram source (`HAZ-24`). Bundled, never fetched. |
 | git, planned | Xcode command-line tools | The agent's checkout (#32) | Must never write to the user's clone (`HAZ-22`). |
 | Swift toolchain | 6.2 minimum; 6.4 on the development Mac | Build | Managed Macs may have an older toolchain, so the minimum is checked by building against `swift-tools-version: 6.2`. |
