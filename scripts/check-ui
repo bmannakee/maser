@@ -45,6 +45,8 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS"
 cp "$bin/Maser" "$app/Contents/MacOS/Maser"
 cp "$bin/maser-agent-tools" "$app/Contents/MacOS/maser-agent-tools"
+mkdir -p "$app/Contents/Resources"
+cp Vendor/pele/pele.global.js "$app/Contents/Resources/pele.global.js"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -97,8 +99,10 @@ for scenario in $scenarios; do
     sed -e "s|@FAKE_GH@|$bin/fake-gh|" -e "s|@FAKE_CLAUDE@|$bin/fake-claude|" Tests/UIScenarios/config.toml \
         > "$dir/config/maser/config.toml"
     # The agent reads this folder instead of a checkout: the recorded PRs' commits can't be fetched without GitHub.
-    mkdir -p "$dir/checkout"
-    echo "struct Door {}" > "$dir/checkout/Door.swift"
+    # It holds the door controller the fake claude draws, and the file test PR #1 adds, for its citations.
+    mkdir -p "$dir/checkout/Sources"
+    cp Tests/UIScenarios/checkout/Door.swift "$dir/checkout/Sources/Door.swift"
+    cp Tests/UIScenarios/checkout/COMMENT-TEST.md "$dir/checkout/COMMENT-TEST.md"
     # Start from nothing saved: no restored windows, sidebar widths or unsent text from an earlier run.
     defaults delete "$bundle_id" >/dev/null 2>&1 || true
     rm -rf "$HOME/Library/Saved Application State/$bundle_id.savedState" "$HOME/Library/Application Support/$bundle_id"

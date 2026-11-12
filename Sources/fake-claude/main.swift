@@ -6,6 +6,8 @@
 //
 // - containing "pr_context": calls that tool and answers with the first line it returned;
 // - containing "outside": tries to read /etc/hosts and reports it refused, as `dontAsk` mode would;
+// - containing "draw unsafe": calls show_diagram with a `click` directive, which Maser must refuse;
+// - containing "draw": calls show_diagram with a door diagram whose `edge2` cites lines the PR doesn't change;
 // - anything else: answers "You said: …".
 //
 // It ends each turn with a `result` whose cost grows by $0.01 per turn across a session, even after `--resume`, as
@@ -113,7 +115,41 @@ while let line = readLine() {
     var denials: [[String: Any]] = []
     callNumber += 1
     let callID = "toolu_fake_\(callNumber)"
-    if text.contains("pr_context"), let server {
+    if text.contains("draw"), let server {
+        let unsafe = text.contains("unsafe")
+        let source =
+            unsafe
+            ? "flowchart LR\n    A --> B\n    click A callback"
+            : "stateDiagram-v2\n    [*] --> closed\n    closed --> opening: open\n    closing --> opening: obstructed\n    readme --> closed: test"
+        let arguments: [String: Any] = [
+            "title": unsafe ? "Unsafe" : "Door (fake)", "format": "mermaid", "source": source,
+            "elements": unsafe
+                ? [[String: Any]]()
+                : [
+                    ["id": "closed", "citation": "Sources/Door.swift:2", "change": "unchanged"],
+                    ["id": "edge2", "citation": "Sources/Door.swift:15-16", "change": "added"],
+                    ["id": "readme", "citation": "COMMENT-TEST.md:3", "change": "added"],
+                ],
+        ]
+        emit([
+            "type": "assistant", "session_id": sessionID,
+            "message": [
+                "role": "assistant",
+                "content": [["type": "tool_use", "id": callID, "name": "mcp__maser__show_diagram", "input": arguments]],
+            ],
+        ])
+        let result = server.request("tools/call", ["name": "show_diagram", "arguments": arguments])
+        let content = ((result?["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        let isError = result?["isError"] as? Bool ?? true
+        emit([
+            "type": "user", "session_id": sessionID,
+            "message": [
+                "role": "user",
+                "content": [["type": "tool_result", "tool_use_id": callID, "content": content, "is_error": isError]],
+            ],
+        ])
+        answer = "Drew it: \(content.split(separator: "\n").first ?? "")"
+    } else if text.contains("pr_context"), let server {
         emit([
             "type": "assistant", "session_id": sessionID,
             "message": [

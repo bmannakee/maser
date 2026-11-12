@@ -426,6 +426,7 @@ final class ReviewModel {
     /// - Returns: False if the command doesn't apply here, so the key can fall through to other handlers.
     @discardableResult
     func perform(_ command: CommandID) -> Bool {
+        if tab == .agent, let handled = agent.perform(command) { return handled }
         switch command {
         case .showOverview: tab = .overview
         case .showFiles: tab = .files
@@ -976,6 +977,23 @@ final class ReviewModel {
         } else {
             focusedThreadID = thread.id
         }
+    }
+
+    /// Shows a line of a changed file in the Files tab, with the cursor on it.
+    ///
+    /// - Parameters:
+    ///   - path: The file's path in the PR's head.
+    ///   - line: The line's number on that side.
+    ///   - side: The side the number counts on.
+    /// - Returns: False if the file isn't in the diff, or the line isn't shown in it.
+    @discardableResult
+    func revealLine(path: String, line: Int, side: DiffSide) -> Bool {
+        guard filesByPath[path] != nil else { return false }
+        select(path: path)
+        guard let id = displayedFile(at: path)?.lineID(side: side, line: line) else { return false }
+        selectionAnchor = nil
+        placeCursor(id, placement: .center)
+        return true
     }
 
     /// Scrolls the diff to the line a thread is anchored to, centered, and moves the cursor there.

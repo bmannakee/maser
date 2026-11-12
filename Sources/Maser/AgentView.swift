@@ -3,7 +3,7 @@
 // When the agent is off for the PR, the tab says why and which setting allows it. Otherwise it shows what the agent can
 // read (repository, commit, checkout) and the model, effort and cost, then the conversation (messages, answers, every
 // tool call with its input and outcome, refusals, and Maser's notes), and a message box: ⌘↩ sends, Esc leaves it.
-// The canvas for diagrams comes in a later increment (#32).
+// The canvas with the agent's diagrams (`CanvasView`) sits beside the conversation; `i` hides it.
 
 import MaserCore
 import SwiftUI
@@ -28,9 +28,19 @@ struct AgentView: View {
                         .background(.yellow.opacity(0.15))
                         .shownText("agent-stale", note)
                 }
-                AgentConversation(agent: agent)
-                Divider()
-                AgentComposer(agent: agent)
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        AgentConversation(agent: agent)
+                        Divider()
+                        AgentComposer(agent: agent)
+                    }
+                    .frame(minWidth: 320, idealWidth: 420, maxWidth: agent.showsCanvas ? 480 : .infinity)
+                    if agent.showsCanvas {
+                        Divider()
+                        CanvasView(agent: agent, head: model.diffCommitID)
+                            .frame(minWidth: 320, maxWidth: .infinity)
+                    }
+                }
             }
         } else {
             let owner = model.pr.repository.nameWithOwner.split(separator: "/").first.map(String.init) ?? ""

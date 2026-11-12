@@ -41,6 +41,18 @@ final class AgentSession {
     /// Set to ask the Agent tab to focus the message box; it clears this once it has.
     var focusRequest = false
 
+    // Canvas
+    /// The diagram on the canvas, by ID; nil shows the newest.
+    var selectedDiagramID: String?
+    /// The selected element of the diagram on the canvas, by its index in the agent's list.
+    var selectedElement: Int?
+    /// Whether the Agent tab shows the canvas beside the conversation.
+    var showsCanvas = true
+    /// Lines an element cites outside the diff, opened read-only from the checkout.
+    var openedCitation: OpenedCitation?
+    /// Renders diagrams, loaded with Pele on first use.
+    @ObservationIgnored private var renderer: DiagramRenderer?
+
     /// The running `claude`, if any.
     @ObservationIgnored private var process: Process?
     /// Where messages are written to the running `claude`.
@@ -377,9 +389,141 @@ final class AgentSession {
                 text: AgentPRContext.render(
                     pr: pr, overview: review.overview, headCommit: head, commits: commits, files: review.diffFiles,
                     threads: review.allThreads) + note)
+        case "show_diagram":
+            return draw(call.arguments, review: review)
         default:
             return AgentTools.Reply(text: "\(call.tool) isn't available in this version of Maser yet.", isError: true)
         }
+    }
+
+    // MARK: - Canvas
+
+    /// Draws a diagram from the agent on the canvas, after checking it.
+    ///
+    /// The source is refused if it could act or reach out, rendered with Pele, and checked against the checkout and the
+    /// diff. Flagged elements are outlined, and the agent's reply lists them, so it can draw again.
+    ///
+    /// - Parameters:
+    ///   - arguments: The `show_diagram` arguments.
+    ///   - review: The review, for the diff.
+    /// - Returns: The agent's answer.
+    private func draw(_ arguments: String, review: ReviewModel) -> AgentTools.Reply {
+        guard let head = transcript.commit, review.diffCommitID == head, let checkout = checkoutPath else {
+            return AgentTools.Reply(
+                text: "The PR's diff changed since this message was sent. Ask the user to send a new message.", isError: true)
+        }
+        let diagram: Diagram
+        do {
+            diagram = try Diagram.decode(toolArguments: arguments)
+        } catch {
+            return AgentTools.Reply(text: "Those arguments aren't a diagram: \(error.localizedDescription)", isError: true)
+        }
+        do {
+            let renderer = try renderer ?? DiagramRenderer(script: Self.peleScript())
+            self.renderer = renderer
+            let rendering = try renderer.render(diagram)
+            let findings = DiagramGrounding.check(
+                diagram, checkout: URL(filePath: checkout), files: review.diffFiles, renderedIDs: rendering.ids)
+            let changes = Dictionary(
+                diagram.elements.compactMap { element in element.change.map { (element.id, $0) } },
+                uniquingKeysWith: { first, _ in first })
+            let flagged = Set(findings.filter { !$0.problems.isEmpty }.map(\.id))
+            let drawn = AgentDiagram(
+                diagram: diagram, commit: head,
+                svg: DiagramRenderer.annotate(rendering.svg, changes: changes, flagged: flagged), findings: findings)
+            transcript.diagrams.append(drawn)
+            selectedDiagramID = drawn.id
+            selectedElement = nil
+            showsCanvas = true
+            save()
+            return AgentTools.Reply(text: drawn.replyText)
+        } catch {
+            return AgentTools.Reply(text: "The diagram wasn't shown: \(error.localizedDescription)", isError: true)
+        }
+    }
+
+    /// The text of the bundled Pele.
+    ///
+    /// The app bundle carries it in its resources. A debug build run from the repository (`swift run`) reads the
+    /// vendored copy instead.
+    ///
+    /// - Returns: The script.
+    /// - Throws: An error if it can't be found or read.
+    private static func peleScript() throws -> String {
+        if let url = Bundle.main.url(forResource: "pele.global", withExtension: "js") {
+            return try String(contentsOf: url, encoding: .utf8)
+        }
+        #if DEBUG
+            let vendored = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().appending(path: "Vendor/pele/pele.global.js")
+            if let script = try? String(contentsOf: vendored, encoding: .utf8) { return script }
+        #endif
+        throw AgentFailure("Maser's diagram renderer (pele.global.js) is missing from the app.")
+    }
+
+    /// The diagram on the canvas: the one chosen, or else the newest.
+    var shownDiagram: AgentDiagram? {
+        transcript.diagrams.first { $0.id == selectedDiagramID } ?? transcript.diagrams.last
+    }
+
+    /// Shows an older or newer diagram, stopping at the ends.
+    ///
+    /// - Parameter offset: How many to move; negative goes to older ones.
+    func selectDiagram(offset: Int) {
+        let diagrams = transcript.diagrams
+        guard !diagrams.isEmpty else { return }
+        let current = diagrams.firstIndex { $0.id == shownDiagram?.id } ?? diagrams.count - 1
+        selectedDiagramID = diagrams[min(max(current + offset, 0), diagrams.count - 1)].id
+        selectedElement = nil
+    }
+
+    /// Moves the selection through the shown diagram's elements, stopping at the ends.
+    ///
+    /// - Parameter offset: How many to move; negative moves up.
+    func selectElement(offset: Int) {
+        guard let count = shownDiagram?.diagram.elements.count, count > 0 else { return }
+        selectedElement = selectedElement.map { min(max($0 + offset, 0), count - 1) } ?? (offset > 0 ? 0 : count - 1)
+    }
+
+    /// Opens the lines an element cites: in the Files tab when the diff has them, otherwise read-only from the checkout.
+    ///
+    /// - Parameter element: The element; the selected one if nil.
+    func openCitation(of element: Diagram.Element? = nil) {
+        guard let review,
+            let element = element ?? selectedElement.flatMap({ shownDiagram?.diagram.elements[safe: $0] }),
+            let text = element.citation, let citation = Citation(text)
+        else { return }
+        let removed = element.change == .removed
+        if let file = review.diffFiles.first(where: { (removed ? $0.oldPath ?? $0.path : $0.path) == citation.path }),
+            review.revealLine(path: file.path, line: citation.lines.lowerBound, side: removed ? .left : .right)
+        {
+            return
+        }
+        guard let checkout = checkoutPath,
+            let contents = try? String(contentsOf: URL(filePath: checkout).appending(path: citation.path), encoding: .utf8),
+            DiagramGrounding.lineCount(of: citation.path, in: URL(filePath: checkout)) != nil
+        else { return }
+        openedCitation = OpenedCitation(path: citation.path, lines: citation.lines, text: contents)
+    }
+
+    /// Handles a key's command while the Agent tab is showing.
+    ///
+    /// `]`/`[` move between diagrams, `j`/`k` between elements, Return opens the selected element's lines, and `i` shows
+    /// or hides the canvas.
+    ///
+    /// - Parameter command: The command.
+    /// - Returns: Whether the tab handled it; nil to let the review handle it as usual.
+    func perform(_ command: CommandID) -> Bool? {
+        switch command {
+        case .nextFile: selectDiagram(offset: 1)
+        case .previousFile: selectDiagram(offset: -1)
+        case .cursorDown: selectElement(offset: 1)
+        case .cursorUp: selectElement(offset: -1)
+        case .openSelected: openCitation()
+        case .toggleComments: showsCanvas.toggle()
+        default: return nil
+        }
+        return true
     }
 
     /// Saves the transcript, logging a failure; the conversation carries on in memory.
@@ -390,6 +534,22 @@ final class AgentSession {
             NSLog("Couldn't save the agent conversation for %@: %@", pr.url.absoluteString, error.localizedDescription)
         }
     }
+}
+
+/// Lines an element cites, read from the checkout.
+struct OpenedCitation: Identifiable {
+    let id = UUID()
+    /// The file's path in the repository.
+    let path: String
+    /// The cited lines.
+    let lines: ClosedRange<Int>
+    /// The whole file's text.
+    let text: String
+}
+
+extension Array {
+    /// The element at an index, or nil if it's out of range.
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
 /// A failure to show in the Agent tab.

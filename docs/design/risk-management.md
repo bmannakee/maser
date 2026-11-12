@@ -90,13 +90,13 @@ Each row lists:
 | HAZ-15 | Development: a live write test posts to a real PR other than the test PR. | H2 | S3 P2 Medium | RC-19 | S3 P1 Low |
 | HAZ-16 | A mistake in `config.toml` silently changes or removes bindings, so keys act unexpectedly (leading to HAZ-04). | H2 | S3 P3 Medium | RC-18 | S3 P1 Low |
 | HAZ-17 | A line comment is attached to the wrong line or side, because a cursor line is mapped to GitHub's line numbers incorrectly, for example for a range across hunks or sides. | H6 | S3 P3 Medium | RC-01, RC-20 | S3 P1 Low |
-| HAZ-18 | The agent misdescribes the change. A diagram leaves out a state or transition, shows a changed part as unchanged, or invents code that isn't there. The user relies on it instead of the diff and approves a defect. | H1 | S4 P3 **High** | RC-29, RC-30, RC-25 | Target S4 P2 Medium (planned) |
+| HAZ-18 | The agent misdescribes the change. A diagram leaves out a state or transition, shows a changed part as unchanged, or invents code that isn't there. The user relies on it instead of the diff and approves a defect. | H1 | S4 P3 **High** | RC-29, RC-30, RC-25 | S4 P2 Medium, pending the accuracy evaluation |
 | HAZ-19 | A comment the agent added to the pending review is wrong, misleading or misplaced, and the user submits it without reading it. It appears under their name. | H2, H6 | S3 P3 Medium | RC-26, RC-04, RC-12 | Target S3 P1 Low (planned) |
 | HAZ-20 | Text in the PR, its comments, or the repository's files steers the agent (prompt injection): to misdescribe the change, add misleading comments, or reveal data, such as files outside the checkout or the user's connected services (mail, documents), which `claude` loads by default. | H1, H2, H7 | S4 P3 **High** | RC-22, RC-26, RC-27, RC-29 | Target S4 P2 Medium (planned) |
 | HAZ-21 | Code from an organization that hasn't approved it is sent to the model provider through the agent. | H7 | S3 P3 Medium | RC-24 | S3 P1 Low |
 | HAZ-22 | The agent, or Maser preparing its checkout, changes the user's own clone or pushes: local work is lost, or a push appears under their name. | H3, H2 | S3 P2 Medium | RC-23, RC-22 | S3 P1 Low |
 | HAZ-23 | Settings, hooks, agents or MCP servers from the PR's repository load into the agent and run code on the user's Mac. A PR can be written to attack its reviewer. | H4 | S4 P3 **High** | RC-22 | S4 P1 Medium |
-| HAZ-24 | A diagram from the agent runs script, or loads remote content, in Maser's canvas. | H4, H7 | S4 P2 Medium | RC-28 | Target S4 P1 Medium (planned) |
+| HAZ-24 | A diagram from the agent runs script, or loads remote content, in Maser's canvas. | H4, H7 | S4 P2 Medium | RC-28 | S4 P1 Medium |
 | HAZ-25 | The agent's answers or diagrams describe an older commit than the one the user is now reviewing. | H1 | S4 P2 Medium | RC-25 | S4 P1 Medium |
 
 ## Risk controls
@@ -132,9 +132,9 @@ The verification for each control is the verification of its requirements, in [r
 | RC-25 | A conversation is pinned to a commit. Answers about an older commit are marked as such, and the checkout follows the head. | Protective measure | REQ-AGT-006 | Implemented |
 | RC-26 | Agent comments go through the user's checks (head, account, line in the diff), are badged as the agent's, and Finish Review asks before submitting ones the user hasn't opened. Each one says on GitHub that an agent drafted it. | Protective measure; information for safety | REQ-AGT-007 | **Proposed** |
 | RC-27 | Every agent action is shown in the conversation as it happens. | Information for safety | REQ-AGT-010 | Implemented |
-| RC-28 | The canvas renders only declarative diagram source, with bundled renderers, no network, and no agent script or HTML. | Inherent safety by design | REQ-CNV-002 | **Proposed** |
-| RC-29 | Diagrams are grounded: each element's citation is checked against the checkout, and each change mark against the diff. Mismatches and unsourced diagrams are flagged. | Protective measure | REQ-CNV-003, REQ-CNV-004 | **Proposed** |
-| RC-30 | Everything the agent produces is labeled as the agent's, with its commit, and none of it changes review state. | Information for safety | REQ-CNV-005 | **Proposed** |
+| RC-28 | The canvas renders only declarative diagram source, with bundled renderers, no network, and no agent script or HTML. | Inherent safety by design | REQ-CNV-002 | Implemented |
+| RC-29 | Diagrams are grounded: each element's citation is checked against the checkout, and each change mark against the diff. Mismatches and unsourced diagrams are flagged. | Protective measure | REQ-CNV-003, REQ-CNV-004 | Implemented |
+| RC-30 | Everything the agent produces is labeled as the agent's, with its commit, and none of it changes review state. | Information for safety | REQ-CNV-005 | Implemented |
 
 ## Residual risk
 
@@ -184,8 +184,15 @@ and RC-27, so HAZ-21, HAZ-22, HAZ-23 and HAZ-25 now carry real residual risks:
 - **HAZ-25:** Medium because the harm is Critical. A conversation about an older commit is marked, and the next message
   moves the agent on and tells it so (UI:agent-follows-head).
 
-The others carry target residual risks, which hold only once their controls are built: comments (RC-26), the canvas
-(RC-28 to RC-30). Until then the agent's comment and diagram tools answer that they aren't available. Two start High:
+The canvas was built the same day, with RC-28 to RC-30:
+
+- **HAZ-24:** Medium because the harm is Critical. Unsafe source is refused before rendering, Pele runs outside any
+  page with links and images off, and the canvas shows the SVG with page JavaScript off, no network, and every
+  navigation refused (UI:canvas-rejects-script, T:DiagramTests.sourceProblems).
+- **HAZ-18:** controls built; the estimate of P2 still waits on the accuracy evaluation (see below).
+
+HAZ-19 and HAZ-20 still carry target residual risks: they need RC-26, the agent's comments, which aren't built; until
+then the comment tool answers that it isn't available. Two hazards started High:
 
 - **HAZ-18** (the agent misdescribes the change): the defining risk of the feature, since a convincing diagram invites
   the user to stop reading the diff. RC-29 checks what can be checked mechanically, citations and change marks, but

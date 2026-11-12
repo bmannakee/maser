@@ -8,9 +8,9 @@
 import Foundation
 
 /// A diagram from the review agent.
-public struct Diagram: Codable, Equatable, Sendable {
+public struct Diagram: Codable, Hashable, Sendable {
     /// The diagram's source language.
-    public enum Format: String, Codable, Sendable {
+    public enum Format: String, Codable, Hashable, Sendable {
         /// Mermaid, rendered by the bundled Pele.
         case mermaid
         /// Graphviz DOT; planned, not rendered yet.
@@ -18,12 +18,12 @@ public struct Diagram: Codable, Equatable, Sendable {
     }
 
     /// Whether the PR changed an element.
-    public enum Change: String, Codable, Sendable {
+    public enum Change: String, Codable, Hashable, Sendable {
         case added, removed, changed, unchanged
     }
 
     /// One element of the diagram, as the agent describes it.
-    public struct Element: Codable, Equatable, Sendable {
+    public struct Element: Codable, Hashable, Sendable {
         /// The element's ID in the rendered diagram: a state or node's name in the source, or `edgeN` for the Nth edge.
         public let id: String
         /// Where it comes from, as `path:start-end` or `path:line` at the head commit; for a removed element, the old
@@ -131,7 +131,7 @@ public struct Citation: Equatable, Sendable {
 }
 
 /// What the grounding check found about one element.
-public struct ElementFinding: Equatable, Sendable {
+public struct ElementFinding: Codable, Hashable, Sendable {
     /// The element's ID.
     public let id: String
     /// What's wrong with it, as a sentence; empty if nothing is.
@@ -229,7 +229,7 @@ public enum DiagramGrounding {
     ///   - path: The path, relative to the checkout.
     ///   - checkout: The checkout's folder.
     /// - Returns: The number of lines, or nil if it isn't a readable file inside the checkout.
-    static func lineCount(of path: String, in checkout: URL) -> Int? {
+    public static func lineCount(of path: String, in checkout: URL) -> Int? {
         let root = checkout.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
         let file = checkout.appending(path: path).standardizedFileURL.resolvingSymlinksInPath()
         guard file.path(percentEncoded: false).hasPrefix(root.hasSuffix("/") ? root : root + "/"),

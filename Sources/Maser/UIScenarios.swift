@@ -26,6 +26,7 @@
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
             queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
+            canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -654,6 +655,98 @@
             try app.expect(
                 !review.agent.isStale && review.agent.transcript.commit == pushed, "the conversation is now about the new head",
                 app.summary)
+        }
+
+        /// A diagram from the agent is rendered, labeled as the agent's with its commit, and checked; the flagged element
+        /// is outlined and listed, and the agent is told.
+        static let canvasShowsDiagram = UIScenario(
+            "canvas-shows-diagram",
+            "REQ-CNV-001, REQ-CNV-004, REQ-CNV-005: A diagram is drawn, labeled as the agent's at its commit, and checked"
+        ) { app in
+            let review = try await openAgent(app)
+            let agent = review.agent
+            try await ask(app, review, "draw the door")
+            guard let drawn = agent.transcript.diagrams.last else {
+                throw UIScenarioFailure(description: "no diagram: \(agent.transcript.entries)")
+            }
+            let head = review.diffCommitID ?? ""
+            try await app.waitUntil("the canvas shows it, labeled as the agent's at the commit") {
+                ShownText.values["canvas-title"] == "Door (fake)"
+                    && ShownText.values["canvas-label"]?.hasPrefix("Drawn by the agent at \(head.prefix(7)).") == true
+            }
+            try app.expect(
+                drawn.svg.contains(#"data-id="closed""#)
+                    && drawn.svg.contains(#"[data-id="edge2"] :is(rect,ellipse,circle,polygon,path) { stroke-dasharray"#)
+                    && !drawn.svg.contains("<script"),
+                "the SVG has the elements, with the flagged one outlined", String(drawn.svg.prefix(300)))
+            try app.expect(
+                drawn.flagged.map(\.id) == ["edge2"] && ShownText.values["canvas-flags"] == "3 elements; 1 flagged",
+                "only the element citing lines the PR doesn't change is flagged", "\(drawn.findings)")
+            let reply = agent.transcript.entries.compactMap { if case let .tool(use) = $0 { use } else { nil } }.last
+            try app.expect(
+                reply?.result?.contains("Maser flagged these elements") == true && reply?.isError == false,
+                "the agent is told what was flagged", reply?.result ?? "")
+            try app.expect(
+                review.tab == .agent && review.overview != nil && review.pendingCommentCount == 0,
+                "drawing changed no review state", app.summary)
+            app.snapshot("canvas")
+        }
+
+        /// A diagram that could act or reach out is refused before it renders, and the agent is told why.
+        static let canvasRejectsScript = UIScenario(
+            "canvas-rejects-script", "REQ-CNV-002: A diagram with a click handler is refused, and nothing is drawn"
+        ) { app in
+            let review = try await openAgent(app)
+            try await ask(app, review, "draw unsafe")
+            let call = review.agent.transcript.entries.compactMap { if case let .tool(use) = $0 { use } else { nil } }.last
+            try app.expect(
+                call?.name == "mcp__maser__show_diagram" && call?.isError == true
+                    && call?.result?.contains("can't use click") == true,
+                "the call is refused with the reason", "\(String(describing: call))")
+            try app.expect(review.agent.transcript.diagrams.isEmpty, "nothing was drawn", app.summary)
+        }
+
+        /// Keys move through diagrams and elements; Return opens an element's lines, in the Files tab when they're in the
+        /// diff and read-only from the checkout when they're not.
+        static let canvasFollowsCitation = UIScenario(
+            "canvas-follows-citation",
+            "REQ-CNV-003, REQ-CNV-006: Keys choose a diagram and element, and Return opens its lines in the diff or the checkout"
+        ) { app in
+            let review = try await openAgent(app)
+            let agent = review.agent
+            try await ask(app, review, "draw the door")
+            try await ask(app, review, "draw it again")
+            try app.expect(agent.transcript.diagrams.count == 2, "two diagrams", app.summary)
+            try await app.press("[")
+            try app.expect(agent.shownDiagram?.id == agent.transcript.diagrams.first?.id, "[ shows the older one", app.summary)
+            try await app.press("]")
+            try app.expect(agent.shownDiagram?.id == agent.transcript.diagrams.last?.id, "] the newer one", app.summary)
+
+            // The third element cites COMMENT-TEST.md:3, a line PR #1 adds.
+            for _ in 0..<3 { try await app.press("j") }
+            try app.expect(agent.selectedElement == 2, "j moves through the elements", app.summary)
+            try await app.press("enter")
+            try await app.waitUntil("Return opens the cited line in the Files tab") {
+                review.tab == .files && review.selectedPath == "COMMENT-TEST.md"
+                    && review.cursorLineID.flatMap { review.selectedFile?.line(withID: $0)?.newLine } == 3
+            }
+
+            // The first cites Sources/Door.swift:2, which isn't in the diff.
+            try await app.press("g a")
+            try await app.press("k")
+            try await app.press("k")
+            try app.expect(agent.selectedElement == 0, "k moves back", app.summary)
+            try await app.press("enter")
+            try await app.waitUntil("Return opens lines outside the diff from the checkout") {
+                ShownText.values["citation-title"] == "Sources/Door.swift:2-2" && agent.openedCitation != nil
+            }
+            try await app.press("esc")
+            try await app.waitUntil("Esc closes it") { agent.openedCitation == nil }
+
+            try await app.press("i")
+            try app.expect(!agent.showsCanvas, "i hides the canvas", app.summary)
+            try await app.press("i")
+            try app.expect(agent.showsCanvas, "and shows it again", app.summary)
         }
 
         /// Going back to a PR finds it as it was left, without reloading it.

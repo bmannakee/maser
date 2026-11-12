@@ -41,6 +41,12 @@ struct MaserApp: App {
         }
         .defaultSize(width: 1500, height: 950)
 
+        // A diagram from the review agent, opened from the canvas.
+        WindowGroup("Diagram", for: AgentDiagram.self) { $drawn in
+            if let drawn {
+                DiagramWindow(drawn: drawn)
+            }
+        }
         Window("Open Pull Request", id: OpenPullRequestView.windowID) {
             OpenPullRequestView()
         }
