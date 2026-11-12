@@ -23,8 +23,8 @@ Made with the user on 2026-11-12.
 
 | Decision | Choice | Why | Rejected |
 | --- | --- | --- | --- |
-| How the agent runs | The user's own `claude` CLI, run headless, as Maser runs `gh` | Maser never handles an Anthropic credential (as RC-11 does for GitHub). The user's login, model and org policy apply. Claude Code supplies the agent loop and file tools. Nothing new to sign or ship except a small helper. | A bundled Agent SDK helper: it needs a Node or Python runtime, signed, on the work Mac. Calling the API from Swift: Maser would store a key and rebuild the loop and tools. |
-| Work code | Off until `[agent] allow` names the PR's owner or host | Whether a work organization's code may go to the model provider is the organization's decision. A default of off makes it a deliberate step (HAZ-21). | On everywhere; home only. |
+| How the agent runs | The user's own `claude` CLI, run headless, as Maser runs `gh` | Maser never handles an Anthropic credential (as RC-11 does for GitHub). The user's login, model and org policy apply. Claude Code supplies the agent loop and file tools. Nothing new to sign or ship except a small helper. | A bundled Agent SDK helper: it needs a Node or Python runtime, signed, on managed Macs. Calling the API from Swift: Maser would store a key and rebuild the loop and tools. |
+| Code owners' approval | Off until `[agent] allow` names the PR's owner or host | Whether code may go to the model provider is its owner's decision, which Maser can't know. A default of off makes allowing it a deliberate step by the user, who is responsible for having that approval (HAZ-21). | On everywhere; home only. |
 | What the agent may write | Line comments in the pending review, private until submit | Useful, and the user still submits. The comments carry the user's name, so they're badged in Maser and Finish Review asks before submitting unread ones (HAZ-19). | Suggestions the user must accept one by one (safer, slower). Posting directly (puts unread text in a shared record). |
 | Repository access | A read-only checkout of the head commit, owned by Maser | The agent sees what the PR contains, and can't touch the user's clone (HAZ-22). | Running builds and tests: a PR's code would run on the user's Mac (HAZ-23). |
 
@@ -55,8 +55,11 @@ Made with the user on 2026-11-12.
 - **`maser-agent-tools`** is a small executable in the app bundle. `claude` starts it as a stdio MCP server, and it
   forwards each call to the running Maser over a Unix socket. The socket lives in a per-session folder that only the
   user can read, and each call carries a per-session token. Maser listens on no network port.
+- **The whole PR, not one commit.** "The head commit" names the PR's state: the checkout is the repository at the
+  head, and the diff is the whole PR from the merge base, every commit in it, as the Files tab shows it.
 - **Maser's tools** (the only ones besides file reading):
-  - `pr_context`: the description, the diff at the commit, and the threads, from what Maser already loaded.
+  - `pr_context`: the description, the diff, the list of commits with their messages, and the threads, from what Maser
+    already loaded.
   - `add_review_comment`: path, line or range, side, body. It runs the user's own posting path: `ReviewModel`'s head
     and account checks, and the comment target rules.
   - `show_diagram`: format (`mermaid` or `dot`), source, title, and per-element citations and change marks.
@@ -64,7 +67,12 @@ Made with the user on 2026-11-12.
   borrows objects from the user's local clone, opened read-only through git's alternates, and otherwise fetches with
   `gh repo clone`. It checks out the head commit as a detached worktree and makes its files read-only. Where a local
   clone lives comes from `[agent] repositories` (folders to search), matched by remote URL.
-- **The canvas** is a `WKWebView` with JavaScript on but only for the bundled Mermaid and Viz.js renderers. A content
+- **The canvas** is a `WKWebView` with JavaScript on but only for the bundled renderers: [Pele](https://github.com/obsidianmd/pele)
+  (MIT, from Obsidian) for Mermaid, and Viz.js for DOT. Pele suits untrusted source: it ignores `click` callbacks,
+  escapes label text rather than rendering HTML, can turn links and images off (`links: false`, `images: false`),
+  and rejects oversized source and output. Its layout differs from Mermaid's own, which doesn't matter here.
+  Its `render()` returns SVG text, so if it runs in JavaScriptCore without a page, the canvas could show the SVG with
+  no script at all. A content
   security policy allows no network and no inline or remote script, and pages navigate nowhere. Diagram source goes in
   as data and is checked first: no HTML labels, no `click` callbacks, no links. Each rendered element reports its ID,
   so Maser can draw citation and change-mark flags over it and open its lines when it's chosen.
@@ -98,12 +106,14 @@ Each one is a PR that updates these documents, as usual.
 
 1. **Spike** (a verification record, no product code). Run `claude` headless with the planned command line. Record the
    stream-json event shapes. Confirm that a planted project hook and MCP server don't run, and that the stdio-to-socket
-   helper works. Confirm whether `claude` may be used at work, and which version is there.
+   helper works. Record the `claude` version tested, as the minimum. Render sample state machines with Pele: check that
+   its SVG gives each element an ID from the diagram source (needed to flag citations), and whether `render()` works
+   in JavaScriptCore without a page.
 2. **Conversation:** the pane, the checkout, the allow list, read tools, `pr_context`, commit pinning, the spending cap,
    and showing every action (REQ-AGT-001 to 006, 009, 010).
 3. **Canvas:** the renderers, checking, citations and change marks (REQ-CNV-001 to 006).
 4. **Comments:** `add_review_comment`, badges, and the Finish Review question (REQ-AGT-007, 008).
-5. **Evaluation:** the accuracy set, run before the agent is relied on at work.
+5. **Evaluation:** the accuracy set, run before the agent is relied on to review regulated software.
 
 ## Open questions
 
@@ -114,9 +124,7 @@ Each one is a PR that updates these documents, as usual.
    room, and the Files tab already has three columns.
 3. **Model and effort.** Use whatever `claude` is set to, or an `[agent] model` setting? Claude Opus 5.5 is the
    default suggestion.
-4. **Conversation storage.** `claude` keeps sessions in `~/.claude`. Is that acceptable for work code, or should Maser
+4. **Conversation storage.** `claude` keeps sessions in `~/.claude`. Is that acceptable for confidential code, or should Maser
    ask `claude` not to persist them, and keep only its own transcript?
-5. **Work approval.** Is `claude` installed and approved on the work Mac, under an enterprise account? This decides
-   whether `[agent] allow` will ever name a work organization.
-6. **More diagram kinds.** Mermaid and DOT cover state machines, flows, sequences and class diagrams. Data plots or
+5. **More diagram kinds.** Mermaid and DOT cover state machines, flows, sequences and class diagrams. Data plots or
    custom layouts would need Vega-Lite or similar, with the same checking. Leave it until a need appears.

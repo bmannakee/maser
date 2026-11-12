@@ -1,6 +1,6 @@
 # Maser — guide for contributors and coding agents
 
-Maser is a native macOS app for reviewing GitHub pull requests, built for one user who prefers the keyboard
+Maser is a native macOS app for reviewing GitHub pull requests, built for engineers who prefer the keyboard
 and vim-style keys. This file holds the project's conventions. Read it before changing code; when a convention changes,
 update it here in the same PR.
 
@@ -17,7 +17,7 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
 ```
 
 - Requires macOS 26 and Swift 6.2 (Xcode 26 or its command-line tools); `swift-tools-version: 6.2` is the lowest that
-  allows `.macOS(.v26)`. Keep both minimums there: the work Mac is managed and stays on macOS 26. A newer API needs an
+  allows `.macOS(.v26)`. Keep both minimums there: managed Macs may stay on macOS 26. A newer API needs an
   `if #available` check with a macOS 26 fallback.
 - `MASER_LIVE_TESTS=1 swift test` also runs read-only tests against real GitHub through `gh`.
 - `MASER_LIVE_WRITE_TESTS=1 swift test` writes to GitHub. It only touches the closed test PR bmannakee/maser#1

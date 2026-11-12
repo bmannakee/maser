@@ -19,7 +19,7 @@ change faithfully and acts only as the user intends.
 | H4 | The user's GitHub credentials, or their account, are compromised. | S4 Critical |
 | H5 | Time is lost to a hang, crash or confusing behavior, with no lasting effect. | S1 Negligible |
 | H6 | Feedback goes to the wrong place (a different line, file or PR), or never arrives, and the author acts on it wrongly or never sees it. | S3 Serious |
-| H7 | Code or data that the user's employer, or the PR's owner, hasn't approved for it is disclosed to a third party: here, the model provider. | S3 Serious |
+| H7 | Code or data is disclosed to a third party, here the model provider, that its owner hasn't approved. | S3 Serious |
 
 ## Risk estimation
 
@@ -165,7 +165,7 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
 - **HAZ-11:** Medium. A "loaded at" indicator on the Overview would reduce it further. It's recorded as a candidate
   control, not yet a requirement.
 
-The open risks need further controls before Maser is relied on for review at work:
+The open risks need further controls before Maser is relied on to review regulated software:
 
 | Hazard | Residual | Needs | Issue |
 | --- | --- | --- | --- |
@@ -185,9 +185,10 @@ hold only once their controls are built and verified. Two start High:
 The agent's comments carry the user's name on GitHub. The planned controls make them distinct in Maser only. Whether
 the posted text should also say an agent drafted it is an open question in [review-agent.md](review-agent.md).
 
-**Overall residual risk:** no residual risk is High since RC-04 (2026-11-10), and every proposed control was built by
-RC-10 on the same day. Before Maser is relied on for review at work, the usability evaluation needs to be run. It is
-acceptable for personal use.
+**Overall residual risk,** for the features built so far: no residual risk is High since RC-04 (2026-11-10), and every
+control proposed for them was built by RC-10 on the same day. Before Maser is relied on to review regulated software,
+the usability evaluation needs to be run. It is acceptable for other use. The review agent's risks are open until it's
+built (see above).
 
 ## Production and post-production
 
