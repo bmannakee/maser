@@ -47,6 +47,8 @@ extension GitHubCLI {
         try PullRequestCommit.decodeList(
             from: await run([
                 "pr", "view", String(pr.number), "--repo", "\(pr.host)/\(pr.repository.nameWithOwner)", "--json", "commits",
+                // Only what Maser reads; gh also gives each author's name and email, which it has no use for.
+                "--jq", "{commits: [.commits[] | {oid, messageHeadline, messageBody}]}",
             ]))
     }
 }

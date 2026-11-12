@@ -29,8 +29,9 @@ if [ -z "$scenarios" ]; then
         print substr($0, RSTART + 1, RLENGTH - 2); want = 0 }' Sources/Maser/UIScenarios.swift)"
 fi
 
-# A locked screen leaves loginwindow frontmost, and then no app can become active.
-if lsappinfo info -only name "$(lsappinfo front)" 2>/dev/null | grep -q loginwindow; then
+# No app can become active while the screen is locked. The console session says so directly; the system-wide
+# IOConsoleLocked flag can read false while the session is locked.
+if ioreg -n Root -d1 | grep -q '"CGSSessionScreenIsLocked"=Yes'; then
     echo "The screen is locked; the UI scenarios need it unlocked." >&2
     exit 2
 fi

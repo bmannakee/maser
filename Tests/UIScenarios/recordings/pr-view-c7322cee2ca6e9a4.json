@@ -1,0 +1,16 @@
+{
+  "args" : [
+    "pr",
+    "view",
+    "1",
+    "--repo",
+    "github.com/bmannakee/maser",
+    "--json",
+    "commits",
+    "--jq",
+    "{commits: [.commits[] | {oid, messageHeadline, messageBody}]}"
+  ],
+  "status" : 0,
+  "stderr" : "",
+  "stdout" : "{\"commits\":[{\"messageBody\":\"Co-Authored-By: Claude Opus 5.5 \\u003cnoreply@anthropic.com\\u003e\",\"messageHeadline\":\"Add throwaway file for testing comments\",\"oid\":\"4a3f86d1f0981128efd0a35f624f863f89384f2e\"},{\"messageBody\":\"Co-Authored-By: Claude Opus 5.5 \\u003cnoreply@anthropic.com\\u003e\",\"messageHeadline\":\"Test edit in README for full-file diff tests\",\"oid\":\"4e5b8e054d5da90dc647db34891d6247c454f495\"}]}\n"
+}
