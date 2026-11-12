@@ -58,6 +58,8 @@ public struct AgentTranscript: Codable, Equatable, Sendable {
     public var effort: String?
     /// What the session has cost, in US dollars, as `claude` last reported it.
     public var totalCostUSD = 0.0
+    /// The diagrams the agent drew, oldest first.
+    public var diagrams: [AgentDiagram] = []
 
     /// Creates an empty conversation.
     public init() {}
@@ -106,6 +108,55 @@ public struct AgentTranscript: Codable, Equatable, Sendable {
         else { return }
         change(&use)
         entries[index] = .tool(use)
+    }
+}
+
+/// A diagram the agent drew, as the canvas shows it.
+public struct AgentDiagram: Codable, Hashable, Identifiable, Sendable {
+    /// A unique ID, for choosing it on the canvas.
+    public let id: String
+    /// What the agent sent.
+    public let diagram: Diagram
+    /// The commit the diagram describes: the conversation's commit when it was drawn.
+    public let commit: String
+    /// The rendered SVG, with Maser's marks.
+    public let svg: String
+    /// What the grounding check found, one per element the agent described.
+    public let findings: [ElementFinding]
+    /// When it was drawn.
+    public let drawnAt: Date
+
+    /// Records a drawn diagram.
+    public init(
+        id: String = UUID().uuidString, diagram: Diagram, commit: String, svg: String, findings: [ElementFinding],
+        drawnAt: Date = .now
+    ) {
+        self.id = id
+        self.diagram = diagram
+        self.commit = commit
+        self.svg = svg
+        self.findings = findings
+        self.drawnAt = drawnAt
+    }
+
+    /// Whether no element cites any lines, so nothing in it can be checked against the code.
+    public var isUnsourced: Bool { !diagram.elements.contains { $0.citation != nil } }
+    /// The elements the grounding check found problems with.
+    public var flagged: [ElementFinding] { findings.filter { !$0.problems.isEmpty } }
+
+    /// What the agent is told after drawing: that it's shown, and anything flagged, so it can correct it.
+    public var replyText: String {
+        var lines = ["Shown on the user's canvas as \"\(diagram.title)\"."]
+        if isUnsourced {
+            lines.append(
+                "No element cites source lines, so the user is told it's unsourced. Cite path:start-end for each element.")
+        }
+        let flagged = flagged
+        if !flagged.isEmpty {
+            lines.append("Maser flagged these elements to the user; check them and draw again if they're wrong:")
+            lines += flagged.map { "- \($0.id) \($0.problems.joined(separator: "; "))" }
+        }
+        return lines.joined(separator: "\n")
     }
 }
 

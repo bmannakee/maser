@@ -62,7 +62,11 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   sends. Every file it reads and every tool it calls is listed, with what was refused. The header shows what it can
   read, the model and effort (changeable for this PR), and what the conversation has cost. If someone pushes, the
   conversation is marked as about the older commit until your next message moves the agent on. Conversations survive
-  quitting. Diagrams and comments from the agent are coming (#32).
+  quitting. Ask for a diagram, such as the state machine a PR changes, and it appears on the canvas beside the
+  conversation, labeled as the agent's at its commit. Each element lists the lines it comes from; Maser checks them
+  against the checkout and the diff, outlines anything that doesn't match, and tells the agent. On this tab `]`/`[`
+  move between diagrams, `j`/`k` between elements, Return opens the selected element's lines (in the Files tab when
+  they're in the diff), and `i` hides the canvas. Comments from the agent are coming (#32).
 
 ## Keyboard
 

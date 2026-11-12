@@ -134,7 +134,8 @@ Each one is a PR that updates these documents, as usual.
 2. **Conversation:** the pane, the checkout, the allow list, read tools, `pr_context`, commit pinning, the spending cap,
    and showing every action (REQ-AGT-001 to 006, 009 to 011). Built 2026-11-12 in four PRs (#35 to #38): core logic,
    checkout, tool bridge, and the Agent tab with a fake `claude` for the UI scenarios.
-3. **Canvas:** the renderers, checking, citations and change marks (REQ-CNV-001 to 006).
+3. **Canvas:** the renderers, checking, citations and change marks (REQ-CNV-001 to 006). Built 2026-11-12 (#39, #40),
+   Mermaid only: DOT waits for a need.
 4. **Comments:** `add_review_comment`, badges, and the Finish Review question (REQ-AGT-007, 008).
 5. **Evaluation:** the accuracy set, run before the agent is relied on to review regulated software.
 
