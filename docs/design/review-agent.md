@@ -29,7 +29,7 @@ Made with the user on 2026-11-12, in the review of #33.
 | Repository access | A read-only checkout of the head commit, owned by Maser | The agent sees what the PR contains, and can't touch the user's clone (HAZ-22). | Running builds and tests: a PR's code would run on the user's Mac (HAZ-23). |
 | Attribution | Each agent comment says, in its posted text, that an agent drafted it, naming the model | The comment carries the user's name, and colleagues should know what they're reading (HAZ-19). | No attribution; a setting with a default. |
 | Where it lives | A third tab, Agent, beside Overview and Files | The canvas needs room, and the Files tab already has three columns. | A side pane on both tabs. |
-| Model | `[agent] model`, which the Agent tab can change for one PR | The right model is likely to differ by PR. | Always `claude`'s own setting. |
+| Model and effort | `[agent] model` and `[agent] effort`, which the Agent tab can change for one PR | The right model and effort are likely to differ by PR. | Always `claude`'s own settings. |
 | Conversation storage | `claude`'s own session store, under the user's home folder | Acceptable for this iteration; revisit systematically if Maser gains other users. | Maser asking `claude` not to persist, keeping its own transcript. |
 
 ## Architecture
@@ -54,7 +54,7 @@ Made with the user on 2026-11-12, in the review of #33.
   `--print --input-format stream-json --output-format stream-json --verbose`, `--tools Read,Grep,Glob`,
   `--strict-mcp-config --mcp-config <maser's only>`, `--setting-sources user` (never `project` or `local`, which would
   load the PR's `.claude/` settings and hooks), `--permission-mode` set so nothing outside the tool list can be
-  approved, `--model`, `--max-budget-usd`, `--append-system-prompt` with Maser's instructions, and the checkout as the working
+  approved, `--model`, `--effort`, `--max-budget-usd`, `--append-system-prompt` with Maser's instructions, and the checkout as the working
   directory. These options exist in `claude` 2.1.322. What each actually does is checked in the spike.
 - **`maser-agent-tools`** is a small executable in the app bundle. `claude` starts it as a stdio MCP server, and it
   forwards each call to the running Maser over a Unix socket. The socket lives in a per-session folder that only the
@@ -121,7 +121,5 @@ Each one is a PR that updates these documents, as usual.
 
 ## Open questions
 
-1. **Effort.** Whether the Agent tab should also choose the effort level (`--effort`, if `claude` offers it), as it
-   chooses the model. Decide in the spike.
-2. **More diagram kinds.** Mermaid and DOT cover state machines, flows, sequences and class diagrams. Data plots or
+1. **More diagram kinds.** Mermaid and DOT cover state machines, flows, sequences and class diagrams. Data plots or
    custom layouts would need Vega-Lite or similar, with the same checking. Leave it until a need appears.
