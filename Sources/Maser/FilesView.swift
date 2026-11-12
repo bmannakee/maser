@@ -701,6 +701,11 @@ private struct ThreadView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 4) {
                         Text(comment.author).bold()
+                        if comment.isPending && AgentComment.isAgents(comment.body) {
+                            Tag(text: "Agent", color: .purple)
+                                .help("Drafted by the review agent; read it before you submit")
+                                .shownText("agent-badge", comment.id)
+                        }
                         Text("\(comment.createdAt, style: .relative) ago").foregroundStyle(.secondary)
                         if comment.isPending {
                             if !thread.isPending { Tag(text: "Pending", color: .orange) }

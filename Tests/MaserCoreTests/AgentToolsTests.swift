@@ -243,3 +243,49 @@ struct LiveAgentTests {
         #expect(finished?.text.contains(marker) == true, "\(finished?.text ?? "no result")")
     }
 }
+
+/// Tests for `AgentComment`.
+@Suite struct AgentCommentTests {
+    /// A file the PR changes: lines 13 to 17 of the new side, with one removed line.
+    static let files = DiagramTests.diff
+
+    @Test("REQ-AGT-007: The posted body says an agent drafted it, and is recognized by that line") func attribution() {
+        let body = AgentComment.body("  Is this tested?\n", model: "claude-opus-5-5")
+        #expect(body == "Is this tested?\n\n---\n_Drafted by an agent (claude-opus-5-5) in Maser._")
+        #expect(AgentComment.isAgents(body))
+        #expect(!AgentComment.isAgents("Is this tested?"))
+        #expect(!AgentComment.isAgents("_Drafted by an agent (x) in Maser._\n\nThen the user's own words."))
+    }
+
+    @Test("REQ-AGT-007: A comment goes only on lines in the diff, within one hunk") func targets() throws {
+        let request = { (json: String) in try AgentComment.Request.decode(json) }
+        let single = AgentComment.target(for: try request(#"{"path":"Sources/Door.swift","line":16,"body":"b"}"#), in: Self.files)
+        #expect(
+            try single.get() == CommentTarget(path: "Sources/Door.swift", side: .right, line: 16, startSide: nil, startLine: nil))
+        let range = AgentComment.target(
+            for: try request(#"{"path":"Sources/Door.swift","line":16,"start_line":15,"side":"RIGHT","body":"b"}"#),
+            in: Self.files)
+        #expect(
+            try range.get() == CommentTarget(path: "Sources/Door.swift", side: .right, line: 16, startSide: .right, startLine: 15)
+        )
+        let removed = AgentComment.target(
+            for: try request(#"{"path":"Sources/Door.swift","line":15,"side":"LEFT","body":"b"}"#), in: Self.files)
+        #expect(try removed.get().side == .left)
+
+        for (json, says) in [
+            (#"{"path":"Other.swift","line":1,"body":"b"}"#, "isn't in the PR's diff"),
+            (#"{"path":"Sources/Door.swift","line":2,"body":"b"}"#, "isn't in the diff"),
+            (
+                #"{"path":"Sources/Door.swift","line":16,"start_line":3,"body":"b"}"#,
+                "Line 3 of Sources/Door.swift isn't in the diff"
+            ),
+        ] {
+            guard case let .failure(refusal) = AgentComment.target(for: try request(json), in: Self.files) else {
+                Issue.record("expected a refusal for \(json)")
+                continue
+            }
+            #expect(refusal.message.contains(says), "\(refusal.message)")
+        }
+        #expect(throws: (any Error).self) { try request(#"{"path":"x","body":"no line"}"#) }
+    }
+}

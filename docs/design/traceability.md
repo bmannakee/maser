@@ -24,7 +24,7 @@ Every user need must have at least one implemented requirement.
 | UN-10 | REQ-GH-005, REQ-QUE-005, REQ-WIN-001, REQ-DIF-005, REQ-DIF-007, REQ-PLT-003 | — |
 | UN-11 | REQ-AGT-001, REQ-AGT-002, REQ-AGT-004, REQ-AGT-006, REQ-AGT-009, REQ-AGT-010, REQ-AGT-011 | — |
 | UN-12 | REQ-CNV-001, REQ-CNV-002, REQ-CNV-003, REQ-CNV-004, REQ-CNV-005 | — |
-| UN-13 | — | REQ-AGT-007 |
+| UN-13 | REQ-AGT-007 | — |
 | UN-14 | REQ-AGT-002, REQ-AGT-003, REQ-AGT-004, REQ-AGT-005, REQ-AGT-008, REQ-AGT-010, REQ-CNV-002 | — |
 <!-- trace:end needs-to-requirements -->
 
@@ -54,8 +54,8 @@ The requirements listed are those that implement each hazard's controls, as the 
 | HAZ-16 | H2 | RC-18 | REQ-CFG-002 | S3 P1 Low |
 | HAZ-17 | H6 | RC-01, RC-20 | REQ-DIF-001, REQ-CMT-001 | S3 P1 Low |
 | HAZ-18 | H1 | RC-29, RC-30, RC-25 | REQ-CNV-003, REQ-CNV-004, REQ-CNV-005, REQ-AGT-006 | S4 P2 Medium, pending the accuracy evaluation |
-| HAZ-19 | H2, H6 | RC-26, RC-04, RC-12 | REQ-AGT-007 (proposed), REQ-CMT-007, REQ-CMT-009 | Target S3 P1 Low (planned) |
-| HAZ-20 | H1, H2, H7 | RC-22, RC-26, RC-27, RC-29 | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008, REQ-AGT-007 (proposed), REQ-AGT-010, REQ-CNV-003, REQ-CNV-004 | Target S4 P2 Medium (planned) |
+| HAZ-19 | H2, H6 | RC-26, RC-04, RC-12 | REQ-AGT-007, REQ-CMT-007, REQ-CMT-009 | S3 P1 Low |
+| HAZ-20 | H1, H2, H7 | RC-22, RC-26, RC-27, RC-29 | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008, REQ-AGT-007, REQ-AGT-010, REQ-CNV-003, REQ-CNV-004 | S4 P2 Medium, pending the accuracy evaluation |
 | HAZ-21 | H7 | RC-24 | REQ-AGT-005 | S3 P1 Low |
 | HAZ-22 | H3, H2 | RC-23, RC-22 | REQ-AGT-004, REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | S3 P1 Low |
 | HAZ-23 | H4 | RC-22 | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | S4 P1 Medium |
@@ -72,15 +72,15 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | Coverage | Count | Requirements (REQ-…) |
 | --- | --- | --- |
 | Unit tests, fully | 33 | GH-003, GH-004, QUE-001, QUE-002, QUE-003, QUE-004, WIN-008, OVR-001, DIF-001, DIF-002, CMT-001, CMT-007, CMT-008, CMT-009, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-008, AGT-009, AGT-010, AGT-011, CNV-001, CNV-002, CNV-003, CNV-004, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
-| Unit tests, partly (the rest is a gap) | 8 | GH-002, GH-006, QUE-007, OVR-004, DIF-003, DIF-004, DIF-006, DIF-008 |
+| Unit tests, partly (the rest is a gap) | 9 | GH-002, GH-006, QUE-007, OVR-004, DIF-003, DIF-004, DIF-006, DIF-008, AGT-007 |
 | UI scenarios (no unit tests) | 9 | WIN-001, WIN-003, WIN-007, DIF-009, CNV-005, CNV-006, KEY-002, KEY-003, KEY-004 |
 | Live GitHub tests only | 4 | DIF-007, CMT-002, CMT-005, CMT-006 |
 | A one-off scripted run or use (not repeatable) | 2 | WIN-006, DIF-005 |
 | Inspection only | 6 | GH-001, GH-005, OVR-002, CMT-004, PLT-001, PLT-002 |
 | None yet | 10 | QUE-005, QUE-006, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
-| Proposed (not built) | 1 | AGT-007 |
+| Proposed (not built) | 0 | — |
 
-73 requirements: 72 implemented and 1 proposed.
+73 requirements: 73 implemented and 0 proposed.
 <!-- trace:end coverage -->
 
 Most of the "one-off", "inspection only" and "none yet" rows have UI scenarios planned (`UI:…` after `Gap` in
@@ -91,5 +91,5 @@ risk as well as for coverage.
 
 1. **More UI scenarios:** the planned ones for risk controls first: UI:finish-review-defaults (RC-07),
    UI:discard-confirms (RC-08), UI:link-opens-browser (RC-16), UI:open-pr-marker (RC-06).
-2. **Review agent (#32):** the conversation and the canvas are built (increments 2 and 3). Next are the agent's
-   comments (RC-26), then the accuracy evaluation that HAZ-18's estimate waits on.
+2. **Review agent (#32):** the conversation, canvas and comments are built (increments 2 to 4). Next is the accuracy
+   evaluation that the estimates for HAZ-18 and HAZ-20 wait on.

@@ -6,6 +6,7 @@
 //
 // - containing "pr_context": calls that tool and answers with the first line it returned;
 // - containing "outside": tries to read /etc/hosts and reports it refused, as `dontAsk` mode would;
+// - containing "comment": calls add_review_comment on line 3 of COMMENT-TEST.md, which test PR #1 adds;
 // - containing "draw unsafe": calls show_diagram with a `click` directive, which Maser must refuse;
 // - containing "draw": calls show_diagram with a door diagram whose `edge2` cites lines the PR doesn't change;
 // - anything else: answers "You said: …".
@@ -115,7 +116,29 @@ while let line = readLine() {
     var denials: [[String: Any]] = []
     callNumber += 1
     let callID = "toolu_fake_\(callNumber)"
-    if text.contains("draw"), let server {
+    if text.contains("comment"), let server {
+        let arguments: [String: Any] = [
+            "path": "COMMENT-TEST.md", "line": 3, "side": "RIGHT", "body": "Is this file meant to stay?",
+        ]
+        emit([
+            "type": "assistant", "session_id": sessionID,
+            "message": [
+                "role": "assistant",
+                "content": [["type": "tool_use", "id": callID, "name": "mcp__maser__add_review_comment", "input": arguments]],
+            ],
+        ])
+        let result = server.request("tools/call", ["name": "add_review_comment", "arguments": arguments])
+        let content = ((result?["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        let isError = result?["isError"] as? Bool ?? true
+        emit([
+            "type": "user", "session_id": sessionID,
+            "message": [
+                "role": "user",
+                "content": [["type": "tool_result", "tool_use_id": callID, "content": content, "is_error": isError]],
+            ],
+        ])
+        answer = "Commented: \(content)"
+    } else if text.contains("draw"), let server {
         let unsafe = text.contains("unsafe")
         let source =
             unsafe

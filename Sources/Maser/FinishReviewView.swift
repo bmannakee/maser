@@ -30,7 +30,7 @@ struct FinishReviewView: View {
                 Text(account)
                     .foregroundStyle(.secondary)
                     .shownText("finish-review-account", account)
-                Text(pendingDescription).foregroundStyle(.secondary)
+                Text(pendingDescription).foregroundStyle(.secondary).shownText("finish-review-pending", pendingDescription)
             }
 
             TextEditor(text: $model.reviewSummary)
@@ -83,7 +83,12 @@ struct FinishReviewView: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button("Submit Review") {
-                    Task { await model.submitReview() }
+                    // The agent's comments go out under the user's name, so submitting unread ones takes a second step.
+                    if model.unopenedAgentComments.isEmpty {
+                        Task { await model.submitReview() }
+                    } else {
+                        model.isConfirmingUnopenedAgentComments = true
+                    }
                 }
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
@@ -112,14 +117,29 @@ struct FinishReviewView: View {
         } message: {
             Text("This deletes the pending review and its draft comments from GitHub.")
         }
+        .confirmationDialog(unopenedQuestion, isPresented: $model.isConfirmingUnopenedAgentComments) {
+            Button("Submit Anyway") { Task { await model.submitReview() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("They'll be posted under your name. Open them in the Files tab's comments pane (n) to read them first.")
+                .shownText("agent-unopened-question", unopenedQuestion)
+        }
     }
 
-    /// The subtitle saying how many draft comments submitting will publish.
+    /// The question asked before submitting the agent's comments the user hasn't opened.
+    private var unopenedQuestion: String {
+        let count = model.unopenedAgentComments.count
+        return "Submit \(count) comment\(count == 1 ? "" : "s") the agent drafted that you haven't opened?"
+    }
+
+    /// The subtitle saying how many draft comments submitting will publish, and how many the agent drafted.
     private var pendingDescription: String {
-        switch model.pendingCommentCount {
+        let agent = model.agentComments.count
+        let byAgent = agent == 0 ? "" : ", \(agent) drafted by the agent"
+        return switch model.pendingCommentCount {
         case 0: "No draft comments. Submit a verdict or summary on its own."
-        case 1: "1 draft comment will be published."
-        case let count: "\(count) draft comments will be published."
+        case 1: "1 draft comment\(byAgent) will be published."
+        case let count: "\(count) draft comments\(byAgent) will be published."
         }
     }
 }
