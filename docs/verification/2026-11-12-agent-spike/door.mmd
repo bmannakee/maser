@@ -1,0 +1,9 @@
+stateDiagram-v2
+    [*] --> closed
+    closed --> opening: open
+    opening --> open: done
+    open --> closing: close
+    closing --> closed: done
+    closed --> locked: lock
+    locked --> closed: unlock
+    closing --> opening: obstructed
