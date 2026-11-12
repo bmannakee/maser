@@ -29,6 +29,15 @@ final class ConfigStore {
     }
     /// Human-readable problems from the last load, such as unknown commands or a read or parse error.
     private(set) var problems: [String] = []
+
+    #if DEBUG
+        /// Changes the agent's settings in memory, for UI scenarios that need the agent off or configured differently.
+        ///
+        /// - Parameter change: Changes the settings in place.
+        func overrideAgentSettings(_ change: (inout AgentSettings) -> Void) {
+            change(&settings.agent)
+        }
+    #endif
     /// Whether the user closed the problems banner; reset whenever the list of problems changes.
     var problemsDismissed = false
 

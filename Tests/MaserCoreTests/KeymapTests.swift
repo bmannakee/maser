@@ -189,8 +189,8 @@ import Testing
                 [keys.normal]
                 refresh = "g"
                 """)
-        #expect(result.problems.count == 4)  // hides "g o", "g f", "g g" and "g p"
-        #expect(result.problems[0].contains("\"g\" (refresh) hides \"g f\" (show-files)"))
+        #expect(result.problems.count == 5)  // hides "g a", "g o", "g f", "g g" and "g p"
+        #expect(result.problems[0].contains("\"g\" (refresh) hides \"g a\" (show-agent)"))
         #expect(result.keymap.match([KeyChord("g")]) == .command(.refresh))
     }
 

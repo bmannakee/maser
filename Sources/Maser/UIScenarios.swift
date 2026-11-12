@@ -25,7 +25,7 @@
         static let all: [UIScenario] = [
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
             queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
-            draftSurvivesRelaunch, closedPRLeavesPane,
+            draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -514,6 +514,146 @@
                 app.review?.pr.number == mainPR && app.review?.commentDraft == "Not posted yet."
                     && !app.queuePRs.contains { $0.number == mainPR },
                 "with its text, though the queue dropped it", app.summary)
+        }
+
+        /// Opens the test PR's Agent tab, once its diff and account have loaded.
+        ///
+        /// - Parameter app: The driver.
+        /// - Returns: The PR's review.
+        /// - Throws: `UIScenarioFailure` if the PR or the tab doesn't open.
+        private static func openAgent(_ app: UIScenarioDriver) async throws -> ReviewModel {
+            try await app.openFromQueue(testPR)
+            guard let review = app.review else { throw UIScenarioFailure(description: "no review") }
+            try await app.waitUntil("the diff loads") { review.diffCommitID != nil }
+            try await app.press("g a")
+            try app.expect(review.tab == .agent, "g a shows the Agent tab", app.summary)
+            return review
+        }
+
+        /// Sends a message from the Agent tab's box and waits for the turn to end.
+        ///
+        /// - Parameters:
+        ///   - app: The driver.
+        ///   - review: The PR's review.
+        ///   - message: The message.
+        /// - Throws: `UIScenarioFailure` if the box doesn't focus or the turn doesn't end.
+        private static func ask(_ app: UIScenarioDriver, _ review: ReviewModel, _ message: String) async throws {
+            let ends = review.agent.transcript.entries.count { if case .turnEnded = $0 { true } else { false } }
+            try await app.press("c")
+            try await app.waitUntil("c focuses the message box") { app.responder == .editor }
+            await app.type(message)
+            try await app.press("cmd+enter")
+            try await app.waitUntil("the agent answers \"\(message)\"", timeout: .seconds(20)) {
+                review.agent.status == .idle
+                    && review.agent.transcript.entries.count { if case .turnEnded = $0 { true } else { false } } == ends + 1
+            }
+            try await app.press("esc")
+        }
+
+        /// The conversation reaches Maser's tools through the real helper, shows every call and refusal, keeps its cost,
+        /// uses the chosen effort, and carries on after a crash.
+        static let agentConversation = UIScenario(
+            "agent-conversation",
+            "REQ-AGT-001, REQ-AGT-002, REQ-AGT-009, REQ-AGT-010, REQ-AGT-011: A conversation with tool calls, refusals, cost, effort, and a relaunch"
+        ) { app in
+            let review = try await openAgent(app)
+            let agent = review.agent
+            if app.relaunched {
+                try app.expect(agent.transcript.entries.count >= 6, "the conversation is back after the crash", app.summary)
+                guard let session = agent.transcript.sessionID else {
+                    throw UIScenarioFailure(description: "no session to resume: \(app.summary)")
+                }
+                try await ask(app, review, "still there?")
+                try app.expect(
+                    app.claudeStarts.last.map { $0.contains("--resume") && $0.contains(session) } == true,
+                    "the next message resumes the same session", "\(app.claudeStarts.last ?? [])")
+                return
+            }
+            let head = review.diffCommitID ?? ""
+            try await app.waitUntil("the tab says what the agent reads") {
+                ShownText.values["agent-scope"]?.hasPrefix("Reads bmannakee/maser at \(head.prefix(7)), read-only") == true
+            }
+
+            try await ask(app, review, "Please call pr_context")
+            let tools = agent.transcript.entries.compactMap { if case let .tool(use) = $0 { use } else { nil } }
+            try app.expect(
+                tools.first?.name == "mcp__maser__pr_context" && tools.first?.isError == false
+                    && tools.first?.result?.contains("bmannakee/maser #1") == true,
+                "pr_context went through the helper to Maser and back", "\(tools)")
+            let answer = agent.transcript.entries.compactMap { if case let .agent(text) = $0 { text } else { nil } }.last
+            try app.expect(answer?.hasPrefix("Read the PR: # bmannakee/maser #1") == true, "the answer is shown", answer ?? "")
+            try app.expect(ShownText.values["agent-cost"] == "$0.01", "the cost is shown", "\(ShownText.values)")
+            let first = app.claudeStarts.first ?? []
+            let confining = ["--permission-mode", "dontAsk", "--setting-sources", "user", "--strict-mcp-config"]
+            try app.expect(
+                confining.allSatisfy(first.contains) && !first.contains("--resume") && !first.contains("--effort"),
+                "claude ran with the confining flags, no resume and no effort set", "\(first)")
+
+            try await ask(app, review, "read something outside")
+            let refused = agent.transcript.entries.compactMap { if case let .tool(use) = $0 { use } else { nil } }.last
+            try app.expect(
+                refused?.name == "Read" && refused?.isRefused == true, "the refusal is shown", "\(String(describing: refused))")
+
+            agent.setEffort(.max)
+            try await app.waitUntil("the tab shows the effort chosen") { ShownText.values["agent-effort"] == "max" }
+            try await ask(app, review, "hello again")
+            let restart = app.claudeStarts.last ?? []
+            try app.expect(
+                app.claudeStarts.count == 2 && restart.contains("--effort") && restart.contains("max")
+                    && restart.contains(agent.transcript.sessionID ?? "?"),
+                "a new effort restarts claude, resuming the session", "\(app.claudeStarts)")
+            try app.expect(
+                ShownText.values["agent-cost"] == "$0.03", "the cost carries on across the restart", "\(ShownText.values)")
+            app.crash()
+        }
+
+        /// The agent stays off for a PR whose owner isn't allowed, and says how to allow it.
+        static let agentOffUntilAllowed = UIScenario(
+            "agent-off-until-allowed", "REQ-AGT-005: The Agent tab is off until [agent] allow names the owner, and says so"
+        ) { app in
+            ConfigStore.shared.overrideAgentSettings { $0.allow = [] }
+            _ = try await openAgent(app)
+            try await app.waitUntil("the tab says the agent is off, and how to allow it") {
+                ShownText.values["agent-off"]?.hasPrefix("To let it read this PR, add \"bmannakee\" to [agent] allow") == true
+            }
+            try await app.press("c")
+            try app.expect(app.claudeLog.isEmpty, "claude was never started", "\(app.claudeLog)")
+
+            ConfigStore.shared.overrideAgentSettings { $0.allow = ["bmannakee"].compactMap(AgentSettings.AllowRule.init) }
+            try await app.waitUntil("allowing the owner turns it on") { ShownText.values["agent-scope"] != nil }
+        }
+
+        /// After a push, the conversation is marked as about the older commit, and the next message moves the agent on.
+        static let agentFollowsHead = UIScenario(
+            "agent-follows-head",
+            "REQ-AGT-006: After a push, the conversation is marked as older, and the next message moves the agent to the new head"
+        ) { app in
+            let review = try await openAgent(app)
+            try await ask(app, review, "first")
+            let seen = review.diffCommitID ?? ""
+            let pushed = String(repeating: "2", count: 40)
+            try app.overrideGH([
+                .init(
+                    match: ["number=\(testPR)", "headRefOid"], status: 0,
+                    stdout:
+                        #"{"data":{"viewer":{"login":"\#(review.postingAccount ?? "")"},"repository":{"pullRequest":{"id":"\#(review.reviewContext?.pullRequestID ?? "")","headRefOid":"\#(pushed)","reviews":{"nodes":[]}}}}}"#,
+                    stderr: nil)
+            ])
+            try await app.press("r")
+            try await app.waitUntil("the refresh finds the new head") { review.diffCommitID == pushed }
+            try await app.waitUntil("the conversation is marked as about the older commit") {
+                ShownText.values["agent-stale"]?.hasPrefix("This conversation is about \(seen.prefix(7))") == true
+            }
+            try await ask(app, review, "and now?")
+            try app.expect(
+                app.claudeMessages.last?.hasPrefix("[Maser: the PR's head commit changed from \(seen) to \(pushed)") == true,
+                "the agent is told the head moved", app.claudeMessages.last ?? "")
+            try app.expect(
+                app.claudeStarts.count == 2 && app.claudeStarts.last?.contains("--resume") == true,
+                "claude restarted on the new commit, resuming the session", "\(app.claudeStarts)")
+            try app.expect(
+                !review.agent.isStale && review.agent.transcript.commit == pushed, "the conversation is now about the new head",
+                app.summary)
         }
 
         /// Going back to a PR finds it as it was left, without reloading it.

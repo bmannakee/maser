@@ -93,11 +93,11 @@ Each row lists:
 | HAZ-18 | The agent misdescribes the change. A diagram leaves out a state or transition, shows a changed part as unchanged, or invents code that isn't there. The user relies on it instead of the diff and approves a defect. | H1 | S4 P3 **High** | RC-29, RC-30, RC-25 | Target S4 P2 Medium (planned) |
 | HAZ-19 | A comment the agent added to the pending review is wrong, misleading or misplaced, and the user submits it without reading it. It appears under their name. | H2, H6 | S3 P3 Medium | RC-26, RC-04, RC-12 | Target S3 P1 Low (planned) |
 | HAZ-20 | Text in the PR, its comments, or the repository's files steers the agent (prompt injection): to misdescribe the change, add misleading comments, or reveal data, such as files outside the checkout or the user's connected services (mail, documents), which `claude` loads by default. | H1, H2, H7 | S4 P3 **High** | RC-22, RC-26, RC-27, RC-29 | Target S4 P2 Medium (planned) |
-| HAZ-21 | Code from an organization that hasn't approved it is sent to the model provider through the agent. | H7 | S3 P3 Medium | RC-24 | Target S3 P1 Low (planned) |
-| HAZ-22 | The agent, or Maser preparing its checkout, changes the user's own clone or pushes: local work is lost, or a push appears under their name. | H3, H2 | S3 P2 Medium | RC-23, RC-22 | Target S3 P1 Low (planned) |
-| HAZ-23 | Settings, hooks, agents or MCP servers from the PR's repository load into the agent and run code on the user's Mac. A PR can be written to attack its reviewer. | H4 | S4 P3 **High** | RC-22 | Target S4 P1 Medium (planned) |
+| HAZ-21 | Code from an organization that hasn't approved it is sent to the model provider through the agent. | H7 | S3 P3 Medium | RC-24 | S3 P1 Low |
+| HAZ-22 | The agent, or Maser preparing its checkout, changes the user's own clone or pushes: local work is lost, or a push appears under their name. | H3, H2 | S3 P2 Medium | RC-23, RC-22 | S3 P1 Low |
+| HAZ-23 | Settings, hooks, agents or MCP servers from the PR's repository load into the agent and run code on the user's Mac. A PR can be written to attack its reviewer. | H4 | S4 P3 **High** | RC-22 | S4 P1 Medium |
 | HAZ-24 | A diagram from the agent runs script, or loads remote content, in Maser's canvas. | H4, H7 | S4 P2 Medium | RC-28 | Target S4 P1 Medium (planned) |
-| HAZ-25 | The agent's answers or diagrams describe an older commit than the one the user is now reviewing. | H1 | S4 P2 Medium | RC-25 | Target S4 P1 Medium (planned) |
+| HAZ-25 | The agent's answers or diagrams describe an older commit than the one the user is now reviewing. | H1 | S4 P2 Medium | RC-25 | S4 P1 Medium |
 
 ## Risk controls
 
@@ -126,12 +126,12 @@ The verification for each control is the verification of its requirements, in [r
 | RC-19 | Live write tests are hard-coded to bmannakee/maser#1, which `AGENTS.md` requires. | Process control | — (I: `LiveReviewWriteTests`) | Implemented |
 | RC-20 | Comment targets are computed from the parsed line numbers on each side, and clipped to one hunk. | Inherent safety by design | REQ-CMT-001 | Implemented |
 | RC-21 | Every diff line is drawn in full: long lines wrap inside their row, and a scenario checks that no line's text leaves its row. Found in use on 2026-11-10, when wrapped lines were drawn partly under the next line. | Inherent safety by design | REQ-DIF-009 | Implemented; UI:long-lines-wrap |
-| RC-22 | The agent is confined. It's the user's own `claude`, so Maser holds no credential. Its tool set is fixed by Maser: read-only file tools in its checkout, and Maser's tools. It has no shell, no web, no other MCP servers or connectors, no reads outside its checkout, and no settings, hooks or `CLAUDE.md` from the PR's repository. It can't submit or post publicly. | Inherent safety by design | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | **Proposed** |
-| RC-23 | The agent reads a separate checkout that Maser owns. The user's clone is only ever read. | Inherent safety by design | REQ-AGT-004 | **Proposed** |
-| RC-24 | The agent is off unless `config.toml` allows the PR's owner or host, and the pane shows what it can read. | Protective measure | REQ-AGT-005 | **Proposed** |
-| RC-25 | A conversation is pinned to a commit. Answers about an older commit are marked as such, and the checkout follows the head. | Protective measure | REQ-AGT-006 | **Proposed** |
+| RC-22 | The agent is confined. It's the user's own `claude`, so Maser holds no credential. Its tool set is fixed by Maser: read-only file tools in its checkout, and Maser's tools. It has no shell, no web, no other MCP servers or connectors, no reads outside its checkout, and no settings, hooks or `CLAUDE.md` from the PR's repository. It can't submit or post publicly. | Inherent safety by design | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | Implemented |
+| RC-23 | The agent reads a separate checkout that Maser owns. The user's clone is only ever read. | Inherent safety by design | REQ-AGT-004 | Implemented |
+| RC-24 | The agent is off unless `config.toml` allows the PR's owner or host, and the pane shows what it can read. | Protective measure | REQ-AGT-005 | Implemented |
+| RC-25 | A conversation is pinned to a commit. Answers about an older commit are marked as such, and the checkout follows the head. | Protective measure | REQ-AGT-006 | Implemented |
 | RC-26 | Agent comments go through the user's checks (head, account, line in the diff), are badged as the agent's, and Finish Review asks before submitting ones the user hasn't opened. Each one says on GitHub that an agent drafted it. | Protective measure; information for safety | REQ-AGT-007 | **Proposed** |
-| RC-27 | Every agent action is shown in the conversation as it happens. | Information for safety | REQ-AGT-010 | **Proposed** |
+| RC-27 | Every agent action is shown in the conversation as it happens. | Information for safety | REQ-AGT-010 | Implemented |
 | RC-28 | The canvas renders only declarative diagram source, with bundled renderers, no network, and no agent script or HTML. | Inherent safety by design | REQ-CNV-002 | **Proposed** |
 | RC-29 | Diagrams are grounded: each element's citation is checked against the checkout, and each change mark against the diff. Mismatches and unsourced diagrams are flagged. | Protective measure | REQ-CNV-003, REQ-CNV-004 | **Proposed** |
 | RC-30 | Everything the agent produces is labeled as the agent's, with its commit, and none of it changes review state. | Information for safety | REQ-CNV-005 | **Proposed** |
@@ -171,8 +171,21 @@ The open risks need further controls before Maser is relied on to review regulat
 | --- | --- | --- | --- |
 | HAZ-12 | Low (observation) | Timeouts on `gh` calls, which have none today, so a hung `gh` loads forever | #21 |
 
-**The review agent (#32)** is planned, not built. Its hazards (HAZ-18 to HAZ-25) carry target residual risks, which
-hold only once their controls are built and verified. Two start High:
+**The review agent (#32)** is being built in increments. The conversation was built on 2026-11-12, with RC-22 to RC-25
+and RC-27, so HAZ-21, HAZ-22, HAZ-23 and HAZ-25 now carry real residual risks:
+
+- **HAZ-21:** Low. The agent stays off until the user names the owner, and the tab names the setting and the
+  condition (UI:agent-off-until-allowed). It still relies on the user knowing the owner's policy.
+- **HAZ-22:** Low. The checkout is Maser's own, made by fetching from the user's clone, which only reads it
+  (T:AgentCheckoutTests).
+- **HAZ-23:** Medium because the harm is Critical. The confining flags are pinned by T:AgentTests.commandLine and
+  checked against the real `claude` (L:LiveAgentTests.bridge; spike V1 to V5). A future `claude` that changed what these
+  flags do would reopen it, which is why the live test runs before changes to how the agent is run.
+- **HAZ-25:** Medium because the harm is Critical. A conversation about an older commit is marked, and the next message
+  moves the agent on and tells it so (UI:agent-follows-head).
+
+The others carry target residual risks, which hold only once their controls are built: comments (RC-26), the canvas
+(RC-28 to RC-30). Until then the agent's comment and diagram tools answer that they aren't available. Two start High:
 
 - **HAZ-18** (the agent misdescribes the change): the defining risk of the feature, since a convincing diagram invites
   the user to stop reading the diff. RC-29 checks what can be checked mechanically, citations and change marks, but

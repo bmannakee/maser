@@ -96,6 +96,10 @@ import SwiftUI
             guard ConfigStore.shared.settings.ghPath?.hasSuffix("/fake-gh") == true else {
                 throw UIScenarioFailure(description: "config.toml must set [github] gh to fake-gh")
             }
+            // Nor real claude: it would spend money, and read whatever the scenario points it at.
+            guard ConfigStore.shared.settings.agent.claudePath?.hasSuffix("/fake-claude") == true else {
+                throw UIScenarioFailure(description: "config.toml must set [agent] claude to fake-claude")
+            }
             guard let window = MainWindows.shared.window(for: probe.state) else {
                 throw UIScenarioFailure(description: "the main window isn't registered")
             }
@@ -387,6 +391,22 @@ import SwiftUI
                 review?.pr.number == number && review?.overview != nil
             }
         }
+
+        // MARK: - Fake claude
+
+        /// What the fake `claude` logged: one entry per process started (`args`, `cwd`) and per message (`message`).
+        var claudeLog: [[String: Any]] {
+            guard let path = ProcessInfo.processInfo.environment["FAKE_CLAUDE_LOG"],
+                let text = try? String(contentsOfFile: path, encoding: .utf8)
+            else { return [] }
+            return text.split(separator: "\n").compactMap {
+                (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [String: Any]
+            }
+        }
+        /// The arguments of each `claude` process started, in order.
+        var claudeStarts: [[String]] { claudeLog.compactMap { $0["args"] as? [String] } }
+        /// The messages sent to `claude`, in order.
+        var claudeMessages: [String] { claudeLog.compactMap { $0["message"] as? String } }
 
         // MARK: - Fake gh
 

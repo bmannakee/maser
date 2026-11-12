@@ -42,7 +42,7 @@ import Testing
         var all: [AgentTools.Call] { lock.withLock { calls } }
     }
 
-    @Test("REQ-AGT-003: The helper offers exactly Maser's three tools") func handshakeAndList() async throws {
+    @Test("REQ-AGT-003, REQ-AGT-008: The helper offers exactly Maser's three tools") func handshakeAndList() async throws {
         let (hello, _) = try await Self.respond([
             "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": ["protocolVersion": "2025-11-25"],
         ])

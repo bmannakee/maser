@@ -24,7 +24,7 @@ final class ReviewModel {
 
     /// One of the review window's whole-window views.
     enum Tab: String, CaseIterable, Identifiable {
-        case overview, files
+        case overview, files, agent
 
         var id: Self { self }
         /// The tab's name in the toolbar's picker.
@@ -32,6 +32,7 @@ final class ReviewModel {
             switch self {
             case .overview: "Overview"
             case .files: "Files"
+            case .agent: "Agent"
             }
         }
         /// The command that switches to this tab, for showing its key bindings.
@@ -39,6 +40,7 @@ final class ReviewModel {
             switch self {
             case .overview: .showOverview
             case .files: .showFiles
+            case .agent: .showAgent
             }
         }
     }
@@ -104,6 +106,8 @@ final class ReviewModel {
 
     /// The pull request this window reviews.
     let pr: PullRequest
+    /// The conversation with the review agent about this PR.
+    let agent: AgentSession
     var tab: Tab = .overview
     /// Whether the Files tab shows the comments pane.
     var showComments = true
@@ -236,6 +240,7 @@ final class ReviewModel {
     /// - Parameter pr: The pull request to review.
     init(pr: PullRequest) {
         self.pr = pr
+        agent = AgentSession(pr: pr)
         showsFullFiles = ConfigStore.shared.settings.diffView == .full
         do {
             let unsent = try Self.unsentStore.load(for: pr)
@@ -245,6 +250,7 @@ final class ReviewModel {
         } catch {
             NSLog("Couldn't read the unsent text for %@: %@", pr.url.absoluteString, error.localizedDescription)
         }
+        agent.review = self
     }
 
     /// Saves a change to the PR's unsent text, so it survives a crash or quit.
@@ -259,6 +265,11 @@ final class ReviewModel {
             NSLog("Couldn't save the unsent text for %@: %@", pr.url.absoluteString, error.localizedDescription)
         }
     }
+
+    /// The changed files' diffs, in the order the file tree shows them.
+    var diffFiles: [FileDiff] { filePaths.compactMap { filesByPath[$0] } }
+    /// Every review thread, by file path.
+    var allThreads: [ReviewThread] { threadsByPath.keys.sorted().flatMap { threadsByPath[$0] ?? [] } }
 
     /// The selected file as the Files tab shows it: its hunks, or the whole file.
     var selectedFile: FileDiff? { selectedPath.flatMap(displayedFile(at:)) }
@@ -418,6 +429,7 @@ final class ReviewModel {
         switch command {
         case .showOverview: tab = .overview
         case .showFiles: tab = .files
+        case .showAgent: tab = .agent
         case .toggleComments:
             if tab != .files {
                 tab = .files
@@ -443,6 +455,10 @@ final class ReviewModel {
         case .comment:
             if tab == .files {
                 return startComment()
+            }
+            if tab == .agent {
+                agent.focusRequest = true
+                return true
             }
             composerFocusRequest = true
         case .reply: return inFiles { startReply() }
