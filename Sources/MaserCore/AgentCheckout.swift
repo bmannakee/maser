@@ -106,15 +106,18 @@ public struct AgentCheckout: Sendable {
         root.appending(path: repository.host).appending(path: repository.owner).appending(path: "\(repository.name).git")
     }
 
-    /// The checkout of one commit.
+    /// The checkout for one PR, which holds whichever commit the conversation is about.
+    ///
+    /// The path stays the same when the PR's head moves, because `claude` keeps sessions by working directory, and a
+    /// conversation resumed elsewhere wouldn't be found.
     ///
     /// - Parameters:
     ///   - repository: The repository.
-    ///   - commit: The commit's full ID.
+    ///   - pullNumber: The PR's number.
     /// - Returns: Its folder, whether or not it exists yet.
-    public func checkoutURL(for repository: Repository, commit: String) -> URL {
+    public func checkoutURL(for repository: Repository, pullNumber: Int) -> URL {
         root.appending(path: repository.host).appending(path: repository.owner)
-            .appending(path: "\(repository.name)@\(commit.prefix(12))")
+            .appending(path: "\(repository.name)#\(pullNumber)")
     }
 
     /// Looks for the user's own clone of a repository.
@@ -162,7 +165,7 @@ public struct AgentCheckout: Sendable {
         _ repository: Repository, commit: String, pullNumber: Int, localClone: URL?, remote: String,
         credentialHelper: String?
     ) async throws -> URL {
-        let checkout = checkoutURL(for: repository, commit: commit)
+        let checkout = checkoutURL(for: repository, pullNumber: pullNumber)
         if FileManager.default.fileExists(atPath: checkout.path(percentEncoded: false)),
             let head = try? await git(["-C", checkout.path(percentEncoded: false), "rev-parse", "HEAD"]), head == commit
         {

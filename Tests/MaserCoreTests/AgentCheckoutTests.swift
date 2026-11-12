@@ -180,7 +180,14 @@ import Testing
         #expect(
             try String(contentsOf: checkout.appending(path: "Door.swift"), encoding: .utf8)
                 == "struct Door { var open = false }\n")
-        #expect(checkout.lastPathComponent == "repo@\(fixture.pullCommit.prefix(12))")
+        #expect(checkout.lastPathComponent == "repo#7")
+
+        // Moving to another commit reuses the same folder, so a resumed conversation finds it.
+        let moved = try await fixture.checkout.prepare(
+            Self.repository, commit: fixture.mainCommit, pullNumber: 7, localClone: fixture.clone,
+            remote: fixture.origin.path(percentEncoded: false), credentialHelper: nil)
+        #expect(moved == checkout)
+        #expect(try String(contentsOf: moved.appending(path: "Door.swift"), encoding: .utf8) == "struct Door {}\n")
     }
 
     @Test("REQ-AGT-004: Says so when the commit is nowhere") func missingCommit() async throws {

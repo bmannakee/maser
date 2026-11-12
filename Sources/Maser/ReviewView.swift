@@ -25,6 +25,7 @@ struct ReviewView: View {
             switch model.tab {
             case .overview: OverviewView(model: model)
             case .files: FilesView(model: model)
+            case .agent: AgentView(model: model)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {

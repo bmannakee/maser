@@ -116,7 +116,7 @@ public struct GitHubCLI: Sendable {
             .first(where: { FileManager.default.isExecutableFile(atPath: $0) })
         {
             url = URL(filePath: path)
-        } else if let path = await pathFromLoginShell() {
+        } else if let path = await pathFromLoginShell(command: "gh") {
             url = URL(filePath: path)
         } else {
             throw GitHubCLIError.notInstalled
@@ -128,14 +128,23 @@ public struct GitHubCLI: Sendable {
         return url
     }
 
-    /// Asks the user's login shell where `gh` is, giving up after five seconds.
+    /// The path of the `gh` executable, for git's credential helper.
     ///
-    /// - Returns: The absolute path of an executable `gh`, or `nil` if the shell doesn't find one.
-    private static func pathFromLoginShell() async -> String? {
+    /// - Returns: The absolute path.
+    /// - Throws: The errors from `executable()`.
+    public static func executablePath() async throws -> String {
+        try await executable().path(percentEncoded: false)
+    }
+
+    /// Asks the user's login shell where a command is, giving up after five seconds.
+    ///
+    /// - Parameter command: The command's name, such as `gh`.
+    /// - Returns: The absolute path of the executable, or `nil` if the shell doesn't find one.
+    static func pathFromLoginShell(command: String) async -> String? {
         let shell = ProcessInfo.processInfo.environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
         guard
             let result = try? await Subprocess.run(
-                URL(filePath: shell), ["-l", "-c", "command -v gh"], timeout: .seconds(5)),
+                URL(filePath: shell), ["-l", "-c", "command -v \(command)"], timeout: .seconds(5)),
             result.status == 0
         else { return nil }
         // Shell profiles can print other things; the answer is the last line that's an executable path.

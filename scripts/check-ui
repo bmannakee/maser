@@ -29,8 +29,9 @@ if [ -z "$scenarios" ]; then
         print substr($0, RSTART + 1, RLENGTH - 2); want = 0 }' Sources/Maser/UIScenarios.swift)"
 fi
 
-# A locked screen leaves loginwindow frontmost, and then no app can become active.
-if lsappinfo info -only name "$(lsappinfo front)" 2>/dev/null | grep -q loginwindow; then
+# No app can become active while the screen is locked. The console session says so directly; the system-wide
+# IOConsoleLocked flag can read false while the session is locked.
+if ioreg -n Root -d1 | grep -q '"CGSSessionScreenIsLocked"=Yes'; then
     echo "The screen is locked; the UI scenarios need it unlocked." >&2
     exit 2
 fi
@@ -71,6 +72,7 @@ launch() {
         --env MASER_UI_RELAUNCHED="$2" \
         --env FAKE_GH_DIR="$recordings" --env FAKE_GH_STATE="$dir/gh" --env FAKE_GH_RECORD="$record" \
         --env FAKE_GH_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-}" \
+        --env MASER_AGENT_CHECKOUT="$dir/checkout" --env FAKE_CLAUDE_LOG="$dir/claude.jsonl" \
         "$app" --args -ApplePersistenceIgnoreState YES &
     launcher=$!
     # macOS won't let the app bring itself forward while another app is frontmost, so ask for it here.
@@ -92,7 +94,11 @@ failed=""
 for scenario in $scenarios; do
     dir="$work/$scenario"
     mkdir -p "$dir/config/maser" "$dir/gh"
-    sed "s|@FAKE_GH@|$bin/fake-gh|" Tests/UIScenarios/config.toml > "$dir/config/maser/config.toml"
+    sed -e "s|@FAKE_GH@|$bin/fake-gh|" -e "s|@FAKE_CLAUDE@|$bin/fake-claude|" Tests/UIScenarios/config.toml \
+        > "$dir/config/maser/config.toml"
+    # The agent reads this folder instead of a checkout: the recorded PRs' commits can't be fetched without GitHub.
+    mkdir -p "$dir/checkout"
+    echo "struct Door {}" > "$dir/checkout/Door.swift"
     # Start from nothing saved: no restored windows, sidebar widths or unsent text from an earlier run.
     defaults delete "$bundle_id" >/dev/null 2>&1 || true
     rm -rf "$HOME/Library/Saved Application State/$bundle_id.savedState" "$HOME/Library/Application Support/$bundle_id"

@@ -37,6 +37,7 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
 | `Traceability`, `maser-trace` | Development tool: checks the links in `docs/design/` (see its README). Not part of the app. | Foundation |
 | `TraceabilityTests` | Tests for the traceability checker. | Traceability |
 | `fake-gh` | Development tool: a stand-in for `gh` that replays `Tests/UIScenarios/recordings`, for the UI scenarios. | Foundation |
+| `fake-claude` | Development tool: a stand-in for `claude` for the UI scenarios; it talks to Maser through the real helper. | Foundation |
 | `maser-agent-tools` | The review agent's MCP helper, which `claude` starts; it forwards tool calls to Maser's socket. Shipped in the app bundle. | MaserCore, Foundation |
 
 Rules:

@@ -1,9 +1,13 @@
-# The config the UI scenarios run with. scripts/check-ui fills in the fake gh's path.
+# The config the UI scenarios run with. scripts/check-ui fills in the fake gh's and fake claude's paths.
 #
 # The searches pick recorded PRs in bmannakee/maser: changing them means re-recording (see README.md).
 
 [github]
 gh = "@FAKE_GH@"
+
+[agent]
+claude = "@FAKE_CLAUDE@"
+allow = ["bmannakee"]
 
 [queue]
 sections = []
