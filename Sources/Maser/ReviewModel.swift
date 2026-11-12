@@ -176,6 +176,10 @@ final class ReviewModel {
     /// Changing it to a thread in the selected file scrolls the diff to the thread's line and moves the cursor there.
     var focusedThreadID: String? {
         didSet {
+            // Focusing a thread opens it, which counts for the agent's comments in Finish Review (RC-26).
+            if let thread = selectedThreads.first(where: { $0.id == focusedThreadID }) {
+                agent.markOpened(thread.comments.filter { $0.isPending && AgentComment.isAgents($0.body) }.map(\.id))
+            }
             guard focusedThreadID != oldValue, let id = focusedThreadID,
                 let thread = selectedThreads.first(where: { $0.id == id })
             else { return }
@@ -643,6 +647,39 @@ final class ReviewModel {
             return
         }
         await reloadThreads()
+    }
+
+    /// Adds a line comment the review agent wrote to the pending review, starting one if needed, then reloads the threads.
+    ///
+    /// The same checks as the user's own comments apply: the diff's head must still be `commit`, and `gh` must still
+    /// be signed in as the account shown.
+    ///
+    /// - Parameters:
+    ///   - target: Where the comment goes, from `AgentComment.target(for:in:)`.
+    ///   - body: The body, with the attribution line.
+    ///   - commit: The commit the conversation is about.
+    /// - Throws: `GitHubCLIError` if a check fails or `gh` does.
+    func postAgentComment(target: CommentTarget, body: String, commit: String) async throws {
+        guard commit == diffCommitID else { throw GitHubCLIError.rejected(Self.placeAgainMessage) }
+        let cli = GitHubCLI()
+        let context = try await checkedContext(cli, head: commit)
+        let reviewID = try await pendingReviewID(cli, context: context, commitID: commit)
+        try await cli.addReviewThread(on: pr, reviewID: reviewID, target: target, body: body)
+        await reloadThreads()
+    }
+
+    /// The agent's draft comments in the pending review.
+    var agentComments: [ReviewComment] {
+        allThreads.flatMap(\.comments).filter { $0.isPending && AgentComment.isAgents($0.body) }
+    }
+
+    /// Whether Finish Review is asking before submitting the agent's comments the user hasn't opened.
+    var isConfirmingUnopenedAgentComments = false
+
+    /// The agent's draft comments the user hasn't opened, which Finish Review asks about.
+    var unopenedAgentComments: [ReviewComment] {
+        let opened = Set(agent.transcript.openedAgentComments)
+        return agentComments.filter { !opened.contains($0.id) }
     }
 
     /// Fetches the review context just before posting, and checks it still matches what the user was shown.

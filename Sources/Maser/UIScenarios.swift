@@ -26,7 +26,7 @@
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
             queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
-            canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation,
+            canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -747,6 +747,80 @@
             try app.expect(!agent.showsCanvas, "i hides the canvas", app.summary)
             try await app.press("i")
             try app.expect(agent.showsCanvas, "and shows it again", app.summary)
+        }
+
+        /// The agent's comment goes into the pending review, pinned to the commit and saying an agent drafted it; it's
+        /// badged, and Finish Review asks before submitting it until the user has opened it.
+        static let agentCommentsMarked = UIScenario(
+            "agent-comments-marked",
+            "REQ-AGT-007: The agent's comment is posted with its attribution, badged, and asked about until it's opened"
+        ) { app in
+            let review = try await openAgent(app)
+            try await app.waitUntil("the account is shown") { review.postingAccount != nil }
+            let account = review.postingAccount ?? ""
+            let head = review.diffCommitID ?? ""
+            let body = AgentComment.body("Is this file meant to stay?", model: "claude-opus-5-5")
+            // After posting, GitHub returns the agent's comment as the viewer's pending draft.
+            let thread: [String: Any] = [
+                "id": "PRRT_agent", "path": "COMMENT-TEST.md", "line": 3, "startLine": NSNull(), "originalLine": 3,
+                "diffSide": "RIGHT", "isOutdated": false, "isResolved": false,
+                "comments": [
+                    "nodes": [
+                        [
+                            "id": "PRRC_agent", "author": ["login": account], "body": body, "createdAt": "2026-11-12T12:00:00Z",
+                            "url": NSNull(), "state": "PENDING",
+                        ]
+                    ]
+                ],
+            ]
+            let threads = String(decoding: try JSONSerialization.data(withJSONObject: thread), as: UTF8.self)
+            try app.overrideGH([
+                .init(match: ["addPullRequestReview("], status: 0, stdout: "PRR_scenario\n", stderr: nil),
+                .init(match: ["addPullRequestReviewThread("], status: 0, stdout: "PRRT_agent\n", stderr: nil),
+                .init(match: ["reviewThreads(first"], status: 0, stdout: threads + "\n", stderr: nil),
+                .init(match: ["submitPullRequestReview"], status: 0, stdout: "{}", stderr: nil),
+            ])
+
+            try await ask(app, review, "please comment on the new file")
+            let call = review.agent.transcript.entries.compactMap { if case let .tool(use) = $0 { use } else { nil } }.last
+            try app.expect(
+                call?.name == "mcp__maser__add_review_comment" && call?.isError == false
+                    && call?.result?.hasPrefix("Added to the user's pending review on COMMENT-TEST.md") == true,
+                "the agent's comment is added", "\(String(describing: call))")
+            let posted = app.ghCalls.first { $0.args.contains { $0.contains("addPullRequestReviewThread(") } }
+            let started = app.ghCalls.first { $0.args.contains { $0.contains("addPullRequestReview(") } }
+            try app.expect(
+                posted?.args.contains("body=\(body)") == true && started?.args.contains("commit=\(head)") == true,
+                "it's posted with the attribution, in a review pinned to the commit", "\(posted?.args ?? [])")
+            try await app.waitUntil("the comment is the agent's, and unopened") {
+                review.agentComments.map(\.id) == ["PRRC_agent"] && review.unopenedAgentComments.count == 1
+            }
+
+            try await app.press("S")
+            try await app.waitUntil("Finish Review counts it") {
+                ShownText.values["finish-review-pending"] == "1 draft comment, 1 drafted by the agent will be published."
+            }
+            try await app.press("cmd+enter")
+            try await app.waitUntil("submitting asks first") { review.isConfirmingUnopenedAgentComments }
+            await app.pause(.milliseconds(500))
+            // Either submit mutation carries the verdict: submitPullRequestReview, or addPullRequestReview with an event.
+            let submits = { app.ghCalls.filter { $0.args.contains { $0.contains("event: $event") } } }
+            try app.expect(submits().isEmpty, "nothing was submitted", "\(submits().map(\.args))")
+            // The question is a dialog on the sheet, which the driver's keys don't reach; answer Cancel for it.
+            review.isConfirmingUnopenedAgentComments = false
+            review.isFinishingReview = false
+            try await app.waitUntil("the sheet closes") { !review.isFinishingReview }
+
+            try await app.press("g f")
+            try await app.press("n")
+            try await app.waitUntil("n opens the agent's comment, which is badged") {
+                review.unopenedAgentComments.isEmpty && ShownText.values["agent-badge"] == "PRRC_agent"
+            }
+            try await app.press("S")
+            try await app.waitUntil("Finish Review opens") { review.isFinishingReview }
+            try await app.press("cmd+enter")
+            try await app.waitUntil("once opened, it submits without asking") { !submits().isEmpty }
+            try app.expect(!review.isConfirmingUnopenedAgentComments, "no question was asked", app.summary)
         }
 
         /// Going back to a PR finds it as it was left, without reloading it.

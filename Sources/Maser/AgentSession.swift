@@ -52,6 +52,8 @@ final class AgentSession {
     var openedCitation: OpenedCitation?
     /// Renders diagrams, loaded with Pele on first use.
     @ObservationIgnored private var renderer: DiagramRenderer?
+    /// The model the running session reports, for the attribution on the agent's comments.
+    @ObservationIgnored private var sessionModel: String?
 
     /// The running `claude`, if any.
     @ObservationIgnored private var process: Process?
@@ -320,7 +322,9 @@ final class AgentSession {
         for event in AgentEvent.decode(line) {
             transcript.record(event)
             switch event {
-            case .started: resumedMessage = nil
+            case let .started(session):
+                resumedMessage = nil
+                sessionModel = session.model
             case .finished: status = .idle
             default: break
             }
@@ -391,9 +395,60 @@ final class AgentSession {
                     threads: review.allThreads) + note)
         case "show_diagram":
             return draw(call.arguments, review: review)
+        case "add_review_comment":
+            return await comment(call.arguments, review: review)
         default:
             return AgentTools.Reply(text: "\(call.tool) isn't available in this version of Maser yet.", isError: true)
         }
+    }
+
+    // MARK: - Comments
+
+    /// Adds the agent's line comment to the user's pending review, with the attribution line.
+    ///
+    /// It goes through the review's own posting path: on a line in the diff, for the conversation's commit, as the
+    /// account shown. The comment stays private until the user submits.
+    ///
+    /// - Parameters:
+    ///   - arguments: The `add_review_comment` arguments.
+    ///   - review: The review to post to.
+    /// - Returns: The agent's answer.
+    private func comment(_ arguments: String, review: ReviewModel) async -> AgentTools.Reply {
+        guard let head = transcript.commit, review.diffCommitID == head else {
+            return AgentTools.Reply(
+                text: "The PR's diff changed since this message was sent. Ask the user to send a new message.", isError: true)
+        }
+        let request: AgentComment.Request
+        do {
+            request = try AgentComment.Request.decode(arguments)
+        } catch {
+            return AgentTools.Reply(text: "Those arguments aren't a comment: \(error.localizedDescription)", isError: true)
+        }
+        let target: CommentTarget
+        switch AgentComment.target(for: request, in: review.diffFiles) {
+        case let .success(found): target = found
+        case let .failure(refusal): return AgentTools.Reply(text: refusal.message, isError: true)
+        }
+        let body = AgentComment.body(request.body, model: sessionModel ?? model ?? "claude")
+        do {
+            try await review.postAgentComment(target: target, body: body, commit: head)
+        } catch {
+            return AgentTools.Reply(text: "The comment wasn't added: \(error.localizedDescription)", isError: true)
+        }
+        return AgentTools.Reply(
+            text:
+                "Added to the user's pending review on \(target.path) \(target.description). It stays private until they submit, and says an agent drafted it."
+        )
+    }
+
+    /// Records that the user opened some of the agent's comments.
+    ///
+    /// - Parameter ids: The comments' IDs.
+    func markOpened(_ ids: [String]) {
+        let new = ids.filter { !transcript.openedAgentComments.contains($0) }
+        guard !new.isEmpty else { return }
+        transcript.openedAgentComments += new
+        save()
     }
 
     // MARK: - Canvas

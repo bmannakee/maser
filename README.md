@@ -66,7 +66,9 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   conversation, labeled as the agent's at its commit. Each element lists the lines it comes from; Maser checks them
   against the checkout and the diff, outlines anything that doesn't match, and tells the agent. On this tab `]`/`[`
   move between diagrams, `j`/`k` between elements, Return opens the selected element's lines (in the Files tab when
-  they're in the diff), and `i` hides the canvas. Comments from the agent are coming (#32).
+  they're in the diff), and `i` hides the canvas. The agent can add line comments to your pending review: they end
+  with a line saying an agent drafted them (and which model), carry an **Agent** badge in the comments pane, and Finish
+  Review asks before submitting any you haven't opened (`n` in the Files tab opens them).
 
 ## Keyboard
 

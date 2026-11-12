@@ -91,7 +91,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 
 ## Review agent (AGT)
 
-Planned (#32). The design is in [review-agent.md](review-agent.md).
+Built 2026-11-12 (#32), except the accuracy evaluation. The design is in [review-agent.md](review-agent.md).
 
 | ID | Requirement | Need | Control | Verified by | Status |
 | --- | --- | --- | --- | --- | --- |
@@ -101,7 +101,7 @@ Planned (#32). The design is in [review-agent.md](review-agent.md).
 | REQ-AGT-004 | The agent reads a checkout of the PR's head commit that Maser keeps for it in its own Application Support folder. Maser fetches the commit from the user's local clone, which only reads it, when one is found in `[agent] repositories`, and otherwise from GitHub, with `gh` as git's credential helper. The checkout is read-only, and is made with hooks off. Maser never runs a git command that writes to the user's clone. The checkout uses `core.symlinks=false`, so a symlink in the PR arrives as a plain file. | UN-11, UN-14 | RC-23 | T:AgentCheckoutTests (all 5): the clone is found by its remote, left byte-for-byte unchanged, and the checkout is read-only with symlinks as plain files. | Implemented |
 | REQ-AGT-005 | The agent is off for a PR unless `[agent] allow` names the PR's owner (`bmannakee`), owner and host (`github.example.com/team`) or host (`github.example.com`). Otherwise the pane says why, and names the setting to change. The pane always shows what the agent can read: the repository, commit and checkout path. | UN-14 | RC-24 | UI:agent-off-until-allowed. T:AgentTests.allowRules, .readsSettings, .templateLists (the setting and matching). | Implemented |
 | REQ-AGT-006 | A conversation is about the whole PR as of one head commit: every commit in the PR, as the diff the user loaded shows it (from the merge base to the head), not only the last commit. `pr_context` also lists the PR's commits with their messages. When a refresh finds a new head, the pane marks the conversation and its diagrams as about the older commit, and a new message moves the checkout to the new head first, telling the agent what changed. | UN-11 | RC-25 | UI:agent-follows-head. T:AgentToolsTests.prContext, .fencesUntrustedText (the whole PR in `pr_context`). | Implemented |
-| REQ-AGT-007 | The agent's only GitHub write is adding a line comment to the viewer's pending review, through the same path as the user's comments: on a line in the diff, for the commit it saw (REQ-CMT-007), as the account shown (REQ-CMT-009). Maser records which comments the agent added, shows them with an Agent badge, and counts them in Finish Review. Submitting with agent comments the user hasn't opened asks first, naming how many. Each agent comment ends with a line saying an agent drafted it and naming the model, such as "Drafted by an agent (claude-opus-5-5) in Maser", so the record on GitHub shows it too. | UN-13 | RC-26 | Planned: T for the record of agent comments and the attribution line; UI:agent-comments-marked; a live write test adding a comment to bmannakee/maser#1 and removing it. | **Proposed** (#32) |
+| REQ-AGT-007 | The agent's only GitHub write is adding a line comment to the viewer's pending review, through the same path as the user's comments: on a line in the diff, for the commit it saw (REQ-CMT-007), as the account shown (REQ-CMT-009). Maser records which comments the agent added, shows them with an Agent badge, and counts them in Finish Review. Submitting with agent comments the user hasn't opened asks first, naming how many. Each agent comment ends with a line saying an agent drafted it and naming the model, such as "Drafted by an agent (claude-opus-5-5) in Maser", so the record on GitHub shows it too. | UN-13 | RC-26 | T:AgentCommentTests.attribution, .targets; UI:agent-comments-marked. **Gap:** a live write test on bmannakee/maser#1; the posting path is the user's own, which the live write tests for REQ-CMT-001 cover. | Implemented |
 | REQ-AGT-008 | The agent can't submit, approve, request changes, reply to threads, resolve them, post to the conversation, or delete or edit comments. None of its tools does any of these. | UN-8, UN-14 | RC-22 | T:AgentTests.commandLine (only Maser's three tools are allowed); T:AgentToolsTests.handshakeAndList (the helper offers only those three). I: `AgentSession.answer` writes nothing to GitHub; the comment tool isn't built yet. | Implemented |
 | REQ-AGT-009 | Each turn has a spending cap, `[agent] max_budget_usd` (`--max-budget-usd`). The pane shows each turn's cost and the conversation's total. | UN-11 | — | T:AgentTranscriptTests.turnCosts; UI:agent-conversation. T:AgentTests.readsSettings, .commandLine (the setting and the flag). | Implemented |
 | REQ-AGT-010 | Everything the agent does is shown in the conversation as it happens: each file it reads, search it runs, comment it adds and diagram it draws, with the inputs. | UN-11, UN-14 | RC-27 | T:AgentTranscriptTests.recordsTools; UI:agent-conversation (calls and a refusal shown). T:AgentTests.decodesEvents, .skipsUnknown (decoding what's shown). | Implemented |
@@ -109,7 +109,7 @@ Planned (#32). The design is in [review-agent.md](review-agent.md).
 
 ## Canvas (CNV)
 
-Planned (#32).
+Built 2026-11-12 (#32), Mermaid only.
 
 | ID | Requirement | Need | Control | Verified by | Status |
 | --- | --- | --- | --- | --- | --- |

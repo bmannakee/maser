@@ -60,6 +60,8 @@ public struct AgentTranscript: Codable, Equatable, Sendable {
     public var totalCostUSD = 0.0
     /// The diagrams the agent drew, oldest first.
     public var diagrams: [AgentDiagram] = []
+    /// The IDs of the agent's draft comments the user has opened, for Finish Review's question.
+    public var openedAgentComments: [String] = []
 
     /// Creates an empty conversation.
     public init() {}
