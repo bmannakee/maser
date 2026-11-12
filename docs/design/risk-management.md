@@ -130,7 +130,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-23 | The agent reads a separate checkout that Maser owns. The user's clone is only ever read. | Inherent safety by design | REQ-AGT-004 | **Proposed** |
 | RC-24 | The agent is off unless `config.toml` allows the PR's owner or host, and the pane shows what it can read. | Protective measure | REQ-AGT-005 | **Proposed** |
 | RC-25 | A conversation is pinned to a commit. Answers about an older commit are marked as such, and the checkout follows the head. | Protective measure | REQ-AGT-006 | **Proposed** |
-| RC-26 | Agent comments go through the user's checks (head, account, line in the diff), are badged as the agent's, and Finish Review asks before submitting ones the user hasn't opened. | Protective measure; information for safety | REQ-AGT-007 | **Proposed** |
+| RC-26 | Agent comments go through the user's checks (head, account, line in the diff), are badged as the agent's, and Finish Review asks before submitting ones the user hasn't opened. Each one says on GitHub that an agent drafted it. | Protective measure; information for safety | REQ-AGT-007 | **Proposed** |
 | RC-27 | Every agent action is shown in the conversation as it happens. | Information for safety | REQ-AGT-010 | **Proposed** |
 | RC-28 | The canvas renders only declarative diagram source, with bundled renderers, no network, and no agent script or HTML. | Inherent safety by design | REQ-CNV-002 | **Proposed** |
 | RC-29 | Diagrams are grounded: each element's citation is checked against the checkout, and each change mark against the diff. Mismatches and unsourced diagrams are flagged. | Protective measure | REQ-CNV-003, REQ-CNV-004 | **Proposed** |
@@ -182,8 +182,10 @@ hold only once their controls are built and verified. Two start High:
   or the network, and settings from the PR are never loaded. What's left is the agent's words, which RC-26, RC-27 and
   RC-29 put in front of the user rather than acting on them.
 
-The agent's comments carry the user's name on GitHub. The planned controls make them distinct in Maser only. Whether
-the posted text should also say an agent drafted it is an open question in [review-agent.md](review-agent.md).
+The agent's comments carry the user's name on GitHub, so each one also says that an agent drafted it, naming the
+model (decided 2026-11-12). Colleagues reading the review can weigh it accordingly, even if the user submitted it
+unread. Conversations are kept in `claude`'s own session store under the user's home folder. That is accepted for this
+iteration (H7), and will be revisited if Maser gains other users.
 
 **Overall residual risk,** for the features built so far: no residual risk is High since RC-04 (2026-11-10), and every
 control proposed for them was built by RC-10 on the same day. Before Maser is relied on to review regulated software,

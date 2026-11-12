@@ -19,7 +19,7 @@ nothing the agent does changes review state.
 
 ## Decisions
 
-Made with the user on 2026-11-12.
+Made with the user on 2026-11-12, in the review of #33.
 
 | Decision | Choice | Why | Rejected |
 | --- | --- | --- | --- |
@@ -27,6 +27,10 @@ Made with the user on 2026-11-12.
 | Code owners' approval | Off until `[agent] allow` names the PR's owner or host | Whether code may go to the model provider is its owner's decision, which Maser can't know. A default of off makes allowing it a deliberate step by the user, who is responsible for having that approval (HAZ-21). | On everywhere; home only. |
 | What the agent may write | Line comments in the pending review, private until submit | Useful, and the user still submits. The comments carry the user's name, so they're badged in Maser and Finish Review asks before submitting unread ones (HAZ-19). | Suggestions the user must accept one by one (safer, slower). Posting directly (puts unread text in a shared record). |
 | Repository access | A read-only checkout of the head commit, owned by Maser | The agent sees what the PR contains, and can't touch the user's clone (HAZ-22). | Running builds and tests: a PR's code would run on the user's Mac (HAZ-23). |
+| Attribution | Each agent comment says, in its posted text, that an agent drafted it, naming the model | The comment carries the user's name, and colleagues should know what they're reading (HAZ-19). | No attribution; a setting with a default. |
+| Where it lives | A third tab, Agent, beside Overview and Files | The canvas needs room, and the Files tab already has three columns. | A side pane on both tabs. |
+| Model | `[agent] model`, which the Agent tab can change for one PR | The right model is likely to differ by PR. | Always `claude`'s own setting. |
+| Conversation storage | `claude`'s own session store, under the user's home folder | Acceptable for this iteration; revisit systematically if Maser gains other users. | Maser asking `claude` not to persist, keeping its own transcript. |
 
 ## Architecture
 
@@ -50,7 +54,7 @@ Made with the user on 2026-11-12.
   `--print --input-format stream-json --output-format stream-json --verbose`, `--tools Read,Grep,Glob`,
   `--strict-mcp-config --mcp-config <maser's only>`, `--setting-sources user` (never `project` or `local`, which would
   load the PR's `.claude/` settings and hooks), `--permission-mode` set so nothing outside the tool list can be
-  approved, `--max-budget-usd`, `--append-system-prompt` with Maser's instructions, and the checkout as the working
+  approved, `--model`, `--max-budget-usd`, `--append-system-prompt` with Maser's instructions, and the checkout as the working
   directory. These options exist in `claude` 2.1.322. What each actually does is checked in the spike.
 - **`maser-agent-tools`** is a small executable in the app bundle. `claude` starts it as a stdio MCP server, and it
   forwards each call to the running Maser over a Unix socket. The socket lives in a per-session folder that only the
@@ -61,7 +65,7 @@ Made with the user on 2026-11-12.
   - `pr_context`: the description, the diff, the list of commits with their messages, and the threads, from what Maser
     already loaded.
   - `add_review_comment`: path, line or range, side, body. It runs the user's own posting path: `ReviewModel`'s head
-    and account checks, and the comment target rules.
+    and account checks, and the comment target rules. Maser appends the attribution line; the agent can't leave it out.
   - `show_diagram`: format (`mermaid` or `dot`), source, title, and per-element citations and change marks.
 - **The checkout** (`AgentCheckout`, MaserCore). Maser keeps a bare clone per repository in Application Support. It
   borrows objects from the user's local clone, opened read-only through git's alternates, and otherwise fetches with
@@ -110,21 +114,14 @@ Each one is a PR that updates these documents, as usual.
    its SVG gives each element an ID from the diagram source (needed to flag citations), and whether `render()` works
    in JavaScriptCore without a page.
 2. **Conversation:** the pane, the checkout, the allow list, read tools, `pr_context`, commit pinning, the spending cap,
-   and showing every action (REQ-AGT-001 to 006, 009, 010).
+   and showing every action (REQ-AGT-001 to 006, 009 to 011).
 3. **Canvas:** the renderers, checking, citations and change marks (REQ-CNV-001 to 006).
 4. **Comments:** `add_review_comment`, badges, and the Finish Review question (REQ-AGT-007, 008).
 5. **Evaluation:** the accuracy set, run before the agent is relied on to review regulated software.
 
 ## Open questions
 
-1. **Attribution on GitHub.** Should a comment the agent added carry a line saying so ("Drafted with an agent") when
-   it's posted? It would make the record honest for colleagues, at the cost of noise. It could be a setting with a
-   default, but which default?
-2. **Where the pane lives.** A third tab beside Overview and Files, or a side pane available on both? The canvas wants
-   room, and the Files tab already has three columns.
-3. **Model and effort.** Use whatever `claude` is set to, or an `[agent] model` setting? Claude Opus 5.5 is the
-   default suggestion.
-4. **Conversation storage.** `claude` keeps sessions in `~/.claude`. Is that acceptable for confidential code, or should Maser
-   ask `claude` not to persist them, and keep only its own transcript?
-5. **More diagram kinds.** Mermaid and DOT cover state machines, flows, sequences and class diagrams. Data plots or
+1. **Effort.** Whether the Agent tab should also choose the effort level (`--effort`, if `claude` offers it), as it
+   chooses the model. Decide in the spike.
+2. **More diagram kinds.** Mermaid and DOT cover state machines, flows, sequences and class diagrams. Data plots or
    custom layouts would need Vega-Lite or similar, with the same checking. Leave it until a need appears.

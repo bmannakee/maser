@@ -38,7 +38,7 @@ These are the parts of the interface where a use error could lead to a hazard in
 | UIC-6 | **The verdict choice** in Finish Review: Comment, Approve or Request changes. | HAZ-05 |
 | UIC-7 | **Configurable keys.** The user's bindings can differ from the defaults and from the docs. | HAZ-16 |
 | UIC-8 | **Agent output looks authoritative** (planned, #32). A clean diagram or a confident answer reads as fact, and can stand in for reading the diff. | HAZ-18, HAZ-20, HAZ-25 |
-| UIC-9 | **Agent comments sit among the user's** in the pending review (planned, #32), and on GitHub they carry the user's name. | HAZ-19, HAZ-20 |
+| UIC-9 | **Agent comments sit among the user's** in the pending review (planned, #32). On GitHub they carry the user's name, with a line saying an agent drafted them. | HAZ-19, HAZ-20 |
 
 ## Hazard-related use scenarios
 
