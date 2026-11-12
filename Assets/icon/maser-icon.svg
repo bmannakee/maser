@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<title>maser</title>
+<defs><clipPath id="s"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath></defs>
+<g clip-path="url(#s)">
+<rect x="100" y="100" width="824" height="824" fill="#2B0A16"/>
+<rect x="256.6" y="413.1" width="412.0" height="197.8" rx="98.9" fill="#C2255C"/>
+<rect x="339.0" y="491.4" width="626.2" height="41.2" rx="20.6" fill="#FFC857"/>
+</g>
+</svg>

@@ -23,6 +23,7 @@ these documents in the same PR.
 | [requirements.md](requirements.md) | IEC 62304 §5.2 | Software requirements, each traced to a need and a verification |
 | [risk-management.md](risk-management.md) | ISO 14971 | Harms, hazards, risk estimates, controls and residual risk |
 | [usability.md](usability.md) | IEC 62366-1 | Use specification, user interface characteristics tied to safety, hazard-related use scenarios, evaluations |
+| [brand.md](brand.md) | Brand | Name, logo, colors and interface guidelines; mirrored by `Sources/Maser/Brand.swift` |
 | [review-agent.md](review-agent.md) | Design (planned feature) | The review agent and canvas: architecture, decisions, open questions, verification plan |
 | [traceability.md](traceability.md) | Traceability | Needs → requirements → verification, hazards → controls, and the gaps |
 | [../verification/](../verification/) | Verification records | Dated records of verification runs |

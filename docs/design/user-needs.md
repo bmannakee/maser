@@ -15,6 +15,7 @@ Draft 1, 2026-11-03.
 | UN-8 | Maser never exposes my GitHub credentials, and acts only as me, only on the PR and line I intend. | Actions under my name are visible to my colleagues, and may be part of a regulated record. |
 | UN-9 | I don't lose review work I've written, whether to a crash, a quit or a slip of the keyboard. | Rewriting a careful review is costly, and it gets skipped. |
 | UN-10 | Maser is quick: it opens fast, moves between PRs instantly, and scrolls smoothly. | Slowness pushes me back to the browser. |
+| UN-15 | I can pick Maser out at a glance among the apps and windows I have open. | Reviews happen with several windows and apps open; an app with the generic icon is slow to find in the Dock and the app switcher. |
 
 ## Planned needs
 
