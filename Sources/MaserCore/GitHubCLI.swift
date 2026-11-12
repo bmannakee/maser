@@ -329,12 +329,18 @@ enum Subprocess {
     ///   - executable: The program to run.
     ///   - arguments: Its arguments.
     ///   - timeout: How long to let it run before terminating it, or `nil` for no limit.
+    ///   - environment: Variables to set on top of this process's environment.
     /// - Returns: The exit status and everything written to standard output and standard error.
     /// - Throws: The error from `Process.run()` if the program can't be launched.
-    static func run(_ executable: URL, _ arguments: [String], timeout: Duration? = nil) async throws -> Result {
+    static func run(
+        _ executable: URL, _ arguments: [String], timeout: Duration? = nil, environment: [String: String] = [:]
+    ) async throws -> Result {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
+        if !environment.isEmpty {
+            process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
+        }
         process.standardInput = FileHandle.nullDevice
         let stdout = Pipe()
         let stderr = Pipe()
