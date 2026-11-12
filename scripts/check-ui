@@ -54,18 +54,12 @@ codesign --force --sign - --timestamp=none "$app"
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/maser-ui.XXXXXX")"
 recordings="$PWD/Tests/UIScenarios/recordings"
-passed=0
-failed=""
-for scenario in $scenarios; do
-    dir="$work/$scenario"
-    mkdir -p "$dir/config/maser" "$dir/gh"
-    sed "s|@FAKE_GH@|$bin/fake-gh|" Tests/UIScenarios/config.toml > "$dir/config/maser/config.toml"
-    # Start from nothing saved: no restored windows or sidebar widths from an earlier run.
-    defaults delete "$bundle_id" >/dev/null 2>&1 || true
-    rm -rf "$HOME/Library/Saved Application State/$bundle_id.savedState"
-
+# Launches the test app for one scenario and waits for it to exit, killing it after 120 s.
+# Arguments: the scenario's name, and 1 if this is a relaunch after the scenario crashed the app.
+launch() {
     open -n -W --stdout "$dir/log.txt" --stderr "$dir/log.txt" \
-        --env XDG_CONFIG_HOME="$dir/config" --env MASER_UI_SCENARIO="$scenario" --env MASER_UI_RESULT="$dir/result" \
+        --env XDG_CONFIG_HOME="$dir/config" --env MASER_UI_SCENARIO="$1" --env MASER_UI_RESULT="$dir/result" \
+        --env MASER_UI_RELAUNCHED="$2" \
         --env FAKE_GH_DIR="$recordings" --env FAKE_GH_STATE="$dir/gh" --env FAKE_GH_RECORD="$record" \
         --env FAKE_GH_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-}" \
         "$app" --args -ApplePersistenceIgnoreState YES &
@@ -82,6 +76,24 @@ for scenario in $scenarios; do
             echo "timed out after 120 s" >> "$dir/result"
         fi
     done
+}
+
+passed=0
+failed=""
+for scenario in $scenarios; do
+    dir="$work/$scenario"
+    mkdir -p "$dir/config/maser" "$dir/gh"
+    sed "s|@FAKE_GH@|$bin/fake-gh|" Tests/UIScenarios/config.toml > "$dir/config/maser/config.toml"
+    # Start from nothing saved: no restored windows, sidebar widths or unsent text from an earlier run.
+    defaults delete "$bundle_id" >/dev/null 2>&1 || true
+    rm -rf "$HOME/Library/Saved Application State/$bundle_id.savedState" "$HOME/Library/Application Support/$bundle_id"
+
+    launch "$scenario" 0
+    # A scenario that crashes the app on purpose asks to be launched again, keeping what was saved.
+    if [ "$(cat "$dir/result" 2>/dev/null)" = "RELAUNCH" ]; then
+        rm -f "$dir/result"
+        launch "$scenario" 1
+    fi
     result="$(cat "$dir/result" 2>/dev/null || echo "FAIL: no result; the app crashed or quit (see its log)")"
     if [ "$result" = "PASS" ]; then
         echo "✔ $scenario"

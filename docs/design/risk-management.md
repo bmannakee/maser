@@ -78,7 +78,7 @@ Each row lists:
 | HAZ-04 | A key acts somewhere the user didn't expect. For example, `S`, `c` or Return acts on the open PR while the user is looking at a different, highlighted PR in the queue, or on the wrong pane. Several focus bugs of this kind were found on 2026-11-03 (V8–V10). | H2, H6 | S3 P4 **High** | RC-06, RC-12 | S3 P2 Medium |
 | HAZ-05 | The wrong verdict is submitted, such as Approve instead of Comment, or on the wrong PR. | H2, H1 | S4 P2 Medium | RC-07, RC-12 | S4 P1 Medium |
 | HAZ-06 | The user discards a pending review by accident, deleting every draft comment. | H3 | S2 P3 Medium | RC-08 | S2 P1 Low |
-| HAZ-07 | Maser crashes, or the user quits it, while unsent text is in a comment box or the review summary. The text is only in memory, so it's lost. Four crashes happened on 2026-11-03 (V5). | H3 | S2 P4 Medium | RC-09, RC-14, RC-10 (*proposed*) | S2 P3 Medium: open until RC-10 |
+| HAZ-07 | Maser crashes, or the user quits it, while unsent text is in a comment box or the review summary. The text is only in memory, so it's lost. Four crashes happened on 2026-11-03 (V5). | H3 | S2 P4 Medium | RC-09, RC-14, RC-10 | S2 P1 Low |
 | HAZ-08 | The GitHub token leaks through Maser: logged, stored, or sent somewhere. | H4 | S4 P2 Medium | RC-11 | S4 P1 Medium |
 | HAZ-09 | Malicious content in a PR's description or comments runs script in Maser, or leads the user to a phishing page. | H4 | S4 P2 Medium | RC-16 | S4 P1 Medium |
 | HAZ-10 | `gh` is signed in to a different account than the user expects (personal versus work), so comments and reviews are posted as the wrong identity. | H2 | S3 P3 Medium | RC-12 | S3 P2 Medium |
@@ -105,7 +105,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-07 | The verdict starts at Comment every time and must be chosen explicitly. Submitting takes a button or ⌘↩ in the sheet. | Protective measure | REQ-CMT-003 | Implemented |
 | RC-08 | Discarding a review asks for confirmation, naming the number of drafts it deletes. | Protective measure | REQ-CMT-004 | Implemented |
 | RC-09 | The UI avoids the layouts that loop AppKit's constraint updates (nested split views, an inspector beside the file tree), and a stress scenario checks for it. | Inherent safety by design | REQ-WIN-007 | Implemented; UI:tab-and-pane-stress |
-| RC-10 | Unsent text is saved locally as it's typed, and restored. | Protective measure | REQ-CMT-008 | **Proposed** |
+| RC-10 | Unsent text is saved locally as it's typed, one file per PR, and restored when the PR is opened again. Each part is cleared once it's posted or discarded. | Protective measure | REQ-CMT-008 | Implemented |
 | RC-11 | GitHub access only through `gh`. Maser never handles the token. | Inherent safety by design | REQ-GH-001 | Implemented |
 | RC-12 | The account is named wherever Maser posts, and the PR in Finish Review. A post is refused if `gh`'s account changed since it was shown. | Information for safety; protective measure (the refusal) | REQ-CMT-009 | Implemented |
 | RC-13 | `gh` is found by a fixed, documented search order, or by an explicit configured path. | Protective measure | REQ-GH-002 | Implemented |
@@ -134,6 +134,12 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
 - **HAZ-04:** Medium. RC-12 names the PR in Finish Review, and the comment boxes sit inside the PR they post to. The
   key-routing controls (RC-06) are verified by the repeatable scenarios UI:key-routing, UI:queue-keys and
   UI:typing-pauses-keys; mouse clicks are still checked only by hand. HRUS-1 is yet to be evaluated with the user.
+- **HAZ-07:** Low. RC-10 writes each keystroke's text to disk before the next, so a crash loses at most the key being
+  handled (UI:draft-survives-relaunch kills the app without warning). The control brings risks of its own, judged
+  acceptable: unsent review text sits in a file under the user's Library, as readable as the rest of their home folder;
+  and a crash in the moment after a post succeeds but before its text is cleared brings the text back, so the user
+  could post it twice, which is visible and easily deleted. A restored line comment is checked against the head like
+  any other (RC-04), so it can't be posted onto a diff the user hasn't seen.
 - **HAZ-10:** Medium. RC-12 shows the account on every post button and in Finish Review, and refuses a post when the
   account changed after it was shown (UI:names-pr-and-account). It still relies on the user reading the account when
   `gh` was on the wrong one from the start, which is information for safety, the weakest kind of control. HRUS-7 is
@@ -145,11 +151,11 @@ The open risks need further controls before Maser is relied on for review at wor
 
 | Hazard | Residual | Needs | Issue |
 | --- | --- | --- | --- |
-| HAZ-07 | Medium | RC-10: keep unsent text across crashes and quits | #19 |
 | HAZ-12 | Low (observation) | Timeouts on `gh` calls, which have none today, so a hung `gh` loads forever | #21 |
 
-**Overall residual risk:** no residual risk is High since RC-04 (2026-11-10). Before Maser is relied on for review at
-work, HAZ-07 needs RC-10, and the usability evaluation needs to be run. It is acceptable for personal use.
+**Overall residual risk:** no residual risk is High since RC-04 (2026-11-10), and every proposed control was built by
+RC-10 on the same day. Before Maser is relied on for review at work, the usability evaluation needs to be run. It is
+acceptable for personal use.
 
 ## Production and post-production
 

@@ -21,7 +21,7 @@ bundle (`dev.maser.Maser.uitests`) with its own settings, so a Maser you're usin
 | Runner | `Sources/Maser/UIScenarioRunner.swift` | Starts the scenario named by `MASER_UI_SCENARIO` in the first main window. It presses keys by posting real key events, waits for and checks the window's state, writes `PASS` or `FAIL: …` to `MASER_UI_RESULT`, and exits. |
 | Fake `gh` | `Sources/fake-gh` | Answers each `gh` command from `recordings/`, or from overrides a scenario writes. It logs every command, so a scenario can check what Maser sent. |
 | Config | `config.toml` here | Points `[github] gh` at the fake, and sets the queue's searches to the recorded ones. |
-| Launcher | `scripts/check-ui` | Builds, wraps the debug binary in `.build/MaserUITests.app`, and launches it once per scenario with its own config, `gh` state and log. |
+| Launcher | `scripts/check-ui` | Builds, wraps the debug binary in `.build/MaserUITests.app`, and launches it once per scenario with its own config, `gh` state and log. Before each scenario it clears what the test app saved: settings, window state, and unsent text. |
 
 The runner refuses to start unless `[github] gh` is the fake, so a scenario can never post to real GitHub.
 
@@ -46,6 +46,9 @@ test app, not an app bug.
    To check wording, a view records the text it shows with `.shownText("name", text)` (only during a scenario), and the
    scenario reads `ShownText.values["name"]`. SwiftUI doesn't put most of the review's views in the accessibility tree,
    so reading the screen that way doesn't work.
+   To check what survives a crash, call `app.crash()`: it kills the app without warning, and `scripts/check-ui` launches
+   the scenario again, keeping what was saved, with `app.relaunched` set. Branch on it, as
+   `draft-survives-relaunch` does.
 4. Cite it from each requirement as `UI:name`, before any `Gap`. `maser-trace` checks both directions.
 5. Run it with `--record` once to record any GitHub data it needs, then without, and commit the new recordings.
 
