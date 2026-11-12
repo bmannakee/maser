@@ -36,5 +36,6 @@ let package = Package(
         ),
         // A stand-in for gh that replays recorded responses, for scripts/check-ui; not part of the app.
         .executableTarget(name: "fake-gh"),
+        .executableTarget(name: "maser-agent-tools", dependencies: ["MaserCore"]),
     ]
 )

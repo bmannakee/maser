@@ -15,12 +15,14 @@ version="$(git describe --tags --always 2>/dev/null || echo 0)"
 
 echo "==> swift build -c release"
 swift build -c release
-binary="$(swift build -c release --show-bin-path)/Maser"
+bin="$(swift build -c release --show-bin-path)"
 
 echo "==> $app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS"
-cp "$binary" "$app/Contents/MacOS/Maser"
+cp "$bin/Maser" "$app/Contents/MacOS/Maser"
+# The review agent's MCP helper, which claude starts; Maser finds it beside its own executable.
+cp "$bin/maser-agent-tools" "$app/Contents/MacOS/maser-agent-tools"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -42,6 +44,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
 PLIST
 
 echo "==> codesign (ad hoc)"
+# The helper is signed first: a nested executable must be signed before the bundle around it.
+codesign --force --sign - --timestamp=none "$app/Contents/MacOS/maser-agent-tools"
 codesign --force --sign - --timestamp=none "$app"
 codesign --verify --strict "$app"
 echo "Built $app. Run it with: open \"$app\""

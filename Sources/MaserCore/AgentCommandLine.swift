@@ -74,6 +74,29 @@ public enum AgentCommandLine {
         return arguments
     }
 
+    /// The MCP config that gives the agent Maser's tools and nothing else.
+    ///
+    /// The socket's path and the session's token reach the helper through its environment, not its arguments, so they
+    /// don't show in the process list.
+    ///
+    /// - Parameters:
+    ///   - helper: The `maser-agent-tools` executable.
+    ///   - socketPath: The session's socket.
+    ///   - token: The session's secret.
+    /// - Returns: The JSON to write to the file passed as `--mcp-config`.
+    public static func mcpConfig(helper: String, socketPath: String, token: String) -> Data {
+        let config: [String: Any] = [
+            "mcpServers": [
+                serverName: [
+                    "type": "stdio", "command": helper, "args": [String](),
+                    "env": ["MASER_AGENT_SOCKET": socketPath, "MASER_AGENT_TOKEN": token],
+                ]
+            ]
+        ]
+        // Built from strings only, so it always serializes.
+        return (try? JSONSerialization.data(withJSONObject: config, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data()
+    }
+
     /// One user message as a line of stream-json input.
     ///
     /// - Parameter text: The message.
