@@ -25,6 +25,7 @@ Everything else is quiet, so the beam is the brightest thing on screen.
 - Write the name **maser**, lowercase, wherever a person reads it, including at the start of a sentence.
 - Identifiers keep their conventions: `Maser.app`, the `Maser` and `MaserCore` targets, `dev.maser.Maser`.
 - Messages are short, specific sentences that say what happened and what to do, naming the key, the account and the PR.
+  No exclamation marks, with one exception: the congratulation when no reviews are requested (REQ-QUE-008).
 
 ## Logo
 
@@ -37,6 +38,8 @@ Everything else is quiet, so the beam is the brightest thing on screen.
 
 - The beam always points right and always leaves the rod. Don't rotate, mirror, outline or recolor the mark.
 - Clear space is half the mark's height on every side. Below 64 px, use the small icon.
+- In the app, the mark is drawn by `MaserMark` (`Sources/Maser/MaserMark.swift`) from the color tokens. It appears in
+  one place: above the congratulation when no reviews are requested.
 - To rebuild the icon after changing an SVG, render each size to PNG and pack them into `Assets/AppIcon.icns`
   (`iconutil -c icns` on an `.iconset` folder).
 

@@ -125,6 +125,40 @@ public struct QueueSection: Identifiable, Sendable, Equatable {
     }
 }
 
+/// What the queue's last load knows about reviews requested of the viewer.
+///
+/// Only `clear` means nothing is waiting. Every other case leaves it unknown, or says something is.
+public enum ReviewRequestStatus: Equatable, Sendable {
+    /// The queue hasn't loaded, or the search has never succeeded.
+    case unknown
+    /// Review requested isn't one of the queue's sections.
+    case notSearched
+    /// The search's last run failed, with its message. It may still hold results from an earlier run.
+    case failed(String)
+    /// The search's last run succeeded and found nothing.
+    case clear
+    /// The search's last run succeeded and found this many PRs.
+    case waiting(Int)
+}
+
+extension QueueSection {
+    /// Reports whether reviews are requested of the viewer, from the built-in Review requested search.
+    ///
+    /// Pass the queue's own sections, not the result of `displayed(_:filter:)`: that drops PRs an earlier section
+    /// already shows and PRs the filter hides, so its Review requested section can be empty while reviews wait.
+    ///
+    /// - Parameter sections: The queue's sections as loaded; `nil` before the first load.
+    /// - Returns: `clear` only when the search's last run succeeded and found nothing.
+    public static func reviewRequestStatus(in sections: [QueueSection]?) -> ReviewRequestStatus {
+        guard let sections else { return .unknown }
+        guard let section = sections.first(where: { $0.search == .reviewRequested }) else { return .notSearched }
+        // A failed search keeps its last results, so check the error before trusting an empty list.
+        if let error = section.error { return .failed(error) }
+        guard let prs = section.prs else { return .unknown }
+        return prs.isEmpty ? .clear : .waiting(prs.count)
+    }
+}
+
 extension QueueSection {
     /// Finds the first PR of the next or previous section, for jumping between sections with the keyboard.
     ///

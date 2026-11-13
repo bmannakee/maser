@@ -275,11 +275,8 @@ struct MainView: View {
                         if focus == .list { focus = nil }
                     })
         } else {
-            ContentUnavailableView(
-                "No pull request open", systemImage: "arrow.triangle.pull",
-                description: Text("Pick one from the list, or open one by URL with ⌘O.")
-            )
-            .navigationTitle("Pull Requests")
+            NoReviewOpenView(status: QueueSection.reviewRequestStatus(in: queue.sections), loadedAt: queue.loadedAt)
+                .navigationTitle("Pull Requests")
         }
     }
 

@@ -39,6 +39,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-QUE-005 | A new main window shows the last results at once, and refetches only if they're over 60 s old. Changing the searches in config reloads at once. | UN-10 | — | **Gap:** UI:queue-cache. | Implemented |
 | REQ-QUE-006 | When every section is empty, the queue says which searches it ran and how to add more. | UN-1 | — | **Gap:** UI:queue-empty. | Implemented |
 | REQ-QUE-007 | While the queue has the keys, `j`/`k` move the selection, `]`/`[` jump to the first PR of the next or previous section (skipping empty ones), `g g`/`G` go to the first and last PR, `o` opens the selection on GitHub, and Return opens it. | UN-1, UN-5 | — | T:PullRequestSearchTests.sectionStarts; UI:queue-keys; V-2026-11-03/V10. **Gap:** `o` (it opens a browser). | Implemented |
+| REQ-QUE-008 | With no review open, the main window's detail column says "No reviews requested. Nice work!" and when the queue was checked, but only when the built-in Review requested search last succeeded and found nothing. If that search failed (even with an empty last result), hasn't loaded, or isn't among the queue's sections, it shows "No pull request open" as before. The decision reads the sections as loaded, so de-duplication and the filter can't empty the section into a congratulation. | UN-1 | RC-33 | T:PullRequestSearchTests.reviewRequestStatus, .reviewRequestStatusUsesLoadedSections; UI:review-requested-clear; UI:review-requested-fails; UI:review-requested-off. | Implemented |
 
 ## Main window (WIN)
 
