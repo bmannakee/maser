@@ -233,6 +233,8 @@ final class ReviewModel {
 
     /// Whether the PR left the main window's queue while showing here, kept open because it had unsent text.
     var leftQueue = false
+    /// Called after a review is submitted, before the PR reloads; the main window uses it to focus the next review.
+    @ObservationIgnored var onSubmitted: (@MainActor () -> Void)?
 
     /// Whether any comment, line comment, reply or summary has text that hasn't been posted.
     var hasUnsentText: Bool {
@@ -773,6 +775,7 @@ final class ReviewModel {
         isFinishingReview = false
         reviewSummary = ""
         reviewEvent = .comment
+        onSubmitted?()
         await load()
         // GitHub can take a few seconds to show submitted comments as posted.
         if pendingCommentCount > 0 {

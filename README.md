@@ -30,6 +30,10 @@ mentioned or are assigned), plus any searches you add to `config.toml`. A PR sho
 it, and empty sections are hidden. Type `/` (or ⌘F) to filter by title, repository, author or `#number`; Esc clears the
 filter. Move with `j`/`k` and jump between sections with `]`/`[`.
 
+The queue starts on the next review to do: at launch, after each refresh, and after you submit a review, it selects the
+first PR in Review requested and shows it beside the queue. A PR you've just reviewed is skipped while GitHub still lists
+it. It leaves you alone while you're working in a review, and never moves away from one with text you haven't posted.
+
 When Review requested finds nothing and no review is open, the right pane says so ("No reviews requested. Nice
 work!") with when the queue was checked. It says so only after that search succeeds: a failed search shows its error
 in the queue instead.
