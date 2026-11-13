@@ -19,7 +19,9 @@ final class ReviewQueue {
     private(set) var sections: [QueueSection]?
     /// Whether a load is in progress.
     private(set) var isLoading = false
-    /// When the sections last loaded. A section with an error kept older results; one without is from this load.
+    /// When the sections last loaded.
+    ///
+    /// A section with an error kept older results; one without is from this load.
     private(set) var loadedAt: Date?
     /// The searches the load in progress is running, if any.
     private var loadingSearches: [PullRequestSearch]?

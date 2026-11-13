@@ -273,7 +273,7 @@
             ConfigStore.shared.overrideQueueSearches { $0.insert(.reviewRequested, at: 0) }
         }
 
-        /// The fake `gh`'s Review requested section, as the queue loaded it.
+        /// The Review requested section from the fake `gh`, as the queue loaded it.
         ///
         /// - Parameter app: The scenario's app.
         /// - Returns: The section, or `nil` if the queue doesn't have it.
