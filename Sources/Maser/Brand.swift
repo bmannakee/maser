@@ -30,6 +30,8 @@ extension Color {
         static let beamWash = Color(light: 0xFFF1D0, dark: 0x3D2E0A)
         /// The icon's ground, for brand surfaces such as an About window; not an app surface.
         static let rod = Color(light: 0x2B0A16, dark: 0x2B0A16)
+        /// The rod in the icon: `ruby`'s light value in both appearances, for use on the `rod` ground only.
+        static let iconRuby = Color(light: 0xC2255C, dark: 0xC2255C)
 
         // MARK: - Neutrals
 

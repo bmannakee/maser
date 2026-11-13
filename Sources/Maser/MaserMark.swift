@@ -1,29 +1,38 @@
 // maser's mark, drawn in SwiftUI.
 //
-// The ruby rod with the amber beam leaving it, in the proportions of `Assets/icon/maser-mark.svg`. Drawn from
-// `Color.Brand` rather than loaded from a file, so it follows the appearance and needs no resource in the bundle. The
-// brand document (`docs/design/brand.md`) says where the mark may appear.
+// The app icon as a small tile: the ruby rod with the amber beam leaving it, on the icon's dark ground, in the
+// proportions of `Assets/icon/maser-icon.svg`. The rod and beam need that ground: alone on a window's background they
+// lose the contrast the icon has. Drawn from `Color.Brand` rather than loaded from a file, so it needs no resource in
+// the bundle. The brand document (`docs/design/brand.md`) says where the mark may appear.
 
 import SwiftUI
 
-/// maser's mark: the ruby rod with the amber beam leaving it to the right.
+/// maser's mark: the icon's tile, with the ruby rod and the amber beam leaving it to the right.
+///
+/// It looks the same in light and dark appearances, as the icon does.
 struct MaserMark: View {
-    /// The rod's height in points; the mark is 3⅓ times as wide.
-    var height: CGFloat = 36
+    /// The tile's width and height in points.
+    var size: CGFloat = 72
 
     var body: some View {
-        // The SVG's units: a 100 by 48 rod, and a 140 by 10 beam that starts 20 in from the rod's leading edge.
-        let unit = height / 48
+        // The icon's 200-unit grid: a 100 by 48 rod 38 in from the leading edge, and a beam 10 tall from 58 in.
+        let unit = size / 200
         ZStack(alignment: .leading) {
+            Color.Brand.rod
             Capsule()
-                .fill(Color.Brand.ruby)
-                .frame(width: 100 * unit, height: height)
+                .fill(Color.Brand.iconRuby)
+                .frame(width: 100 * unit, height: 48 * unit)
+                .padding(.leading, 38 * unit)
+            // Longer than the tile is wide, so the tile's edge cuts the beam off square, as in the icon.
             Capsule()
                 .fill(Color.Brand.beam)
-                .frame(width: 140 * unit, height: 10 * unit)
-                .padding(.leading, 20 * unit)
+                .frame(width: 160 * unit, height: 10 * unit)
+                .padding(.leading, 58 * unit)
         }
-        .frame(width: 160 * unit, height: height, alignment: .leading)
+        .frame(width: size, height: size, alignment: .leading)
+        .clipShape(RoundedRectangle(cornerRadius: 46 * unit, style: .continuous))
+        // A faint edge, so the dark tile doesn't merge into a dark window.
+        .overlay(RoundedRectangle(cornerRadius: 46 * unit, style: .continuous).strokeBorder(Color.primary.opacity(0.15)))
         // Decoration: the text beside it says everything.
         .accessibilityHidden(true)
     }
