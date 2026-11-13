@@ -206,7 +206,10 @@ Three hazards started High:
   change marks, but not whether a diagram is complete. The evaluation of 2026-11-12 (V-2026-11-12/V13) found 6 of 6
   diagrams right on the first drawing, after fixing two things it found in Maser's instructions to the agent. Its cases
   are small, so it supports P2 (Remote), not P1. HRUS-9, whether the user notices a wrong diagram, is still to be
-  evaluated with the user.
+  evaluated with the user. Its first real review (V-2026-11-12/V15, V-2026-11-12/V16) found three real defects it
+  wasn't asked to look for, and missed a planted one beside them, in a function it had cited. Its findings don't say
+  what it didn't check, so a user who takes them as a review of the PR would approve what it missed. That is this
+  hazard's foreseeable misuse, and HRUS-9 should cover it.
 - **HAZ-20** and **HAZ-23** (a PR written to attack its reviewer): Medium. The evaluation's injected instruction was
   resisted in 3 of 3 runs, and reported to the user each time (V-2026-11-12/V13), as in the spike (V-2026-11-12/V7).
   RC-22 removes the agent's means to act on the Mac or the network, and settings from the PR are never loaded. What's left is the agent's words, which RC-26, RC-27 and
