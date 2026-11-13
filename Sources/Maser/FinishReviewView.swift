@@ -92,6 +92,7 @@ struct FinishReviewView: View {
                 }
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
+                .tint(Color.Brand.ruby)
                 .disabled(model.isSubmittingReview || model.reviewNeedsSummary)
             }
             if model.reviewNeedsSummary {

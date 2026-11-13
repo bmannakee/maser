@@ -381,7 +381,7 @@ private struct HunkHeaderRow: View {
             .padding(.vertical, 4)
             .padding(.leading, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.Brand.ruby.opacity(0.08))
+            .background(Color.primary.opacity(0.06))
     }
 }
 
@@ -428,7 +428,7 @@ private struct DiffLineRow: View, Equatable {
         .layoutProbe(probeKey, isText: false)
         .background(background)
         .overlay {
-            if isHighlighted { Color.Brand.ruby.opacity(0.14).allowsHitTesting(false) }
+            if isHighlighted { Color.primary.opacity(0.07).allowsHitTesting(false) }
         }
         .overlay(alignment: .leading) {
             if isCursor { Color.Brand.ruby.frame(width: 3).allowsHitTesting(false) }
@@ -473,10 +473,10 @@ private struct DiffLineRow: View, Equatable {
     /// Returns a line-number column, blank for a line that doesn't exist on that side.
     ///
     /// - Parameter number: The line number on one side of the diff.
-    /// - Returns: A fixed-width, right-aligned number, brighter on the cursor line.
+    /// - Returns: A fixed-width, right-aligned number, `rubyStrong` on the cursor line.
     private func lineNumber(_ number: Int?) -> some View {
         Text(number.map(String.init) ?? "")
-            .foregroundStyle(isCursor ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+            .foregroundStyle(isCursor ? AnyShapeStyle(Color.Brand.rubyStrong) : AnyShapeStyle(.tertiary))
             .frame(width: 44, alignment: .trailing)
             .padding(.trailing, 6)
     }
@@ -648,6 +648,9 @@ private struct InlineComposer: View {
                     .shownText("inline-post-button", primaryTitle(draft))
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
+                    .tint(Color.Brand.ruby)
+                    // The account in the title is a risk control (RC-12), so the help text yields, never the button.
+                    .fixedSize(horizontal: true, vertical: false)
                     .disabled(draft.isPosting || draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }

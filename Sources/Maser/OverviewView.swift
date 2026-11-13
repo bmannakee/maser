@@ -117,6 +117,9 @@ private struct CommentComposer: View {
                     .shownText("comment-button", title)
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
+                    .tint(Color.Brand.ruby)
+                    // The account in the title is a risk control (RC-12), so the status text yields, never the button.
+                    .fixedSize(horizontal: true, vertical: false)
                     .disabled(
                         model.isPostingComment || model.commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }

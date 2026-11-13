@@ -281,6 +281,7 @@ private struct AgentComposer: View {
                 }
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
+                .tint(Color.Brand.ruby)
                 .disabled(!agent.canSend)
             }
             .font(.callout)

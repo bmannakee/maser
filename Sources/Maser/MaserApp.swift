@@ -26,7 +26,6 @@ struct MaserApp: App {
         WindowGroup("Pull Requests", id: MainView.windowID) {
             MainView()
                 .frame(minWidth: 900, minHeight: 500)
-                .tint(Color.Brand.ruby)
         }
         .defaultSize(width: 1600, height: 950)
         .commands { MaserCommands() }
@@ -36,7 +35,6 @@ struct MaserApp: App {
             if let pr {
                 ReviewWindow(pr: pr)
                     .frame(minWidth: 900, minHeight: 500)
-                    .tint(Color.Brand.ruby)
             } else {
                 ContentUnavailableView("No pull request", systemImage: "arrow.triangle.pull")
             }
@@ -47,19 +45,16 @@ struct MaserApp: App {
         WindowGroup("Diagram", for: AgentDiagram.self) { $drawn in
             if let drawn {
                 DiagramWindow(drawn: drawn)
-                    .tint(Color.Brand.ruby)
             }
         }
         Window("Open Pull Request", id: OpenPullRequestView.windowID) {
             OpenPullRequestView()
-                .tint(Color.Brand.ruby)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
 
         Window("Keyboard Shortcuts", id: KeybindingsView.windowID) {
             KeybindingsView()
-                .tint(Color.Brand.ruby)
         }
         .defaultSize(width: 640, height: 480)
     }
