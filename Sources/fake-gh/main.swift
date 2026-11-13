@@ -2,9 +2,9 @@
 //
 // Maser runs `gh` as a subprocess, so the scenarios point `[github] gh` at this tool instead. Each recording is one
 // JSON file holding a `gh` command's exact arguments and what it printed. Scenarios can also write overrides that
-// answer matching commands differently, such as a failing search or a successful comment post, and every command run
-// is logged so a scenario can check what Maser sent. With `FAKE_GH_RECORD`, read-only commands go to the real `gh`
-// and are saved as new recordings; mutations are never sent to GitHub from here.
+// answer matching commands differently, such as a failing search, a stalled one or a successful comment post, and
+// every command run is logged so a scenario can check what Maser sent. With `FAKE_GH_RECORD`, read-only commands go to
+// the real `gh` and are saved as new recordings; mutations are never sent to GitHub from here.
 //
 // Environment:
 //   FAKE_GH_DIR     The recordings directory (required).
@@ -37,6 +37,8 @@ struct Override: Codable {
     let stdout: String?
     /// What to write to standard error.
     let stderr: String?
+    /// Seconds to wait before answering, to stand in for a stalled network.
+    let delaySeconds: Double?
 }
 
 /// One line of the call log.
@@ -135,6 +137,7 @@ if let state = environment["FAKE_GH_STATE"],
         override.match.allSatisfy { needle in arguments.contains { $0.contains(needle) } }
     }
     if let matched {
+        if let delay = matched.delaySeconds { Thread.sleep(forTimeInterval: delay) }
         finish(status: matched.status, stdout: matched.stdout ?? "", stderr: matched.stderr ?? "", source: "override")
     }
 }

@@ -442,6 +442,8 @@ import SwiftUI
             let stdout: String?
             /// Standard error.
             let stderr: String?
+            /// Seconds the fake waits before answering, to stand in for a stalled network.
+            var delaySeconds: Double? = nil
         }
 
         /// Replaces the overrides of the fake `gh`; later commands that match one get its answer.

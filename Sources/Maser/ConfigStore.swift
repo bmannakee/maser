@@ -25,7 +25,10 @@ final class ConfigStore {
     private(set) var keymap = Keymap.defaults
     /// The current settings: the defaults, or the last config that parsed.
     private(set) var settings = Settings.defaults {
-        didSet { GitHubCLI.setConfiguredExecutable(settings.ghPath) }
+        didSet {
+            GitHubCLI.setConfiguredExecutable(settings.ghPath)
+            GitHubCLI.setTimeout(seconds: settings.ghTimeoutSeconds)
+        }
     }
     /// Human-readable problems from the last load, such as unknown commands or a read or parse error.
     private(set) var problems: [String] = []
@@ -36,6 +39,13 @@ final class ConfigStore {
         /// - Parameter change: Changes the settings in place.
         func overrideAgentSettings(_ change: (inout AgentSettings) -> Void) {
             change(&settings.agent)
+        }
+
+        /// Changes how long `gh` calls may run, for UI scenarios that stall the fake `gh`.
+        ///
+        /// - Parameter seconds: The timeout.
+        func overrideGHTimeout(seconds: Int) {
+            settings.ghTimeoutSeconds = seconds
         }
     #endif
     /// Whether the user closed the problems banner; reset whenever the list of problems changes.

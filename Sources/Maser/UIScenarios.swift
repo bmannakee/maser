@@ -26,7 +26,7 @@
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
             queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
-            canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked,
+            canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -256,6 +256,50 @@
             try app.expect(
                 searchesAfter - searchesBefore == before.count, "every section searched again",
                 "\(searchesAfter - searchesBefore)")
+        }
+
+        /// A `gh` that never answers is stopped, the user is told so, and trying again loads.
+        static let ghTimesOut = UIScenario(
+            "gh-times-out", "REQ-GH-007: A stalled gh call times out with a message, and trying again loads"
+        ) { app in
+            ConfigStore.shared.overrideGHTimeout(seconds: 2)
+            let failing = app.probe.sections()[0]
+            let word = failing.search.query.split(separator: " ").last.map(String.init) ?? ""
+            try app.overrideGH([.init(match: ["search", word], status: 0, stdout: "[]", stderr: nil, delaySeconds: 60)])
+
+            try await app.press("r")
+            try await app.waitUntil("the stalled search times out") {
+                app.probe.sections().first { $0.id == failing.id }?.error?.contains("within 2 seconds") == true
+            }
+            try app.expect(!ReviewQueue.shared.isLoading, "the queue stops loading", app.summary)
+            try app.expect(
+                app.probe.sections().first { $0.id == failing.id }?.prs == failing.prs, "it keeps the PRs it found before",
+                app.summary)
+
+            try app.overrideGH([])
+            try await app.press("r")
+            try await app.waitUntil("trying again loads the search") {
+                app.probe.sections().first { $0.id == failing.id }?.error == nil && !ReviewQueue.shared.isLoading
+            }
+
+            // A diff gets twice the timeout.
+            try app.overrideGH([.init(match: ["pr", "diff"], status: 0, stdout: "", stderr: nil, delaySeconds: 60)])
+            try await app.openFromQueue(smallPR)
+            try await app.press("g f")
+            try await app.waitUntil("the stalled diff times out") {
+                if case let .failed(message) = app.review?.filesState { return message.contains("within 4 seconds") }
+                return false
+            }
+            try app.expect(
+                ShownText.values["files-failed"]?.contains("Check your network, then try again") == true,
+                "the Files tab says to try again", ShownText.values["files-failed"] ?? "nothing shown")
+
+            try app.overrideGH([])
+            try await app.press("r")
+            try await app.waitUntil("trying again loads the diff") {
+                if case .loaded = app.review?.filesState { return app.review?.selectedFile != nil }
+                return false
+            }
         }
 
         /// Long lines wrap inside their own row, so every line's text is drawn in full and none is hidden under another.

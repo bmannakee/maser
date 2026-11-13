@@ -169,8 +169,13 @@ private struct DiffPane: View {
         case .loading:
             ProgressView()
         case let .failed(message):
-            ContentUnavailableView(
-                "Couldn't load pull request", systemImage: "exclamationmark.triangle", description: Text(message))
+            ContentUnavailableView {
+                Label("Couldn't load pull request", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message).shownText("files-failed", message)
+            } actions: {
+                Button("Try Again") { Task { await model.load() } }
+            }
         case .loaded:
             if let file = model.selectedFile {
                 VStack(spacing: 0) {

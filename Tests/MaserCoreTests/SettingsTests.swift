@@ -14,7 +14,7 @@ import Testing
     }
 
     /// Reads the diff view and the `gh` path, alongside key bindings the settings ignore.
-    @Test("REQ-GH-002, REQ-CFG-005: Reads settings") func readsSettings() throws {
+    @Test("REQ-GH-002, REQ-GH-007, REQ-CFG-005: Reads settings") func readsSettings() throws {
         let result = try Settings.load(
             toml: """
                 [keys.normal]
@@ -25,10 +25,12 @@ import Testing
 
                 [github]
                 gh = "~/bin/gh"
+                timeout = 90
                 """)
         #expect(result.problems.isEmpty)
         #expect(result.settings.diffView == .full)
         #expect(result.settings.ghPath == "~/bin/gh")
+        #expect(result.settings.ghTimeoutSeconds == 90)
     }
 
     /// Reports unknown values and keys and keeps the defaults for them; a blank `gh` means search as usual.
@@ -41,11 +43,13 @@ import Testing
 
                 [github]
                 gh = " "
+                timeout = 0
                 """)
         #expect(result.settings == .defaults)
         #expect(
             result.problems == [
                 "[diff] unknown setting \"colour\"", "[diff] view = \"everything\": expected \"hunks\" or \"full\"",
+                "[github] timeout: expected a number of seconds above 0, such as 60",
             ])
     }
 
@@ -55,7 +59,7 @@ import Testing
         #expect(try Settings.load(toml: Keymap.template).settings == .defaults)
         // Uncomment every setting line, including the multi-line searches example.
         let uncommented = Keymap.template.split(separator: "\n", omittingEmptySubsequences: false).map { line in
-            let settingLines = ["# view", "# gh", "# sections", "# searches", "#   {", "# ]"]
+            let settingLines = ["# view", "# gh", "# timeout", "# sections", "# searches", "#   {", "# ]"]
             return settingLines.contains(where: line.hasPrefix) ? String(line.dropFirst(2)) : String(line)
         }.joined(separator: "\n")
         let result = try Settings.load(toml: uncommented)
