@@ -16,7 +16,13 @@ struct OverviewView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .failed(message):
-            ContentUnavailableView("Couldn't load overview", systemImage: "exclamationmark.triangle", description: Text(message))
+            ContentUnavailableView {
+                Label("Couldn't load overview", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message)
+            } actions: {
+                Button("Try Again") { Task { await model.load() } }
+            }
         case .loaded:
             if let overview = model.overview {
                 HStack(spacing: 0) {

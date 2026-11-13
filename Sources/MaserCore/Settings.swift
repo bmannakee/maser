@@ -21,6 +21,10 @@ public struct Settings: Equatable, Sendable {
     public var diffView = DiffView.hunks
     /// The path to `gh`, if set; `[github] gh` in the config. `nil` means search the usual places.
     public var ghPath: String?
+    /// How many seconds a `gh` call may run before Maser stops it; `[github] timeout` in the config.
+    ///
+    /// A diff or a file's contents get twice as long.
+    public var ghTimeoutSeconds = 60
     /// The review queue's sections, in order: the built-ins `[queue] sections` picks, then `[queue] searches`.
     public var queueSearches = PullRequestSearch.builtIns.map(\.value)
     /// The review agent's settings; the `[agent]` table.
@@ -70,14 +74,10 @@ public struct Settings: Equatable, Sendable {
                 problems.append("[diff] unknown setting \"\(key)\"")
             }
         }
-        for (key, value) in (file.github ?? [:]).sorted(by: { $0.key < $1.key }) {
-            switch key {
-            case "gh":
-                let path = value.trimmingCharacters(in: .whitespaces)
-                settings.ghPath = path.isEmpty ? nil : path
-            default:
-                problems.append("[github] unknown setting \"\(key)\"")
-            }
+        if let github = file.github {
+            settings.ghPath = github.ghPath
+            settings.ghTimeoutSeconds = github.timeoutSeconds ?? settings.ghTimeoutSeconds
+            problems += github.problems
         }
         if let queue = file.queue {
             settings.queueSearches = queueSearches(from: queue, problems: &problems)
@@ -133,9 +133,43 @@ public struct Settings: Equatable, Sendable {
     /// The tables of `config.toml` that hold settings; other tables are ignored.
     private struct File: Decodable {
         let diff: [String: String]?
-        let github: [String: String]?
+        let github: GitHubTable?
         let queue: QueueTable?
         let agent: AgentTable?
+    }
+
+    /// The `[github]` table, read key by key so a wrong value is reported rather than failing the whole file.
+    private struct GitHubTable: Decodable {
+        /// The `gh` path, if set and not blank.
+        var ghPath: String?
+        /// The timeout, if set to a valid value.
+        var timeoutSeconds: Int?
+        /// A message for each unknown key or bad value.
+        var problems: [String] = []
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: Keymap.AnyKey.self)
+            for key in container.allKeys.sorted(by: { $0.stringValue < $1.stringValue }) {
+                let name = "[github] \(key.stringValue)"
+                switch key.stringValue {
+                case "gh":
+                    if let path = try? container.decode(String.self, forKey: key) {
+                        let trimmed = path.trimmingCharacters(in: .whitespaces)
+                        ghPath = trimmed.isEmpty ? nil : trimmed
+                    } else {
+                        problems.append("\(name): expected a path in quotes")
+                    }
+                case "timeout":
+                    if let seconds = try? container.decode(Int.self, forKey: key), seconds > 0 {
+                        timeoutSeconds = seconds
+                    } else {
+                        problems.append("\(name): expected a number of seconds above 0, such as 60")
+                    }
+                default:
+                    problems.append("[github] unknown setting \"\(key.stringValue)\"")
+                }
+            }
+        }
     }
 
     /// The `[agent]` table, read key by key so a wrong value is reported rather than failing the whole file.
@@ -241,6 +275,9 @@ public struct Settings: Equatable, Sendable {
         # then asks your login shell.
         [github]
         # gh = "/opt/homebrew/bin/gh"
+        # How many seconds to wait for gh before giving up, so a stalled network shows a message rather than
+        # loading forever. Loading a diff gets twice as long.
+        # timeout = 60
 
         # The review queue's sections. Built-ins: "review-requested", "yours" (PRs you wrote) and "involving"
         # (you commented, were mentioned or are assigned). Searches use GitHub's syntax and show open PRs

@@ -126,6 +126,7 @@ view = "full"                   # open files in full; the default is "hunks"
 
 [github]
 gh = "~/.local/bin/gh"          # only if Maser can't find gh
+timeout = 60                    # seconds to wait for gh before giving up; a diff gets twice as long
 
 [queue]
 sections = ["review-requested", "yours"]   # built-in sections to show; default adds "involving"

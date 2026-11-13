@@ -25,6 +25,9 @@ public enum GitHubCLIError: Error, LocalizedError {
     case headMoved(seen: String, current: String)
     /// `gh` is signed in to a different account than the one shown, or none was shown yet.
     case accountChanged(shown: String?, current: String?)
+    /// `gh` didn't finish within the timeout and was stopped. `mayHaveWritten` is true for a call that changes
+    /// something on GitHub, which may have happened before it was stopped.
+    case timedOut(seconds: Int, mayHaveWritten: Bool)
 
     /// A user-facing message; for `failed`, it includes the error output from `gh`.
     public var errorDescription: String? {
@@ -56,6 +59,13 @@ public enum GitHubCLIError: Error, LocalizedError {
             """
         case .accountChanged(_, nil):
             "GitHub didn't say which account gh is signed in to, so nothing was posted. Your text is kept."
+        case let .timedOut(seconds, false):
+            "gh didn't answer within \(seconds) seconds, so Maser stopped waiting. Check your network, then try again."
+        case let .timedOut(seconds, true):
+            """
+            gh didn't answer within \(seconds) seconds, so Maser stopped waiting. GitHub may still have received it: \
+            refresh and check before posting again. Your text is kept.
+            """
         }
     }
 }
@@ -77,6 +87,9 @@ public struct GitHubCLI: Sendable {
     /// Where `gh` is: the path set in `config.toml` (if any) and the executable found, cached once found.
     private static let location = Mutex<(configured: String?, found: URL?)>((nil, nil))
 
+    /// How long a `gh` call may run before it's stopped, from `config.toml`; slow calls get twice as long.
+    private static let timeout = Mutex(Settings.defaults.ghTimeoutSeconds)
+
     /// Creates a client.
     ///
     /// Finding `gh` is left to the first call, which happens off the main actor.
@@ -90,6 +103,26 @@ public struct GitHubCLI: Sendable {
             guard location.configured != path else { return }
             location = (path, nil)
         }
+    }
+
+    /// Sets how long a `gh` call may run before it's stopped, from `config.toml`.
+    ///
+    /// - Parameter seconds: The timeout; a diff or a file's contents get twice as long.
+    public static func setTimeout(seconds: Int) {
+        timeout.withLock { $0 = seconds }
+    }
+
+    /// Whether a `gh` command changes something on GitHub, so a timeout may have stopped it after the change was made.
+    ///
+    /// - Parameter arguments: The arguments to `gh`.
+    /// - Returns: True for a REST call with a method other than GET, or a GraphQL mutation.
+    static func isWrite(_ arguments: [String]) -> Bool {
+        if let index = arguments.firstIndex(of: "--method"), arguments.indices.contains(index + 1),
+            arguments[index + 1].uppercased() != "GET"
+        {
+            return true
+        }
+        return arguments.contains { $0.hasPrefix("query=mutation {") }
     }
 
     /// Returns the `gh` executable, finding it the first time.
@@ -265,11 +298,12 @@ public struct GitHubCLI: Sendable {
     /// - Throws: `GitHubCLIError.failed` if `gh` fails, for example when the diff is too large for GitHub to serve.
     @concurrent
     public func fileDiffs(for pr: PullRequest) async throws -> [FileDiff] {
-        let data = try await run([
-            "pr", "diff", String(pr.number),
-            "--repo", "\(pr.host)/\(pr.repository.nameWithOwner)",
-            "--color", "never",
-        ])
+        let data = try await run(
+            [
+                "pr", "diff", String(pr.number),
+                "--repo", "\(pr.host)/\(pr.repository.nameWithOwner)",
+                "--color", "never",
+            ], slow: true)
         return DiffParser.parse(String(decoding: data, as: UTF8.self))
     }
 
@@ -293,11 +327,12 @@ public struct GitHubCLI: Sendable {
         let encodedPath = path.split(separator: "/", omittingEmptySubsequences: false)
             .map { $0.addingPercentEncoding(withAllowedCharacters: allowed) ?? String($0) }
             .joined(separator: "/")
-        let data = try await run([
-            "api", "--hostname", pr.host,
-            "-H", "Accept: application/vnd.github.raw+json",
-            "repos/\(pr.repository.nameWithOwner)/contents/\(encodedPath)?ref=\(commitID)",
-        ])
+        let data = try await run(
+            [
+                "api", "--hostname", pr.host,
+                "-H", "Accept: application/vnd.github.raw+json",
+                "repos/\(pr.repository.nameWithOwner)/contents/\(encodedPath)?ref=\(commitID)",
+            ], slow: true)
         guard data.count <= maxBytes else { throw GitHubCLIError.fileTooLarge(path: path, bytes: data.count) }
         return String(decoding: data, as: UTF8.self)
     }
@@ -305,14 +340,22 @@ public struct GitHubCLI: Sendable {
     /// Runs `gh` with `arguments` and waits for it to exit.
     ///
     /// The wait doesn't tie up a thread, so many `gh` processes can run at once without starving other async work.
+    /// A call that runs past the timeout is stopped (HAZ-12).
     ///
-    /// - Parameter arguments: The arguments to pass to `gh`, not including the executable.
+    /// - Parameters:
+    ///   - arguments: The arguments to pass to `gh`, not including the executable.
+    ///   - slow: Whether the call fetches something large, such as a diff, and gets twice the timeout.
     /// - Returns: Everything `gh` wrote to standard output.
-    /// - Throws: `GitHubCLIError.failed` with `gh`'s standard error if it exits with a non-zero status, the errors from
-    ///   `executable()` if `gh` can't be found, or the error from `Process.run()` if it can't be launched.
+    /// - Throws: `GitHubCLIError.timedOut` if it ran past the timeout, `GitHubCLIError.failed` with `gh`'s standard error
+    ///   if it exits with a non-zero status, the errors from `executable()` if `gh` can't be found, or the error from
+    ///   `Process.run()` if it can't be launched.
     @concurrent
-    func run(_ arguments: [String]) async throws -> Data {
-        let result = try await Subprocess.run(try await Self.executable(), arguments)
+    func run(_ arguments: [String], slow: Bool = false) async throws -> Data {
+        let seconds = Self.timeout.withLock { $0 } * (slow ? 2 : 1)
+        let result = try await Subprocess.run(try await Self.executable(), arguments, timeout: .seconds(seconds))
+        if result.timedOut {
+            throw GitHubCLIError.timedOut(seconds: seconds, mayHaveWritten: Self.isWrite(arguments))
+        }
         guard result.status == 0 else {
             throw GitHubCLIError.failed(status: result.status, stderr: String(decoding: result.stderr, as: UTF8.self))
         }
@@ -328,6 +371,8 @@ enum Subprocess {
         let status: Int32
         let stdout: Data
         let stderr: Data
+        /// Whether it was stopped for running past its timeout.
+        var timedOut = false
     }
 
     /// Runs an executable to completion.
@@ -339,7 +384,7 @@ enum Subprocess {
     ///   - arguments: Its arguments.
     ///   - timeout: How long to let it run before terminating it, or `nil` for no limit.
     ///   - environment: Variables to set on top of this process's environment.
-    /// - Returns: The exit status and everything written to standard output and standard error.
+    /// - Returns: The exit status, everything written to standard output and standard error, and whether it timed out.
     /// - Throws: The error from `Process.run()` if the program can't be launched.
     static func run(
         _ executable: URL, _ arguments: [String], timeout: Duration? = nil, environment: [String: String] = [:]
@@ -381,9 +426,11 @@ enum Subprocess {
             stderr.fileHandleForReading.readabilityHandler = nil
             throw error
         }
+        let stopped = Mutex(false)
         let timer = timeout.map { timeout in
             Task {
                 try await Task.sleep(for: timeout)
+                stopped.withLock { $0 = true }
                 process.terminate()
             }
         }
@@ -392,7 +439,9 @@ enum Subprocess {
         }
         timer?.cancel()
         let (out, err) = output.contents
-        return Result(status: process.terminationStatus, stdout: out, stderr: err)
+        // A process that exited by itself just as the timer fired finished normally.
+        let timedOut = stopped.withLock { $0 } && process.terminationReason == .uncaughtSignal
+        return Result(status: process.terminationStatus, stdout: out, stderr: err, timedOut: timedOut)
     }
 
     /// Output collected from the pipes' handlers, which run on arbitrary threads.

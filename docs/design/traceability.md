@@ -21,7 +21,7 @@ Every user need must have at least one implemented requirement.
 | UN-7 | REQ-GH-002, REQ-GH-006, REQ-CFG-005, REQ-PLT-001, REQ-PLT-002 | — |
 | UN-8 | REQ-GH-001, REQ-WIN-002, REQ-OVR-002, REQ-CMT-005, REQ-CMT-007, REQ-CMT-009, REQ-AGT-008 | — |
 | UN-9 | REQ-WIN-007, REQ-WIN-008, REQ-CMT-004, REQ-CMT-008 | — |
-| UN-10 | REQ-GH-005, REQ-QUE-005, REQ-WIN-001, REQ-DIF-005, REQ-DIF-007, REQ-PLT-003 | — |
+| UN-10 | REQ-GH-005, REQ-GH-007, REQ-QUE-005, REQ-WIN-001, REQ-DIF-005, REQ-DIF-007, REQ-PLT-003 | — |
 | UN-11 | REQ-AGT-001, REQ-AGT-002, REQ-AGT-004, REQ-AGT-006, REQ-AGT-009, REQ-AGT-010, REQ-AGT-011 | — |
 | UN-12 | REQ-AGT-012, REQ-CNV-001, REQ-CNV-002, REQ-CNV-003, REQ-CNV-004, REQ-CNV-005 | — |
 | UN-13 | REQ-AGT-007 | — |
@@ -47,7 +47,7 @@ The requirements listed are those that implement each hazard's controls, as the 
 | HAZ-09 | H4 | RC-16 | REQ-OVR-002 | S4 P1 Medium |
 | HAZ-10 | H2 | RC-12 | REQ-CMT-009 | S3 P2 Medium |
 | HAZ-11 | H1 | RC-17 | REQ-OVR-003, REQ-WIN-001 | S3 P2 Medium |
-| HAZ-12 | H5 | RC-15 | REQ-GH-005 | S1 P2 Low |
+| HAZ-12 | H5 | RC-15, RC-31 | REQ-GH-005, REQ-GH-007 | S1 P1 Low |
 | HAZ-13 | H4 | RC-13 | REQ-GH-002 | S4 P1 Medium |
 | HAZ-14 | H1 | RC-02 | REQ-GH-003, REQ-OVR-001 | S3 P1 Low |
 | HAZ-15 | H2 | RC-19 | — | S3 P1 Low |
@@ -71,7 +71,7 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 <!-- trace:begin coverage -->
 | Coverage | Count | Requirements (REQ-…) |
 | --- | --- | --- |
-| Unit tests, fully | 33 | GH-003, GH-004, QUE-001, QUE-002, QUE-003, QUE-004, WIN-008, OVR-001, DIF-001, DIF-002, CMT-001, CMT-007, CMT-008, CMT-009, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-008, AGT-009, AGT-010, AGT-011, CNV-001, CNV-002, CNV-003, CNV-004, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
+| Unit tests, fully | 34 | GH-003, GH-004, GH-007, QUE-001, QUE-002, QUE-003, QUE-004, WIN-008, OVR-001, DIF-001, DIF-002, CMT-001, CMT-007, CMT-008, CMT-009, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-008, AGT-009, AGT-010, AGT-011, CNV-001, CNV-002, CNV-003, CNV-004, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
 | Unit tests, partly (the rest is a gap) | 9 | GH-002, GH-006, QUE-007, OVR-004, DIF-003, DIF-004, DIF-006, DIF-008, AGT-007 |
 | UI scenarios (no unit tests) | 9 | WIN-001, WIN-003, WIN-007, DIF-009, CNV-005, CNV-006, KEY-002, KEY-003, KEY-004 |
 | Live GitHub tests only | 5 | DIF-007, CMT-002, CMT-005, CMT-006, AGT-012 |
@@ -80,7 +80,7 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | None yet | 10 | QUE-005, QUE-006, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
 | Proposed (not built) | 0 | — |
 
-74 requirements: 74 implemented and 0 proposed.
+75 requirements: 75 implemented and 0 proposed.
 <!-- trace:end coverage -->
 
 Most of the "one-off", "inspection only" and "none yet" rows have UI scenarios planned (`UI:…` after `Gap` in

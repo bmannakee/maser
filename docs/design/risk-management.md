@@ -84,7 +84,7 @@ Each row lists:
 | HAZ-09 | Malicious content in a PR's description or comments runs script in Maser, or leads the user to a phishing page. | H4 | S4 P2 Medium | RC-16 | S4 P1 Medium |
 | HAZ-10 | `gh` is signed in to a different account than the user expects (personal versus work), so comments and reviews are posted as the wrong identity. | H2 | S3 P3 Medium | RC-12 | S3 P2 Medium |
 | HAZ-11 | Maser shows stale status (checks, mergeability, new comments), and the user decides on information that has since changed. | H1 | S3 P3 Medium | RC-17 | S3 P2 Medium |
-| HAZ-12 | A `gh` call hangs, and Maser stops responding or never finishes loading. | H5 | S1 P3 Low | RC-15 | S1 P2 Low |
+| HAZ-12 | A `gh` call hangs, and Maser stops responding or never finishes loading. | H5 | S1 P3 Low | RC-15, RC-31 | S1 P1 Low |
 | HAZ-13 | Maser runs a `gh` other than the user's own, from a planted binary on the search path or a wrong configured path. | H4 | S4 P1 Medium | RC-13 | S4 P1 Medium |
 | HAZ-14 | GitHub returns a capped list (100 items) and Maser shows it as complete, hiding a failing check, a blocking review or a comment. | H1 | S3 P3 Medium | RC-02 | S3 P1 Low |
 | HAZ-15 | Development: a live write test posts to a real PR other than the test PR. | H2 | S3 P2 Medium | RC-19 | S3 P1 Low |
@@ -119,7 +119,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-12 | The account is named wherever Maser posts, and the PR in Finish Review. A post is refused if `gh`'s account changed since it was shown. | Information for safety; protective measure (the refusal) | REQ-CMT-009 | Implemented |
 | RC-13 | `gh` is found by a fixed, documented search order, or by an explicit configured path. | Protective measure | REQ-GH-002 | Implemented |
 | RC-14 | Defensive decoding; failures become messages, per section in the queue. | Protective measure | REQ-GH-004, REQ-QUE-004 | Implemented |
-| RC-15 | Subprocesses never block the UI. | Protective measure | REQ-GH-005 | Implemented (only the login-shell lookup has a timeout) |
+| RC-15 | Subprocesses never block the UI. | Protective measure | REQ-GH-005 | Implemented |
 | RC-16 | Rendered PR content runs no JavaScript, and links open in the default browser. | Inherent safety by design | REQ-OVR-002 | Implemented |
 | RC-17 | Data freshness: relative times are refreshed, a PR reloads on return when over 60 s old, and there's a manual refresh (`r`). | Protective measure | REQ-OVR-003, REQ-WIN-001 | Implemented |
 | RC-18 | Config problems are reported in a banner and skipped, never silently applied. Shadowed bindings are reported. | Information for safety | REQ-CFG-002 | Implemented |
@@ -135,6 +135,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-28 | The canvas renders only declarative diagram source, with bundled renderers, no network, and no agent script or HTML. | Inherent safety by design | REQ-CNV-002 | Implemented |
 | RC-29 | Diagrams are grounded: each element's citation is checked against the checkout, and each change mark against the diff. Mismatches and unsourced diagrams are flagged. | Protective measure | REQ-CNV-003, REQ-CNV-004 | Implemented |
 | RC-30 | Everything the agent produces is labeled as the agent's, with its commit, and none of it changes review state. | Information for safety | REQ-CNV-005 | Implemented |
+| RC-31 | Every `gh` call has a timeout. A call past it is stopped and reported with a way to try again; a timed-out write says it may have reached GitHub. | Protective measure | REQ-GH-007 | Implemented |
 
 ## Residual risk
 
@@ -165,11 +166,11 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
 - **HAZ-11:** Medium. A "loaded at" indicator on the Overview would reduce it further. It's recorded as a candidate
   control, not yet a requirement.
 
-The open risks need further controls before Maser is relied on to review regulated software:
+- **HAZ-12:** Low. RC-31 stops a `gh` call that runs past `[github] timeout` and says so, with Try Again
+  (UI:gh-times-out). A write stopped by the timeout may still have reached GitHub, so its message says to check before
+  posting again: a second post would be a visible duplicate, not a hidden one.
 
-| Hazard | Residual | Needs | Issue |
-| --- | --- | --- | --- |
-| HAZ-12 | Low (observation) | Timeouts on `gh` calls, which have none today, so a hung `gh` loads forever | #21 |
+Of the risks above, none is waiting on a further control. The review agent's are below.
 
 **The review agent (#32)** was built in increments on 2026-11-12. The conversation came first, with RC-22 to RC-25 and
 RC-27:
