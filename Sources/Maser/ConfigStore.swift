@@ -41,6 +41,13 @@ final class ConfigStore {
             change(&settings.agent)
         }
 
+        /// Changes the queue's searches in memory, for UI scenarios that need a section the test config leaves out.
+        ///
+        /// - Parameter change: Changes the searches in place.
+        func overrideQueueSearches(_ change: (inout [PullRequestSearch]) -> Void) {
+            change(&settings.queueSearches)
+        }
+
         /// Changes how long `gh` calls may run, for UI scenarios that stall the fake `gh`.
         ///
         /// - Parameter seconds: The timeout.

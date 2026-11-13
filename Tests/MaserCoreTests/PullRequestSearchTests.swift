@@ -58,6 +58,39 @@ import Testing
         #expect(shown[2].error == "bad query")
     }
 
+    /// Nothing is waiting only when the Review requested search itself succeeded and found nothing.
+    @Test("REQ-QUE-008: Review request status is clear only on an empty, successful search") func reviewRequestStatus() {
+        let other = QueueSection(search: .yours, prs: [Self.pr(3)])
+        #expect(QueueSection.reviewRequestStatus(in: nil) == .unknown)
+        #expect(QueueSection.reviewRequestStatus(in: []) == .notSearched)
+        #expect(QueueSection.reviewRequestStatus(in: [other]) == .notSearched)
+        #expect(QueueSection.reviewRequestStatus(in: [QueueSection(search: .reviewRequested, prs: nil), other]) == .unknown)
+        #expect(QueueSection.reviewRequestStatus(in: [QueueSection(search: .reviewRequested, prs: []), other]) == .clear)
+        #expect(
+            QueueSection.reviewRequestStatus(in: [other, QueueSection(search: .reviewRequested, prs: [Self.pr(1), Self.pr(2)])])
+                == .waiting(2))
+        // A failed search that found nothing last time is not an all-clear.
+        #expect(
+            QueueSection.reviewRequestStatus(in: [QueueSection(search: .reviewRequested, prs: [], error: "HTTP 502")])
+                == .failed("HTTP 502"))
+        // A search of the user's own with the same query isn't the built-in one, so it promises nothing.
+        let lookalike = PullRequestSearch(name: "Reviews", query: "review-requested:@me")
+        #expect(QueueSection.reviewRequestStatus(in: [QueueSection(search: lookalike, prs: [])]) == .notSearched)
+    }
+
+    /// Displaying can empty Review requested while reviews wait, so the status must come from the loaded sections.
+    @Test("REQ-QUE-008: Review request status ignores de-duplication and the filter") func reviewRequestStatusUsesLoadedSections()
+    {
+        let sections = [
+            QueueSection(search: .involving, prs: [Self.pr(1)]),
+            QueueSection(search: .reviewRequested, prs: [Self.pr(1)]),
+        ]
+        let shown = QueueSection.displayed(sections)
+        #expect(shown.map(\.id) == ["Involving you"])
+        #expect(QueueSection.displayed(sections, filter: "no-such-title").isEmpty)
+        #expect(QueueSection.reviewRequestStatus(in: sections) == .waiting(1))
+    }
+
     /// A PR is gone only when no section has it any more; one section dropping it, or a failed search, isn't enough.
     @Test("REQ-WIN-008: Finds PRs that left the queue") func removedPRs() {
         let before = [

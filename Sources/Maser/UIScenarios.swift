@@ -27,6 +27,7 @@
             queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
             canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut,
+            reviewRequestedClear, reviewRequestedFails, reviewRequestedOff,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -256,6 +257,84 @@
             try app.expect(
                 searchesAfter - searchesBefore == before.count, "every section searched again",
                 "\(searchesAfter - searchesBefore)")
+        }
+
+        /// Adds the built-in Review requested search to the queue, answered by the fake `gh` as given.
+        ///
+        /// The test config leaves the section out, and it has no recording, so each scenario supplies its answer.
+        ///
+        /// - Parameters:
+        ///   - app: The scenario's app.
+        ///   - answer: The fake `gh`'s answer to the Review requested search.
+        /// - Throws: `UIScenarioFailure` if the fake `gh` can't be overridden.
+        private static func addReviewRequested(_ app: UIScenarioDriver, answer: UIScenarioDriver.GHOverride) throws {
+            try app.overrideGH([answer])
+            // Changing the searches reloads the queue at once (REQ-QUE-005).
+            ConfigStore.shared.overrideQueueSearches { $0.insert(.reviewRequested, at: 0) }
+        }
+
+        /// The fake `gh`'s Review requested section, as the queue loaded it.
+        ///
+        /// - Parameter app: The scenario's app.
+        /// - Returns: The section, or `nil` if the queue doesn't have it.
+        private static func reviewRequestedSection(_ app: UIScenarioDriver) -> QueueSection? {
+            ReviewQueue.shared.sections?.first { $0.search == .reviewRequested }
+        }
+
+        /// An empty Review requested search congratulates in the detail column, and says when it was checked.
+        static let reviewRequestedClear = UIScenario(
+            "review-requested-clear", "REQ-QUE-008: An empty Review requested search congratulates, with when it was checked"
+        ) { app in
+            try app.expect(app.review == nil, "no review is open at launch", app.summary)
+            try addReviewRequested(
+                app, answer: .init(match: ["search", "review-requested:@me"], status: 0, stdout: "[]", stderr: nil))
+            try await app.waitUntil("the Review requested search finds nothing") {
+                reviewRequestedSection(app)?.prs == [] && reviewRequestedSection(app)?.error == nil
+            }
+            try await app.waitUntil("the congratulations shows") {
+                ShownText.values["no-review-open"] == NoReviewOpenView.clearTitle
+            }
+            let checked = ShownText.values["no-review-checked"] ?? ""
+            try app.expect(checked.hasPrefix("Checked at "), "it says when the queue was checked", checked)
+            try app.expect(checked.contains("⌘O"), "it keeps the hint about ⌘O", checked)
+            try app.expect(!app.queuePRs.isEmpty, "the other sections still list their PRs", app.summary)
+            app.snapshot("review-requested-clear")
+        }
+
+        /// A failed Review requested search never congratulates, even when its last result was empty.
+        static let reviewRequestedFails = UIScenario(
+            "review-requested-fails", "REQ-QUE-008: A failed Review requested search doesn't congratulate"
+        ) { app in
+            try addReviewRequested(
+                app, answer: .init(match: ["search", "review-requested:@me"], status: 0, stdout: "[]", stderr: nil))
+            try await app.waitUntil("the congratulations shows while the search succeeds") {
+                ShownText.values["no-review-open"] == NoReviewOpenView.clearTitle
+            }
+
+            try app.overrideGH([
+                .init(match: ["search", "review-requested:@me"], status: 1, stdout: nil, stderr: "HTTP 502: Bad Gateway")
+            ])
+            // The queue's r, not ⌘R: in the test app the Refresh menu item stays disabled (see the README).
+            try await app.press("r")
+            try await app.waitUntil("the failed search shows its error") {
+                reviewRequestedSection(app)?.error?.contains("Bad Gateway") == true
+            }
+            try app.expect(reviewRequestedSection(app)?.prs == [], "the section keeps its empty last result", app.summary)
+            try await app.waitUntil("the usual message replaces the congratulations") {
+                ShownText.values["no-review-open"] == NoReviewOpenView.noneOpenTitle
+            }
+        }
+
+        /// With Review requested left out of the queue's sections, nothing congratulates.
+        static let reviewRequestedOff = UIScenario(
+            "review-requested-off", "REQ-QUE-008: Review requested turned off doesn't congratulate"
+        ) { app in
+            try app.expect(ReviewQueue.shared.sections != nil, "the queue has loaded", app.summary)
+            try app.expect(reviewRequestedSection(app) == nil, "the test config leaves Review requested out", app.summary)
+            try app.expect(app.review == nil, "no review is open", app.summary)
+            try app.expect(
+                ShownText.values["no-review-open"] == NoReviewOpenView.noneOpenTitle, "the usual message shows",
+                ShownText.values["no-review-open"] ?? "nothing")
         }
 
         /// A `gh` that never answers is stopped, the user is told so, and trying again loads.

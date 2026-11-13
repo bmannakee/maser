@@ -30,6 +30,10 @@ mentioned or are assigned), plus any searches you add to `config.toml`. A PR sho
 it, and empty sections are hidden. Type `/` (or ⌘F) to filter by title, repository, author or `#number`; Esc clears the
 filter. Move with `j`/`k` and jump between sections with `]`/`[`.
 
+When Review requested finds nothing and no review is open, the right pane says so ("No reviews requested. Nice
+work!") with when the queue was checked. It says so only after that search succeeds: a failed search shows its error
+in the queue instead.
+
 The queue sits in the main window's sidebar, with the selected PR's review beside it. Clicking a PR, or pressing Return
 on it, shows it and moves the keys to the review. The queue takes the keys back only when you press ⌘0 (or `g p`),
 which also brings the main window forward from anywhere, or `e`, which shows and hides it; Esc in the queue goes back to
