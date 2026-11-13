@@ -8,7 +8,7 @@ import Foundation
 import Synchronization
 
 /// An error from running `gh` or from the input given to it.
-public enum GitHubCLIError: Error, LocalizedError {
+public enum GitHubCLIError: Error, LocalizedError, Equatable {
     /// `gh` isn't in any of `GitHubCLI.searchPaths`, and the login shell couldn't find it either.
     case notInstalled
     /// The `gh` path set in `config.toml` isn't an executable file.
@@ -115,14 +115,22 @@ public struct GitHubCLI: Sendable {
     /// Whether a `gh` command changes something on GitHub, so a timeout may have stopped it after the change was made.
     ///
     /// - Parameter arguments: The arguments to `gh`.
-    /// - Returns: True for a REST call with a method other than GET, or a GraphQL mutation.
+    /// - Returns: True for a REST call with a method other than GET, or a GraphQL mutation, written `mutation {`,
+    ///   `mutation($id: ID!) {` or `mutation Name {`.
     static func isWrite(_ arguments: [String]) -> Bool {
         if let index = arguments.firstIndex(of: "--method"), arguments.indices.contains(index + 1),
             arguments[index + 1].uppercased() != "GET"
         {
             return true
         }
-        return arguments.contains { $0.hasPrefix("query=mutation {") }
+        return arguments.contains { argument in
+            guard argument.hasPrefix("query=") else { return false }
+            let document = argument.dropFirst("query=".count).drop { $0.isWhitespace }
+            guard document.hasPrefix("mutation") else { return false }
+            // The keyword, not the start of a longer name.
+            let next = document.dropFirst("mutation".count).first
+            return next.map { !($0.isLetter || $0.isNumber || $0 == "_") } ?? true
+        }
     }
 
     /// Returns the `gh` executable, finding it the first time.
@@ -383,11 +391,14 @@ enum Subprocess {
     ///   - executable: The program to run.
     ///   - arguments: Its arguments.
     ///   - timeout: How long to let it run before terminating it, or `nil` for no limit.
+    ///   - killGrace: How long a timed-out process gets to quit before it's killed, and how long its output pipes are
+    ///     then waited for, in case a child process still holds them.
     ///   - environment: Variables to set on top of this process's environment.
     /// - Returns: The exit status, everything written to standard output and standard error, and whether it timed out.
     /// - Throws: The error from `Process.run()` if the program can't be launched.
     static func run(
-        _ executable: URL, _ arguments: [String], timeout: Duration? = nil, environment: [String: String] = [:]
+        _ executable: URL, _ arguments: [String], timeout: Duration? = nil, killGrace: Duration = .seconds(2),
+        environment: [String: String] = [:]
     ) async throws -> Result {
         let process = Process()
         process.executableURL = executable
@@ -403,21 +414,19 @@ enum Subprocess {
 
         let output = Output()
         // Three things must finish before the result is ready: end of standard output, end of standard error, and exit.
-        let group = DispatchGroup()
+        let completion = Completion(waitingFor: 3)
         for (pipe, isStdout) in [(stdout, true), (stderr, false)] {
-            group.enter()
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
                 if data.isEmpty {
                     handle.readabilityHandler = nil
-                    group.leave()
+                    completion.done()
                 } else {
                     output.append(data, toStdout: isStdout)
                 }
             }
         }
-        group.enter()
-        process.terminationHandler = { _ in group.leave() }
+        process.terminationHandler = { _ in completion.done() }
 
         do {
             try process.run()
@@ -432,16 +441,77 @@ enum Subprocess {
                 try await Task.sleep(for: timeout)
                 stopped.withLock { $0 = true }
                 process.terminate()
+                // A process can catch or ignore SIGTERM; SIGKILL can't be.
+                try await Task.sleep(for: killGrace)
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+                // A child that inherited the pipes, such as a credential helper, can hold them open after the process
+                // is gone, so stop waiting for them.
+                try await Task.sleep(for: killGrace)
+                completion.finish()
             }
         }
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            group.notify(queue: .global()) { continuation.resume() }
-        }
+        await completion.wait()
         timer?.cancel()
+        for pipe in [stdout, stderr] { pipe.fileHandleForReading.readabilityHandler = nil }
         let (out, err) = output.contents
-        // A process that exited by itself just as the timer fired finished normally.
-        let timedOut = stopped.withLock { $0 } && process.terminationReason == .uncaughtSignal
+        // Reading the status of a process still running raises an exception; SIGKILL makes that all but impossible.
+        guard !process.isRunning else { return Result(status: SIGKILL, stdout: out, stderr: err, timedOut: true) }
+        // Once the timer has fired, any end but a clean exit counts as the timeout's doing, including a process that
+        // caught SIGTERM and exited with its own status. A clean exit just as the timer fired is a real answer.
+        let exitedCleanly = process.terminationReason == .exit && process.terminationStatus == 0
+        let timedOut = stopped.withLock { $0 } && !exitedCleanly
         return Result(status: process.terminationStatus, stdout: out, stderr: err, timedOut: timedOut)
+    }
+
+    /// Counts down what a run waits for, and resumes the waiting call once: when all of it has finished, or when the
+    /// run gives up on it.
+    ///
+    /// `@unchecked Sendable` is safe because every access to the state holds `lock`.
+    private final class Completion: @unchecked Sendable {
+        private let lock = NSLock()
+        /// How many things haven't finished.
+        private var remaining: Int
+        /// Whether the wait is over.
+        private var isFinished = false
+        /// The call waiting, once it has started waiting.
+        private var continuation: CheckedContinuation<Void, Never>?
+
+        /// Creates a completion waiting for a number of things.
+        ///
+        /// - Parameter count: How many calls to `done()` end the wait.
+        init(waitingFor count: Int) { remaining = count }
+
+        /// Marks one thing finished, ending the wait when it's the last.
+        func done() {
+            let isLast = lock.withLock {
+                remaining -= 1
+                return remaining == 0
+            }
+            if isLast { finish() }
+        }
+
+        /// Ends the wait now, whatever hasn't finished; later calls do nothing.
+        func finish() {
+            let waiting: CheckedContinuation<Void, Never>?? = lock.withLock {
+                guard !isFinished else { return nil }
+                isFinished = true
+                defer { continuation = nil }
+                return .some(continuation)
+            }
+            waiting??.resume()
+        }
+
+        /// Waits until `finish()` runs, returning at once if it already has.
+        func wait() async {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let finished = lock.withLock {
+                    if isFinished { return true }
+                    self.continuation = continuation
+                    return false
+                }
+                if finished { continuation.resume() }
+            }
+        }
     }
 
     /// Output collected from the pipes' handlers, which run on arbitrary threads.
