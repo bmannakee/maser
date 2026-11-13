@@ -11,7 +11,7 @@ import Testing
     private static func pr(_ number: Int, age: Double = 0) -> PullRequest { PullRequestSearchTests.pr(number, age: age) }
 
     /// The first PR shown under Review requested, wherever that section is, after de-duplication and the filter.
-    @Test("REQ-QUE-008: Focuses the first PR in Review requested") func target() {
+    @Test("REQ-QUE-009: Focuses the first PR in Review requested") func target() {
         let sections = [
             QueueSection(search: .yours, prs: [Self.pr(9)]),
             QueueSection(search: .reviewRequested, prs: [Self.pr(1, age: 100), Self.pr(2, age: 10)]),
@@ -28,7 +28,7 @@ import Testing
     }
 
     /// A PR just reviewed is skipped while the search still lists it, and focusable again once it has left.
-    @Test("REQ-QUE-008: Skips a PR just reviewed until it leaves Review requested") func skipsReviewed() {
+    @Test("REQ-QUE-009: Skips a PR just reviewed until it leaves Review requested") func skipsReviewed() {
         var next = NextReview()
         let listed = [QueueSection(search: .reviewRequested, prs: [Self.pr(1), Self.pr(2, age: 10)])]
         next.submitted(Self.pr(1).id)
@@ -55,7 +55,7 @@ import Testing
     }
 
     /// A load moves focus only while the queue has the keys; a submit always does; unsent text stops both.
-    @Test("REQ-QUE-008: Moves focus only when it can't disturb a review") func mayMove() {
+    @Test("REQ-QUE-009: Moves focus only when it can't disturb a review") func mayMove() {
         #expect(NextReview.mayMove(after: .load, queueHasKeys: true, openReviewHasUnsentText: false))
         #expect(!NextReview.mayMove(after: .load, queueHasKeys: false, openReviewHasUnsentText: false))
         #expect(!NextReview.mayMove(after: .load, queueHasKeys: true, openReviewHasUnsentText: true))

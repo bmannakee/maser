@@ -99,6 +99,7 @@ Each row lists:
 | HAZ-24 | A diagram from the agent runs script, or loads remote content, in maser's canvas. | H4, H7 | S4 P2 Medium | RC-28 | S4 P1 Medium |
 | HAZ-25 | The agent's answers or diagrams describe an older commit than the one the user is now reviewing. | H1 | S4 P2 Medium | RC-25 | S4 P1 Medium |
 | HAZ-26 | The file tree draws a file as selected that isn't the one the diff shows, or draws a name unreadably. The diff pane doesn't name its file, so the user believes they're reading a different file than they are, and reasons about or approves the wrong code. | H1 | S4 P3 **High** | RC-32 | S4 P2 Medium |
+| HAZ-27 | maser says no reviews are requested when some are, or when it doesn't know: the Review requested search failed or is old, or the section looks empty only because an earlier section or the filter took its PRs. The user believes nothing is waiting and a requested review is late or never done. | H6 | S3 P2 Medium | RC-33 | S3 P1 Low |
 
 ## Risk controls
 
@@ -111,7 +112,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-03 | A full file is merged only if its contents match the diff; otherwise maser shows an error. | Protective measure | REQ-DIF-002 | Implemented |
 | RC-04 | Comments and reviews are posted only for the head commit of the diff the user saw: reviews are pinned to it, and the head is checked just before each new line comment and submit, refusing with a refresh when it has moved. | Protective measure | REQ-CMT-007 | Implemented |
 | RC-05 | Expanded lines can't take comments, and say why. A comment GitHub doesn't create is shown as an error. | Protective measure | REQ-DIF-003, REQ-CMT-005 | Implemented |
-| RC-06 | Key ownership is explicit. The window tracks whether the queue or the review has the keys, the open PR is marked, vim keys pause while typing, and `/` acts only in the queue. The queue's selection moves by itself only while the queue has the keys or after a review is submitted, and never away from a review with unsent text. | Protective measure | REQ-WIN-002, REQ-WIN-003, REQ-KEY-002, REQ-KEY-003, REQ-QUE-008 | Implemented |
+| RC-06 | Key ownership is explicit. The window tracks whether the queue or the review has the keys, the open PR is marked, vim keys pause while typing, and `/` acts only in the queue. The queue's selection moves by itself only while the queue has the keys or after a review is submitted, and never away from a review with unsent text. | Protective measure | REQ-WIN-002, REQ-WIN-003, REQ-KEY-002, REQ-KEY-003, REQ-QUE-009 | Implemented |
 | RC-07 | The verdict starts at Comment every time and must be chosen explicitly. Submitting takes a button or ⌘↩ in the sheet. | Protective measure | REQ-CMT-003 | Implemented |
 | RC-08 | Discarding a review asks for confirmation, naming the number of drafts it deletes. | Protective measure | REQ-CMT-004 | Implemented |
 | RC-09 | The UI avoids the layouts that loop AppKit's constraint updates (nested split views, an inspector beside the file tree), and a stress scenario checks for it. | Inherent safety by design | REQ-WIN-007 | Implemented; UI:tab-and-pane-stress |
@@ -138,6 +139,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-30 | Everything the agent produces is labeled as the agent's, with its commit, and none of it changes review state. | Information for safety | REQ-CNV-005 | Implemented |
 | RC-31 | Every `gh` call has a timeout. A call past it is stopped and reported with a way to try again; a timed-out write says it may have reached GitHub. | Protective measure | REQ-GH-007 | Implemented |
 | RC-32 | Each file row's look is set from whether it's the selected file, so moving the selection redraws the row it leaves as well as the one it reaches. Found in use on 2026-11-12 (#44), when a row kept its selected text after the selection moved on. | Inherent safety by design | REQ-DIF-010 | Implemented |
+| RC-33 | The congratulation shows only when the Review requested search itself last succeeded and found nothing, judged from the sections as loaded, and it states when the queue was checked. Any other state shows the usual message; a failed search shows its error in the queue (RC-14). | Inherent safety by design | REQ-QUE-008 | Implemented |
 
 ## Residual risk
 
@@ -155,7 +157,7 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
 - **HAZ-04:** Medium. RC-12 names the PR in Finish Review, and the comment boxes sit inside the PR they post to. The
   key-routing controls (RC-06) are verified by the repeatable scenarios UI:key-routing, UI:queue-keys and
   UI:typing-pauses-keys; mouse clicks are still checked only by hand. HRUS-1 is yet to be evaluated with the user.
-  Focusing the next review (REQ-QUE-008, #46) moves the selection without a key, which is a new way for this hazard to
+  Focusing the next review (REQ-QUE-009, #46) moves the selection without a key, which is a new way for this hazard to
   arise: Return pressed just after a refresh opens the first PR in Review requested, not the one highlighted a moment
   before. The selection only moves while the queue has the keys or after a submit, never from a review with unsent text
   or while the review has the keys (UI:focus-next-review). The new selection is highlighted at once and its PR shown a
@@ -181,6 +183,9 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
   the drawing is the framework's, the check is by eye, and only one sequence of moves was captured. Naming the shown
   file above the diff would make the tree no longer the only sign of which file is shown; it's recorded as a
   candidate control, not yet a requirement.
+- **HAZ-27:** Low. Added with the congratulation (#47), which is a new claim that nothing is waiting. RC-33 makes the
+  claim only from a successful, empty search, and the time shown lets an old result be told from a fresh one. The
+  ratings are a first estimate, to be confirmed by the user.
 
 None of the risks above needs a further control before maser is used for review; HAZ-11 and HAZ-26 have candidate
 controls recorded. The review agent's are below.

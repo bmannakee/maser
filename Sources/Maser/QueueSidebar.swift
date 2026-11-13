@@ -20,7 +20,9 @@ final class ReviewQueue {
     /// Whether a load is in progress.
     private(set) var isLoading = false
     /// When the sections last loaded.
-    private var loadedAt: Date?
+    ///
+    /// A section with an error kept older results; one without is from this load.
+    private(set) var loadedAt: Date?
     /// Counts finished loads, so windows can act on each one even when the results haven't changed.
     private(set) var loads = 0
     /// The searches the load in progress is running, if any.
