@@ -38,8 +38,10 @@ Everything else is quiet, so the beam is the brightest thing on screen.
 
 - The beam always points right and always leaves the rod. Don't rotate, mirror, outline or recolor the mark.
 - Clear space is half the mark's height on every side. Below 64 px, use the small icon.
-- In the app, the mark is drawn by `MaserMark` (`Sources/Maser/MaserMark.swift`) from the color tokens. It appears in
-  one place: above the congratulation when no reviews are requested.
+- In the app, the mark is drawn by `MaserMark` (`Sources/Maser/MaserMark.swift`) as the icon's tile: the rod and beam
+  on the `rod` ground, the same in both appearances. The rod and beam alone get lost on a window's background, so
+  inside the app they always sit on that ground. It appears in one place: above the congratulation when no reviews
+  are requested.
 - To rebuild the icon after changing an SVG, render each size to PNG and pack them into `Assets/AppIcon.icns`
   (`iconutil -c icns` on an `.iconset` folder).
 
@@ -55,6 +57,7 @@ Everything else is quiet, so the beam is the brightest thing on screen.
 | `beamInk` | `#8A5A00` | `#FFC857` | Text that means pending or not yet posted. |
 | `beamWash` | `#FFF1D0` | `#3D2E0A` | Background of a pending comment or unsent draft. |
 | `rod` | `#2B0A16` | `#2B0A16` | The icon's ground. Brand surfaces only. |
+| `iconRuby` | `#C2255C` | `#C2255C` | The rod in the icon and the in-app mark, on `rod` only. |
 | `ink` | `#24171B` | `#F1E9EB` | Primary text. |
 | `inkMuted` | `#5C4A50` | `#B5A6AB` | Secondary text. |
 | `inkFaint` | `#6E5F63` | `#A8989D` | Line numbers. |
