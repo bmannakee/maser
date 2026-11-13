@@ -21,6 +21,8 @@ final class ReviewQueue {
     private(set) var isLoading = false
     /// When the sections last loaded.
     private var loadedAt: Date?
+    /// Counts finished loads, so windows can act on each one even when the results haven't changed.
+    private(set) var loads = 0
     /// The searches the load in progress is running, if any.
     private var loadingSearches: [PullRequestSearch]?
     /// Set when the searches change during a load, so it runs again with the new ones.
@@ -82,6 +84,7 @@ final class ReviewQueue {
             }
         }
         loadedAt = .now
+        loads += 1
     }
 }
 

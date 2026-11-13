@@ -27,6 +27,10 @@ final class MainWindowState {
     ///
     /// Tracked here rather than read from keyboard focus: AppKit doesn't always move focus to the list when asked.
     var queueHasKeys = true
+    /// Picks the PR the queue focuses next, remembering the reviews submitted here.
+    var nextReview = NextReview()
+    /// Bumped when a review in this window is submitted, to ask the window to focus the next review.
+    private(set) var reviewSubmittedRequest = 0
 
     /// The review in the detail column.
     var openReview: ReviewModel? { openPR.flatMap { reviews[$0.id] } }
@@ -39,7 +43,11 @@ final class MainWindowState {
     ///     each PR without leaving the queue.
     ///   - fromQueue: Whether it was chosen in the queue; such a PR closes when it leaves the queue.
     func open(_ pr: PullRequest, takeKeys: Bool = true, fromQueue: Bool) {
-        if reviews[pr.id] == nil { reviews[pr.id] = ReviewModel(pr: pr) }
+        if reviews[pr.id] == nil {
+            let review = ReviewModel(pr: pr)
+            review.onSubmitted = { [weak self] in self?.reviewSubmitted(pr.id) }
+            reviews[pr.id] = review
+        }
         openPR = pr
         openedFromQueue = fromQueue
         if fromQueue { reviews[pr.id]?.leftQueue = false }
@@ -63,6 +71,15 @@ final class MainWindowState {
             reviews[pr.id] = nil
             queueHasKeys = true
         }
+    }
+
+    /// Notes a submitted review and asks the window to focus the next one.
+    ///
+    /// - Parameter id: The reviewed PR.
+    private func reviewSubmitted(_ id: PullRequest.ID) {
+        guard id == openPR?.id else { return }
+        nextReview.submitted(id)
+        reviewSubmittedRequest += 1
     }
 
     /// Shows the sidebar and gives the queue the keys.
@@ -175,6 +192,8 @@ struct MainView: View {
     /// The queue's filter text; every word must match a PR.
     @State private var filter = ""
     @FocusState private var focus: QueueFocus?
+    /// The queue's sections as of the last load this window handled, to tell which PRs each load dropped.
+    @State private var handledSections = ReviewQueue.shared.sections
     private let queue = ReviewQueue.shared
     @Environment(\.openURL) private var openURL
     @Environment(\.openWindow) private var openWindow
@@ -234,18 +253,34 @@ struct MainView: View {
                 let pr = sections?.lazy.compactMap(\.prs).joined().first(where: { $0.id == id })
             else { return }
             try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
+            // A review opened meanwhile (by URL, say) has the keys; a queue selection mustn't replace it.
+            guard !Task.isCancelled, state.queueHasKeys else { return }
             state.open(pr, takeKeys: false, fromQueue: true)
         }
-        // A PR merged or closed since the last refresh leaves the queue; don't keep showing it.
-        .onChange(of: queue.sections) { old, new in
-            let gone = QueueSection.removedPRs(from: old, to: new)
-            guard !gone.isEmpty else { return }
-            selection.subtract(gone)
-            state.queueDropped(gone)
+        // Each load: let go of PRs merged or closed since the last one, then focus the next review. In that order, so a
+        // review that closed because its PR left hands the keys to the queue first.
+        .onChange(of: queue.loads) {
+            let gone = QueueSection.removedPRs(from: handledSections, to: queue.sections)
+            handledSections = queue.sections
+            if !gone.isEmpty {
+                selection.subtract(gone)
+                state.queueDropped(gone)
+            }
+            state.nextReview.loaded(queue.sections ?? [])
+            focusNextReview(after: .load)
+        }
+        .onChange(of: state.reviewSubmittedRequest) {
+            focusNextReview(after: .submitted)
+            // So the reviewed PR leaves the queue once GitHub's search catches up.
+            Task { await queue.refresh() }
         }
         .task {
-            if let pr = MainWindows.shared.takePending() { state.open(pr, fromQueue: false) }
+            if let pr = MainWindows.shared.takePending() {
+                state.open(pr, fromQueue: false)
+            } else if queue.sections != nil {
+                // A new window showing results already loaded.
+                focusNextReview(after: .load)
+            }
             await openLaunchArguments()
         }
         #if DEBUG
@@ -386,6 +421,25 @@ struct MainView: View {
         } else if let pr = prs.first {
             state.open(pr, fromQueue: true)
             focus = nil
+        }
+    }
+
+    /// Selects the first PR waiting for the user's review, when that can't disturb a review in progress.
+    ///
+    /// After a submit the queue also gets the keys. Otherwise focus stays where it is: the list, or the filter box
+    /// while the user types in it. The selected PR shows beside the queue once the selection settles.
+    ///
+    /// - Parameter trigger: What prompted it.
+    private func focusNextReview(after trigger: NextReview.Trigger) {
+        let unsent = state.openReview?.hasUnsentText ?? false
+        guard NextReview.mayMove(after: trigger, queueHasKeys: keysGoToQueue, openReviewHasUnsentText: unsent),
+            let id = state.nextReview.target(in: queue.sections.map { QueueSection.displayed($0, filter: filter) } ?? [])
+        else { return }
+        selection = [id]
+        if trigger == .submitted {
+            state.focusQueue()
+        } else if focus != .filter {
+            focus = .list
         }
     }
 

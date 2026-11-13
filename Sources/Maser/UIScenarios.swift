@@ -27,6 +27,7 @@
             queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
             canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut,
+            focusNextReview,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -559,6 +560,111 @@
                 app.review?.pr.number == mainPR && app.review?.commentDraft == "Not posted yet."
                     && !app.queuePRs.contains { $0.number == mainPR },
                 "with its text, though the queue dropped it", app.summary)
+        }
+
+        /// The queue focuses the first PR waiting for review at launch, on a refresh and after a submit, but not while
+        /// the user works in a review or has unsent text.
+        static let focusNextReview = UIScenario(
+            "focus-next-review",
+            "REQ-QUE-008: The first review-requested PR is focused at launch, on a refresh and after a submit, not mid-review"
+        ) { app in
+            /// Makes the Review requested search find the test PR, updated most recently, and two recorded PRs.
+            @MainActor func reviewRequested() throws -> UIScenarioDriver.GHOverride {
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                let prs = app.queuePRs.filter { [testPR, smallPR, mainPR].contains($0.number) }
+                var objects = try JSONSerialization.jsonObject(with: try encoder.encode(prs)) as? [[String: Any]] ?? []
+                for index in objects.indices where objects[index]["number"] as? Int == testPR {
+                    objects[index]["updatedAt"] = Date.now.ISO8601Format()
+                }
+                return .init(
+                    match: ["search", "prs", "review-requested:@me"], status: 0,
+                    stdout: String(decoding: try JSONSerialization.data(withJSONObject: objects), as: UTF8.self),
+                    stderr: nil)
+            }
+
+            if !app.relaunched {
+                // The scenarios' config has no Review requested section, since there's no recording for it. Add one,
+                // answered by the fake gh, and launch again so the launch itself is checked.
+                try app.overrideGH([try reviewRequested()])
+                let url = ConfigStore.shared.fileURL
+                let config = try String(contentsOf: url, encoding: .utf8)
+                try app.expect(config.contains("sections = []"), "the config lists no built-in sections", config)
+                try config.replacing("sections = []", with: #"sections = ["review-requested"]"#)
+                    .write(to: url, atomically: true, encoding: .utf8)
+                app.crash()
+            }
+
+            let waiting = app.probe.sections().first { $0.search == .reviewRequested }?.prs?.map(\.number) ?? []
+            try app.expect(
+                waiting.count == 3 && waiting[0] == testPR, "Review requested lists the test PR first, then two more",
+                "\(waiting)")
+            let second = waiting[1]
+            try await app.waitUntil("at launch the first PR is selected and shown, and the queue has the keys") {
+                app.selectedNumbers == [testPR] && app.state.queueHasKeys && app.review?.pr.number == testPR
+            }
+
+            try await app.press("j")
+            try await app.press("j")
+            try await app.waitUntil("j moves on") { app.review?.pr.number == waiting[2] }
+            try await app.press("r")
+            try await app.waitUntil("a refresh with the queue holding the keys goes back to the first PR") {
+                app.selectedNumbers == [testPR] && app.review?.pr.number == testPR && app.state.queueHasKeys
+            }
+
+            /// Refreshes the queue, with `r` or as a window opening or a config change would, and waits for the load.
+            @MainActor func refreshQueue(pressingR: Bool) async throws {
+                let loads = ReviewQueue.shared.loads
+                if pressingR { try await app.press("r") } else { await ReviewQueue.shared.refresh() }
+                try await app.waitUntil("the queue reloads") { ReviewQueue.shared.loads > loads }
+                await app.pause(.milliseconds(500))
+            }
+
+            try await app.press("j")
+            try await app.press("enter")
+            try await app.waitUntil("Return opens the second PR with the keys") {
+                app.review?.pr.number == second && !app.state.queueHasKeys
+            }
+            try await refreshQueue(pressingR: false)
+            try app.expect(
+                app.selectedNumbers == [second] && app.review?.pr.number == second && !app.state.queueHasKeys,
+                "a refresh leaves a review with the keys alone", app.summary)
+
+            try await app.press("c")
+            try await app.waitUntil("the comment box has focus") { app.responder == .editor }
+            await app.type("Not posted yet.")
+            try await app.press("esc")
+            try await app.press("cmd+0")
+            try await refreshQueue(pressingR: true)
+            try app.expect(
+                app.selectedNumbers == [second] && app.review?.pr.number == second && app.state.queueHasKeys,
+                "nor, with the queue holding the keys, one with unsent text", app.summary)
+
+            try await app.press("g g")
+            try await app.press("enter")
+            try await app.waitUntil("Return opens the test PR, and its diff loads") {
+                app.review?.pr.number == testPR && app.review?.diffCommitID != nil && !app.state.queueHasKeys
+            }
+            try app.overrideGH([
+                try reviewRequested(),
+                .init(match: ["addPullRequestReview("], status: 0, stdout: "PRR_scenario\n", stderr: nil),
+                .init(match: ["submitPullRequestReview"], status: 0, stdout: "{}", stderr: nil),
+            ])
+            let loads = ReviewQueue.shared.loads
+            try await app.press("S")
+            try await app.waitUntil("Finish Review opens") { app.review?.isFinishingReview == true }
+            await app.type("Reviewed.")
+            try await app.press("cmd+enter")
+            try await app.waitUntil("after submitting, the next PR is focused and shown, with the queue holding the keys") {
+                app.selectedNumbers == [second] && app.review?.pr.number == second && app.state.queueHasKeys
+            }
+            try await app.waitUntil("the queue refreshes, still listing the reviewed PR") {
+                ReviewQueue.shared.loads > loads && !ReviewQueue.shared.isLoading
+            }
+            await app.pause(.milliseconds(500))
+            try app.expect(
+                app.selectedNumbers == [second] && app.review?.pr.number == second,
+                "the refresh doesn't go back to the PR just reviewed", app.summary)
         }
 
         /// Opens the test PR's Agent tab, once its diff and account have loaded.

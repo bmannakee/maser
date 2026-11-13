@@ -30,6 +30,10 @@ mentioned or are assigned), plus any searches you add to `config.toml`. A PR sho
 it, and empty sections are hidden. Type `/` (or ⌘F) to filter by title, repository, author or `#number`; Esc clears the
 filter. Move with `j`/`k` and jump between sections with `]`/`[`.
 
+The queue starts on the next review to do: at launch, after each refresh, and after you submit a review, it selects the
+first PR in Review requested and shows it beside the queue. A PR you've just reviewed is skipped while GitHub still lists
+it. It leaves you alone while you're working in a review, and never moves away from one with text you haven't posted.
+
 The queue sits in the main window's sidebar, with the selected PR's review beside it. Clicking a PR, or pressing Return
 on it, shows it and moves the keys to the review. The queue takes the keys back only when you press ⌘0 (or `g p`),
 which also brings the main window forward from anywhere, or `e`, which shows and hides it; Esc in the queue goes back to
