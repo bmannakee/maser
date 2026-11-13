@@ -29,7 +29,7 @@ struct CanvasView: View {
                         Text(drawn.diagram.title).font(.headline).shownText("canvas-title", drawn.diagram.title)
                         Text(label)
                             .font(.caption)
-                            .foregroundStyle(older ? .orange : .secondary)
+                            .foregroundStyle(older ? Color.Brand.beamInk : .secondary)
                             .shownText("canvas-label", label)
                     }
                     Spacer()
@@ -99,14 +99,14 @@ private struct DiagramElementList: View {
                                 ForEach(problems, id: \.self) { problem in
                                     Label("\(element.id) \(problem)", systemImage: "flag.fill")
                                         .font(.caption)
-                                        .foregroundStyle(.red)
+                                        .foregroundStyle(Color.Brand.delInk)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .listRowBackground(agent.selectedElement == index ? Color.accentColor.opacity(0.15) : nil)
+                        .listRowBackground(agent.selectedElement == index ? Color.Brand.ruby.opacity(0.15) : nil)
                         .id(index)
                     }
                 } header: {
@@ -162,7 +162,7 @@ private struct CitationView: View {
                             Text(lines.indices.contains(number - 1) ? String(lines[number - 1]) : "")
                         }
                         .font(.body.monospaced())
-                        .background(citation.lines.contains(number) ? Color.accentColor.opacity(0.15) : .clear)
+                        .background(citation.lines.contains(number) ? Color.Brand.ruby.opacity(0.15) : .clear)
                     }
                 }
                 .textSelection(.enabled)

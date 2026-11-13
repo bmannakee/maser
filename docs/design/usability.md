@@ -7,7 +7,7 @@ Modeled on IEC 62366-1. Draft 1, 2026-11-03.
 - **Intended use:** reviewing GitHub pull requests: reading the change and its context, commenting, and submitting a
   verdict. The full statement is in the [software development plan](software-development-plan.md#scope-and-intended-use).
 - **User profile:**
-  - Experienced software engineers. So far the only user is Maser's author, who stands in for the group in the
+  - Experienced software engineers. So far the only user is maser's author, who stands in for the group in the
     evaluations below.
   - Expert with git, GitHub and the terminal.
   - Prefers the keyboard, with vim-style keys and multi-key sequences.
@@ -49,7 +49,7 @@ These are the parts of the interface where a use error could lead to a hazard in
 | HRUS-3 | The user reaches for `[` `]` `{` `}` and presses `/` by mistake, moving focus to the queue's filter. | HAZ-04 | RC-06 (`/` only in the queue) | FE-4. Fixed and re-checked (V10). |
 | HRUS-4 | In the full-file view, the user comments on a line outside the diff. | HAZ-03 | RC-05 | L:LiveReviewWriteTests (error). The notice wording hasn't been evaluated with the user. |
 | HRUS-5 | In Finish Review, the user means to Comment, but the radio group is left on Approve or set there by a stray key, and they press ⌘↩. | HAZ-05 | RC-07; RC-12 | UI:names-pr-and-account (the sheet names the PR and account). Not yet evaluated with the user. |
-| HRUS-6 | The user writes a long reply, switches to another PR or app, then quits or Maser crashes. | HAZ-07 | RC-09; RC-10 | FE-1 (crashes observed). UI:draft-survives-relaunch (text comes back after a crash). |
+| HRUS-6 | The user writes a long reply, switches to another PR or app, then quits or maser crashes. | HAZ-07 | RC-09; RC-10 | FE-1 (crashes observed). UI:draft-survives-relaunch (text comes back after a crash). |
 | HRUS-7 | The user reviews an organization's PR while `gh` is signed in to their personal account. | HAZ-10 | RC-12 | UI:names-pr-and-account (account shown; a switch is refused). Not yet evaluated with the user. |
 | HRUS-8 | The user reviews a PR, a colleague pushes, and the user submits an approval without reloading. | HAZ-02 | RC-04 | UI:head-moved-blocks-posting (the refusal and refresh). Not yet evaluated with the user. |
 | HRUS-9 | The user asks for the state machine a PR changes. The diagram shows the error transition unchanged, so the user skims that hunk and approves; in fact the PR changed it. | HAZ-18 | RC-29; RC-30 | Planned (#32): seeded PRs where the diagram is wrong, checking whether the user notices. |
@@ -72,7 +72,7 @@ These were informal: the author, as a representative user, with a build on the d
 
 ## Summative evaluation (planned)
 
-Before Maser is relied on to review regulated software, run each HRUS above with the user on a release build, against a test PR.
+Before maser is relied on to review regulated software, run each HRUS above with the user on a release build, against a test PR.
 For each one, record whether the use error happened, and whether the user noticed it before harm. The prerequisites
 are:
 

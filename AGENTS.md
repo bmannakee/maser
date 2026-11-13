@@ -1,8 +1,11 @@
-# Maser — guide for contributors and coding agents
+# maser — guide for contributors and coding agents
 
-Maser is a native macOS app for reviewing GitHub pull requests, built for engineers who prefer the keyboard
+maser is a native macOS app for reviewing GitHub pull requests, built for engineers who prefer the keyboard
 and vim-style keys. This file holds the project's conventions. Read it before changing code; when a convention changes,
 update it here in the same PR.
+
+Write the name **maser**, lowercase, in prose, including at the start of a sentence. Identifiers keep their own
+conventions (`Maser.app`, `MaserCore`, `swift run Maser`). The brand is in [docs/design/brand.md](docs/design/brand.md).
 
 ## Build, run, check
 
@@ -39,8 +42,8 @@ swift format --in-place --recursive Sources Tests Package.swift   # apply format
 | `Traceability`, `maser-trace` | Development tool: checks the links in `docs/design/` (see its README). Not part of the app. | Foundation |
 | `TraceabilityTests` | Tests for the traceability checker. | Traceability |
 | `fake-gh` | Development tool: a stand-in for `gh` that replays `Tests/UIScenarios/recordings`, for the UI scenarios. | Foundation |
-| `fake-claude` | Development tool: a stand-in for `claude` for the UI scenarios; it talks to Maser through the real helper. | Foundation |
-| `maser-agent-tools` | The review agent's MCP helper, which `claude` starts; it forwards tool calls to Maser's socket. Shipped in the app bundle. | MaserCore, Foundation |
+| `fake-claude` | Development tool: a stand-in for `claude` for the UI scenarios; it talks to maser through the real helper. | Foundation |
+| `maser-agent-tools` | The review agent's MCP helper, which `claude` starts; it forwards tool calls to maser's socket. Shipped in the app bundle. | MaserCore, Foundation |
 
 Rules:
 
@@ -149,7 +152,7 @@ enforced in review.
 
 ## Requirements, risks and verification
 
-Maser is run as if it were regulated software, for practice. `docs/design/` holds the user needs, requirements, risk
+maser is run as if it were regulated software, for practice. `docs/design/` holds the user needs, requirements, risk
 file, usability file and traceability, modeled on IEC 62304, ISO 14971 and IEC 62366. `docs/verification/` holds dated
 verification records. See `docs/design/README.md` for the ID scheme.
 
@@ -177,7 +180,7 @@ verification records. See `docs/design/README.md` for the ID scheme.
 
 ## Git and PRs
 
-- Never commit to `main`. Use a branch and a PR, even for small changes; the PR is where review happens, often in Maser itself.
+- Never commit to `main`. Use a branch and a PR, even for small changes; the PR is where review happens, often in maser itself.
 - Keep each PR to one concern. Put mechanical changes (formatting, renames) in their own commit.
 - Commit messages: a short imperative subject (≤ 72 chars), a blank line, then a body explaining what changed and why.
   Commits written with an agent end with a `Co-Authored-By:` trailer.

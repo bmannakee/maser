@@ -80,7 +80,7 @@ private struct CommentComposer: View {
                 .background(.background, in: RoundedRectangle(cornerRadius: 6))
                 .overlay {
                     RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(focused ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: focused ? 2 : 1)
+                        .strokeBorder(focused ? Color.Brand.ruby : Color.secondary.opacity(0.35), lineWidth: focused ? 2 : 1)
                 }
                 .overlay(alignment: .topLeading) {
                     if model.commentDraft.isEmpty {
@@ -99,7 +99,7 @@ private struct CommentComposer: View {
                 HStack(spacing: 10) {
                     if let error = model.commentError {
                         Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Color.Brand.delInk)
                             .lineLimit(2)
                             .textSelection(.enabled)
                     } else {
@@ -162,8 +162,8 @@ private struct OverviewHeader: View {
                 Text("from")
                 RefName(name: overview.headRef)
                 Spacer(minLength: 16)
-                Text("+\(overview.additions)").foregroundStyle(.green)
-                Text("−\(overview.deletions)").foregroundStyle(.red)
+                Text("+\(overview.additions)").foregroundStyle(Color.Brand.addInk)
+                Text("−\(overview.deletions)").foregroundStyle(Color.Brand.delInk)
                 Text("\(overview.changedFiles) files").foregroundStyle(.secondary)
             }
             .font(.callout)

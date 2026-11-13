@@ -2,7 +2,7 @@
 
 A native macOS app for reviewing GitHub pull requests.
 
-Maser talks to GitHub through the [`gh` CLI](https://cli.github.com), so it uses whatever account `gh` is logged in to and never stores credentials itself.
+maser talks to GitHub through the [`gh` CLI](https://cli.github.com), so it uses whatever account `gh` is logged in to and never stores credentials itself.
 
 ## Requirements
 
@@ -45,10 +45,10 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   Move the line cursor with `j`/`k` (or click the line numbers), select a range with `V` (or shift-click), and press `c` to comment;
   `R` replies to the selected thread. Line comments collect in a pending review, visible only to you, until you
   **Finish Review** (`S`, toolbar) as Comment, Approve or Request changes. Replies join the pending review if you have one;
-  otherwise they post immediately (GitHub's rule). If someone pushes after the diff loaded, Maser won't post a line
+  otherwise they post immediately (GitHub's rule). If someone pushes after the diff loaded, maser won't post a line
   comment or submit the review until you refresh (`r`), so nothing lands on a line or commit you haven't seen. A line
   comment then needs `c` on its line again; the text is kept. Every post button names the account `gh` will post as
-  ("Comment as @you"), and Finish Review names the PR too. If `gh` switches accounts while Maser is open, the next post
+  ("Comment as @you"), and Finish Review names the PR too. If `gh` switches accounts while maser is open, the next post
   is refused and the new account shown, so you never post as an account you weren't shown.
   Text you haven't posted (a comment, line comment, reply or review summary) is saved as you type and comes back when
   you open the PR again, even after a crash or quit. It's cleared once posted or discarded; the files are in
@@ -56,14 +56,14 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   `z a` shows the whole file instead of just the changed hunks (`z R` for every file, `z M` to go back); hunk
   navigation still jumps between the changes. GitHub only takes comments on lines in the diff, so the extra lines are
   for reading.
-- **Agent** — a conversation about the PR with an agent: your own `claude`, run by Maser. It reads the PR (description,
+- **Agent** — a conversation about the PR with an agent: your own `claude`, run by maser. It reads the PR (description,
   commits, threads, the whole diff) and a read-only checkout of the PR's head commit, and nothing else: no shell, no web,
   no writes. It's off until you allow the PR's owner in `[agent] allow` (below). `c` jumps to the message box, ⌘↩
   sends. Every file it reads and every tool it calls is listed, with what was refused. The header shows what it can
   read, the model and effort (changeable for this PR), and what the conversation has cost. If someone pushes, the
   conversation is marked as about the older commit until your next message moves the agent on. Conversations survive
   quitting. Ask for a diagram, such as the state machine a PR changes, and it appears on the canvas beside the
-  conversation, labeled as the agent's at its commit. Each element lists the lines it comes from; Maser checks them
+  conversation, labeled as the agent's at its commit. Each element lists the lines it comes from; maser checks them
   against the checkout and the diff, outlines anything that doesn't match, and tells the agent. On this tab `]`/`[`
   move between diagrams, `j`/`k` between elements, Return opens the selected element's lines (in the Files tab when
   they're in the diff), and `i` hides the canvas. The agent can add line comments to your pending review: they end
@@ -109,7 +109,7 @@ Help → Keyboard Shortcuts (or `?`) lists the bindings currently in effect.
 
 ## Configuration
 
-Maser reads `~/.config/maser/config.toml` (or `$XDG_CONFIG_HOME/maser/config.toml`), so it can live in your dotfiles; symlinks are fine. ⌘, opens it, creating a fully commented template listing every command on first use. Changes apply as soon as you save; mistakes show up in a banner in each window, and a file that doesn't parse leaves the previous bindings in place.
+maser reads `~/.config/maser/config.toml` (or `$XDG_CONFIG_HOME/maser/config.toml`), so it can live in your dotfiles; symlinks are fine. ⌘, opens it, creating a fully commented template listing every command on first use. Changes apply as soon as you save; mistakes show up in a banner in each window, and a file that doesn't parse leaves the previous bindings in place.
 
 ```toml
 [keys]                          # menu shortcuts: need cmd, ctrl or opt
@@ -139,7 +139,7 @@ searches = [                               # more sections, in GitHub's search s
 Queue searches show open PRs unless the query picks a state (`is:closed`, `is:merged`). Quote phrases as on GitHub,
 with TOML escapes: `query = "label:\"needs review\""`. Hover a section's heading to see its query.
 
-Maser looks for `gh` in Homebrew, MacPorts, Nix, `~/.local/bin` and mise or asdf shims, then asks your login shell. Set `[github] gh` if it's somewhere else.
+maser looks for `gh` in Homebrew, MacPorts, Nix, `~/.local/bin` and mise or asdf shims, then asks your login shell. Set `[github] gh` if it's somewhere else.
 
 The review agent is configured in `[agent]`. It runs your own `claude` (Claude Code, signed in) and is off for every PR
 until `allow` names the PR's owner (`"my-name"`, on github.com), a host (`"github.example.com"`) or a host

@@ -4,9 +4,9 @@ Modeled on ISO 14971. Draft 1, 2026-11-03, covering `main` as of PR #16.
 
 ## Scope
 
-This file covers Maser as described in the [software development plan](software-development-plan.md): reviewing
+This file covers maser as described in the [software development plan](software-development-plan.md): reviewing
 GitHub pull requests on macOS through `gh`. The risks are those of the review tool itself, not of the software being
-reviewed. That software's own risks are managed by the projects that own it. Maser's part is whether it presents the
+reviewed. That software's own risks are managed by the projects that own it. maser's part is whether it presents the
 change faithfully and acts only as the user intends.
 
 ## Harms
@@ -73,20 +73,20 @@ Each row lists:
 
 | ID | Hazard and sequence of events | Harm | Initial | Controls | Residual |
 | --- | --- | --- | --- | --- | --- |
-| HAZ-01 | The diff Maser shows doesn't match the PR: a parse error, a truncated list, a mangled path, a full-file merge that doesn't fit, or lines drawn over one another so part of one is hidden. The user approves code they didn't actually see. | H1 | S4 P3 **High** | RC-01, RC-02, RC-03, RC-21 | S4 P1 Medium |
-| HAZ-02 | The PR's head moves (a new push) after Maser loaded the diff. A line comment posted with old line numbers lands on a different line of the new head, or an approval covers commits the user never saw. | H1, H6 | S4 P3 **High** | RC-04, RC-17 (partial) | S4 P1 Medium |
+| HAZ-01 | The diff maser shows doesn't match the PR: a parse error, a truncated list, a mangled path, a full-file merge that doesn't fit, or lines drawn over one another so part of one is hidden. The user approves code they didn't actually see. | H1 | S4 P3 **High** | RC-01, RC-02, RC-03, RC-21 | S4 P1 Medium |
+| HAZ-02 | The PR's head moves (a new push) after maser loaded the diff. A line comment posted with old line numbers lands on a different line of the new head, or an approval covers commits the user never saw. | H1, H6 | S4 P3 **High** | RC-04, RC-17 (partial) | S4 P1 Medium |
 | HAZ-03 | The user comments on a line that's only shown in the full-file view. GitHub silently creates nothing, and the user believes they raised the issue. | H6 | S3 P4 **High** | RC-05 | S3 P1 Low |
 | HAZ-04 | A key acts somewhere the user didn't expect. For example, `S`, `c` or Return acts on the open PR while the user is looking at a different, highlighted PR in the queue, or on the wrong pane. Several focus bugs of this kind were found on 2026-11-03 (V8–V10). | H2, H6 | S3 P4 **High** | RC-06, RC-12 | S3 P2 Medium |
 | HAZ-05 | The wrong verdict is submitted, such as Approve instead of Comment, or on the wrong PR. | H2, H1 | S4 P2 Medium | RC-07, RC-12 | S4 P1 Medium |
 | HAZ-06 | The user discards a pending review by accident, deleting every draft comment. | H3 | S2 P3 Medium | RC-08 | S2 P1 Low |
-| HAZ-07 | Maser crashes, or the user quits it, while unsent text is in a comment box or the review summary. The text is only in memory, so it's lost. Four crashes happened on 2026-11-03 (V5). | H3 | S2 P4 Medium | RC-09, RC-14, RC-10 | S2 P1 Low |
-| HAZ-08 | The GitHub token leaks through Maser: logged, stored, or sent somewhere. | H4 | S4 P2 Medium | RC-11 | S4 P1 Medium |
-| HAZ-09 | Malicious content in a PR's description or comments runs script in Maser, or leads the user to a phishing page. | H4 | S4 P2 Medium | RC-16 | S4 P1 Medium |
+| HAZ-07 | maser crashes, or the user quits it, while unsent text is in a comment box or the review summary. The text is only in memory, so it's lost. Four crashes happened on 2026-11-03 (V5). | H3 | S2 P4 Medium | RC-09, RC-14, RC-10 | S2 P1 Low |
+| HAZ-08 | The GitHub token leaks through maser: logged, stored, or sent somewhere. | H4 | S4 P2 Medium | RC-11 | S4 P1 Medium |
+| HAZ-09 | Malicious content in a PR's description or comments runs script in maser, or leads the user to a phishing page. | H4 | S4 P2 Medium | RC-16 | S4 P1 Medium |
 | HAZ-10 | `gh` is signed in to a different account than the user expects (personal versus work), so comments and reviews are posted as the wrong identity. | H2 | S3 P3 Medium | RC-12 | S3 P2 Medium |
-| HAZ-11 | Maser shows stale status (checks, mergeability, new comments), and the user decides on information that has since changed. | H1 | S3 P3 Medium | RC-17 | S3 P2 Medium |
-| HAZ-12 | A `gh` call hangs, and Maser stops responding or never finishes loading. | H5 | S1 P3 Low | RC-15, RC-31 | S1 P1 Low |
-| HAZ-13 | Maser runs a `gh` other than the user's own, from a planted binary on the search path or a wrong configured path. | H4 | S4 P1 Medium | RC-13 | S4 P1 Medium |
-| HAZ-14 | GitHub returns a capped list (100 items) and Maser shows it as complete, hiding a failing check, a blocking review or a comment. | H1 | S3 P3 Medium | RC-02 | S3 P1 Low |
+| HAZ-11 | maser shows stale status (checks, mergeability, new comments), and the user decides on information that has since changed. | H1 | S3 P3 Medium | RC-17 | S3 P2 Medium |
+| HAZ-12 | A `gh` call hangs, and maser stops responding or never finishes loading. | H5 | S1 P3 Low | RC-15, RC-31 | S1 P1 Low |
+| HAZ-13 | maser runs a `gh` other than the user's own, from a planted binary on the search path or a wrong configured path. | H4 | S4 P1 Medium | RC-13 | S4 P1 Medium |
+| HAZ-14 | GitHub returns a capped list (100 items) and maser shows it as complete, hiding a failing check, a blocking review or a comment. | H1 | S3 P3 Medium | RC-02 | S3 P1 Low |
 | HAZ-15 | Development: a live write test posts to a real PR other than the test PR. | H2 | S3 P2 Medium | RC-19 | S3 P1 Low |
 | HAZ-16 | A mistake in `config.toml` silently changes or removes bindings, so keys act unexpectedly (leading to HAZ-04). | H2 | S3 P3 Medium | RC-18 | S3 P1 Low |
 | HAZ-17 | A line comment is attached to the wrong line or side, because a cursor line is mapped to GitHub's line numbers incorrectly, for example for a range across hunks or sides. | H6 | S3 P3 Medium | RC-01, RC-20 | S3 P1 Low |
@@ -94,9 +94,9 @@ Each row lists:
 | HAZ-19 | A comment the agent added to the pending review is wrong, misleading or misplaced, and the user submits it without reading it. It appears under their name. | H2, H6 | S3 P3 Medium | RC-26, RC-04, RC-12 | S3 P1 Low |
 | HAZ-20 | Text in the PR, its comments, or the repository's files steers the agent (prompt injection): to misdescribe the change, add misleading comments, or reveal data, such as files outside the checkout or the user's connected services (mail, documents), which `claude` loads by default. | H1, H2, H7 | S4 P3 **High** | RC-22, RC-26, RC-27, RC-29 | S4 P2 Medium |
 | HAZ-21 | Code from an organization that hasn't approved it is sent to the model provider through the agent. | H7 | S3 P3 Medium | RC-24 | S3 P1 Low |
-| HAZ-22 | The agent, or Maser preparing its checkout, changes the user's own clone or pushes: local work is lost, or a push appears under their name. | H3, H2 | S3 P2 Medium | RC-23, RC-22 | S3 P1 Low |
+| HAZ-22 | The agent, or maser preparing its checkout, changes the user's own clone or pushes: local work is lost, or a push appears under their name. | H3, H2 | S3 P2 Medium | RC-23, RC-22 | S3 P1 Low |
 | HAZ-23 | Settings, hooks, agents or MCP servers from the PR's repository load into the agent and run code on the user's Mac. A PR can be written to attack its reviewer. | H4 | S4 P3 **High** | RC-22 | S4 P1 Medium |
-| HAZ-24 | A diagram from the agent runs script, or loads remote content, in Maser's canvas. | H4, H7 | S4 P2 Medium | RC-28 | S4 P1 Medium |
+| HAZ-24 | A diagram from the agent runs script, or loads remote content, in maser's canvas. | H4, H7 | S4 P2 Medium | RC-28 | S4 P1 Medium |
 | HAZ-25 | The agent's answers or diagrams describe an older commit than the one the user is now reviewing. | H1 | S4 P2 Medium | RC-25 | S4 P1 Medium |
 | HAZ-26 | The file tree draws a file as selected that isn't the one the diff shows, or draws a name unreadably. The diff pane doesn't name its file, so the user believes they're reading a different file than they are, and reasons about or approves the wrong code. | H1 | S4 P3 **High** | RC-32 | S4 P2 Medium |
 
@@ -108,7 +108,7 @@ The verification for each control is the verification of its requirements, in [r
 | --- | --- | --- | --- | --- |
 | RC-01 | The diff parser is verified against the diff shapes GitHub produces: renames, binary files, the no-newline marker, quoted paths. | Inherent safety by design | REQ-DIF-001 | Implemented |
 | RC-02 | Every paged list is fetched in full, and truncation is detected rather than shown as complete. | Inherent safety by design | REQ-GH-003, REQ-OVR-001 | Implemented |
-| RC-03 | A full file is merged only if its contents match the diff; otherwise Maser shows an error. | Protective measure | REQ-DIF-002 | Implemented |
+| RC-03 | A full file is merged only if its contents match the diff; otherwise maser shows an error. | Protective measure | REQ-DIF-002 | Implemented |
 | RC-04 | Comments and reviews are posted only for the head commit of the diff the user saw: reviews are pinned to it, and the head is checked just before each new line comment and submit, refusing with a refresh when it has moved. | Protective measure | REQ-CMT-007 | Implemented |
 | RC-05 | Expanded lines can't take comments, and say why. A comment GitHub doesn't create is shown as an error. | Protective measure | REQ-DIF-003, REQ-CMT-005 | Implemented |
 | RC-06 | Key ownership is explicit. The window tracks whether the queue or the review has the keys, the open PR is marked, vim keys pause while typing, and `/` acts only in the queue. | Protective measure | REQ-WIN-002, REQ-WIN-003, REQ-KEY-002, REQ-KEY-003 | Implemented |
@@ -116,8 +116,8 @@ The verification for each control is the verification of its requirements, in [r
 | RC-08 | Discarding a review asks for confirmation, naming the number of drafts it deletes. | Protective measure | REQ-CMT-004 | Implemented |
 | RC-09 | The UI avoids the layouts that loop AppKit's constraint updates (nested split views, an inspector beside the file tree), and a stress scenario checks for it. | Inherent safety by design | REQ-WIN-007 | Implemented; UI:tab-and-pane-stress |
 | RC-10 | Unsent text is saved locally as it's typed, one file per PR, and restored when the PR is opened again. Each part is cleared once it's posted or discarded. | Protective measure | REQ-CMT-008 | Implemented |
-| RC-11 | GitHub access only through `gh`. Maser never handles the token. | Inherent safety by design | REQ-GH-001 | Implemented |
-| RC-12 | The account is named wherever Maser posts, and the PR in Finish Review. A post is refused if `gh`'s account changed since it was shown. | Information for safety; protective measure (the refusal) | REQ-CMT-009 | Implemented |
+| RC-11 | GitHub access only through `gh`. maser never handles the token. | Inherent safety by design | REQ-GH-001 | Implemented |
+| RC-12 | The account is named wherever maser posts, and the PR in Finish Review. A post is refused if `gh`'s account changed since it was shown. | Information for safety; protective measure (the refusal) | REQ-CMT-009 | Implemented |
 | RC-13 | `gh` is found by a fixed, documented search order, or by an explicit configured path. | Protective measure | REQ-GH-002 | Implemented |
 | RC-14 | Defensive decoding; failures become messages, per section in the queue. | Protective measure | REQ-GH-004, REQ-QUE-004 | Implemented |
 | RC-15 | Subprocesses never block the UI. | Protective measure | REQ-GH-005 | Implemented |
@@ -127,8 +127,8 @@ The verification for each control is the verification of its requirements, in [r
 | RC-19 | Live write tests are hard-coded to bmannakee/maser#1, which `AGENTS.md` requires. | Process control | — (I: `LiveReviewWriteTests`) | Implemented |
 | RC-20 | Comment targets are computed from the parsed line numbers on each side, and clipped to one hunk. | Inherent safety by design | REQ-CMT-001 | Implemented |
 | RC-21 | Every diff line is drawn in full: long lines wrap inside their row, and a scenario checks that no line's text leaves its row. Found in use on 2026-11-10, when wrapped lines were drawn partly under the next line. | Inherent safety by design | REQ-DIF-009 | Implemented; UI:long-lines-wrap |
-| RC-22 | The agent is confined. It's the user's own `claude`, so Maser holds no credential. Its tool set is fixed by Maser: read-only file tools in its checkout, and Maser's tools. It has no shell, no web, no other MCP servers or connectors, no reads outside its checkout, and no settings, hooks or `CLAUDE.md` from the PR's repository. It can't submit or post publicly. | Inherent safety by design | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | Implemented |
-| RC-23 | The agent reads a separate checkout that Maser owns. The user's clone is only ever read. | Inherent safety by design | REQ-AGT-004 | Implemented |
+| RC-22 | The agent is confined. It's the user's own `claude`, so maser holds no credential. Its tool set is fixed by maser: read-only file tools in its checkout, and maser's tools. It has no shell, no web, no other MCP servers or connectors, no reads outside its checkout, and no settings, hooks or `CLAUDE.md` from the PR's repository. It can't submit or post publicly. | Inherent safety by design | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | Implemented |
+| RC-23 | The agent reads a separate checkout that maser owns. The user's clone is only ever read. | Inherent safety by design | REQ-AGT-004 | Implemented |
 | RC-24 | The agent is off unless `config.toml` allows the PR's owner or host, and the pane shows what it can read. | Protective measure | REQ-AGT-005 | Implemented |
 | RC-25 | A conversation is pinned to a commit. Answers about an older commit are marked as such, and the checkout follows the head. | Protective measure | REQ-AGT-006 | Implemented |
 | RC-26 | Agent comments go through the user's checks (head, account, line in the diff), are badged as the agent's, and Finish Review asks before submitting ones the user hasn't opened. Each one says on GitHub that an agent drafted it. | Protective measure; information for safety | REQ-AGT-007 | Implemented |
@@ -177,7 +177,7 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
   file above the diff would make the tree no longer the only sign of which file is shown; it's recorded as a
   candidate control, not yet a requirement.
 
-None of the risks above needs a further control before Maser is used for review; HAZ-11 and HAZ-26 have candidate
+None of the risks above needs a further control before maser is used for review; HAZ-11 and HAZ-26 have candidate
 controls recorded. The review agent's are below.
 
 **The review agent (#32)** was built in increments on 2026-11-12. The conversation came first, with RC-22 to RC-25 and
@@ -185,7 +185,7 @@ RC-27:
 
 - **HAZ-21:** Low. The agent stays off until the user names the owner, and the tab names the setting and the
   condition (UI:agent-off-until-allowed). It still relies on the user knowing the owner's policy.
-- **HAZ-22:** Low. The checkout is Maser's own, made by fetching from the user's clone, which only reads it
+- **HAZ-22:** Low. The checkout is maser's own, made by fetching from the user's clone, which only reads it
   (T:AgentCheckoutTests).
 - **HAZ-23:** Medium because the harm is Critical. The confining flags are pinned by T:AgentTests.commandLine and
   checked against the real `claude` (L:LiveAgentTests.bridge; spike V1 to V5). A future `claude` that changed what these
@@ -212,7 +212,7 @@ Three hazards started High:
 - **HAZ-18** (the agent misdescribes the change): Medium, at P2. The defining risk of the feature, since a convincing
   diagram invites the user to stop reading the diff. RC-29 checks what can be checked mechanically, citations and
   change marks, but not whether a diagram is complete. The evaluation of 2026-11-12 (V-2026-11-12/V13) found 6 of 6
-  diagrams right on the first drawing, after fixing two things it found in Maser's instructions to the agent. Its cases
+  diagrams right on the first drawing, after fixing two things it found in maser's instructions to the agent. Its cases
   are small, so it supports P2 (Remote), not P1. HRUS-9, whether the user notices a wrong diagram, is still to be
   evaluated with the user. Its first real review (V-2026-11-12/V15, V-2026-11-12/V16) found three real defects it
   wasn't asked to look for, and missed a planted one beside them, in a function it had cited. Its findings don't say
@@ -227,10 +227,10 @@ Three hazards started High:
 The agent's comments carry the user's name on GitHub, so each one also says that an agent drafted it, naming the
 model (decided 2026-11-12). Colleagues reading the review can weigh it accordingly, even if the user submitted it
 unread. Conversations are kept in `claude`'s own session store under the user's home folder. That is accepted for this
-iteration (H7), and will be revisited if Maser gains other users.
+iteration (H7), and will be revisited if maser gains other users.
 
 **Overall residual risk:** no residual risk is High. Since RC-04 (2026-11-10) none is for the review features, and
-since the review agent was built and evaluated (2026-11-12) none is for the agent. Before Maser, or its agent, is relied
+since the review agent was built and evaluated (2026-11-12) none is for the agent. Before maser, or its agent, is relied
 on to review regulated software, the usability evaluation (HRUS-1 to HRUS-12) needs to be run with the user. It is
 acceptable for other use.
 

@@ -22,6 +22,7 @@ Every user need must have at least one implemented requirement.
 | UN-8 | REQ-GH-001, REQ-WIN-002, REQ-OVR-002, REQ-CMT-005, REQ-CMT-007, REQ-CMT-009, REQ-AGT-008 | — |
 | UN-9 | REQ-WIN-007, REQ-WIN-008, REQ-CMT-004, REQ-CMT-008 | — |
 | UN-10 | REQ-GH-005, REQ-GH-007, REQ-QUE-005, REQ-WIN-001, REQ-DIF-005, REQ-DIF-007, REQ-PLT-003 | — |
+| UN-15 | REQ-PLT-004 | — |
 | UN-11 | REQ-AGT-001, REQ-AGT-002, REQ-AGT-004, REQ-AGT-006, REQ-AGT-009, REQ-AGT-010, REQ-AGT-011 | — |
 | UN-12 | REQ-AGT-012, REQ-CNV-001, REQ-CNV-002, REQ-CNV-003, REQ-CNV-004, REQ-CNV-005 | — |
 | UN-13 | REQ-AGT-007 | — |
@@ -77,11 +78,11 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | UI scenarios (no unit tests) | 9 | WIN-001, WIN-003, WIN-007, DIF-009, CNV-005, CNV-006, KEY-002, KEY-003, KEY-004 |
 | Live GitHub tests only | 5 | DIF-007, CMT-002, CMT-005, CMT-006, AGT-012 |
 | A one-off scripted run or use (not repeatable) | 3 | WIN-006, DIF-005, DIF-010 |
-| Inspection only | 6 | GH-001, GH-005, OVR-002, CMT-004, PLT-001, PLT-002 |
+| Inspection only | 7 | GH-001, GH-005, OVR-002, CMT-004, PLT-001, PLT-002, PLT-004 |
 | None yet | 10 | QUE-005, QUE-006, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
 | Proposed (not built) | 0 | — |
 
-76 requirements: 76 implemented and 0 proposed.
+77 requirements: 77 implemented and 0 proposed.
 <!-- trace:end coverage -->
 
 Most of the "one-off", "inspection only" and "none yet" rows have UI scenarios planned (`UI:…` after `Gap` in
