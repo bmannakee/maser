@@ -6,8 +6,8 @@ The browsable version, with live previews, is the "maser brand" design system ar
 travels with the code; `Sources/Maser/Brand.swift` mirrors its color table.
 
 **Status:** the icon is in the app bundle (REQ-PLT-004). The views take the accent, the pending amber, the diff washes
-and the error and success colors from `Brand.swift`, and each window is tinted ruby. Still on system colors: text and
-backgrounds (`ink`, `paper`, `chrome` are defined but unused), the PR state pill, warnings, and the notices with a
+and the error and success colors from `Brand.swift`, and the primary buttons are tinted ruby. Still on system colors:
+text and backgrounds (`ink`, `paper`, `chrome` are defined but unused), the PR state pill, warnings, and the notices with a
 yellow background.
 
 ## The idea
@@ -81,8 +81,9 @@ or `ink`; `controlBorder` is 3.5:1, enough for a control boundary.
   their sign under the cursor, and the cursor keeps its rule, so no state depends on hue alone.
 - **Agent output is neutral:** `ink` on `paper`, labeled as the agent's. Never ruby.
 - **GitHub's colors stay GitHub's:** label colors, the PR state pill and the rendered conversation are shown as given.
-- **The line cursor** is a 3 pt `ruby` bar at the line's leading edge with a ruby tint over the line. The tint lies
-  over the line's own wash, so an added or deleted line under the cursor still reads as one.
+- **The line cursor** is a 3 pt `ruby` bar at the line's leading edge, a neutral lightening over the line so its own
+  wash still shows, and the line number in `rubyStrong`.
+- **Hunk headers, pickers, menus and secondary buttons are neutral.** Ruby is never applied as a window-wide tint.
 - **Warnings have no token yet.** Blocked, behind, review required, checks pending, renamed files and the unsourced
   diagram note use the system orange. Open question: system orange sits close to the pending amber, so either
   warnings need their own hue or the two meanings need different shapes.
