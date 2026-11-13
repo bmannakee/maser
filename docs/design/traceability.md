@@ -74,8 +74,8 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 <!-- trace:begin coverage -->
 | Coverage | Count | Requirements (REQ-…) |
 | --- | --- | --- |
-| Unit tests, fully | 35 | GH-003, GH-004, GH-007, QUE-001, QUE-002, QUE-003, QUE-004, QUE-008, WIN-008, OVR-001, DIF-001, DIF-002, CMT-001, CMT-007, CMT-008, CMT-009, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-008, AGT-009, AGT-010, AGT-011, CNV-001, CNV-002, CNV-003, CNV-004, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
-| Unit tests, partly (the rest is a gap) | 10 | GH-002, GH-006, QUE-007, QUE-009, OVR-004, DIF-003, DIF-004, DIF-006, DIF-008, AGT-007 |
+| Unit tests, fully | 34 | GH-003, GH-004, GH-007, QUE-001, QUE-002, QUE-003, QUE-004, QUE-008, WIN-008, OVR-001, DIF-001, DIF-002, CMT-001, CMT-007, CMT-008, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-008, AGT-009, AGT-010, AGT-011, CNV-001, CNV-002, CNV-003, CNV-004, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
+| Unit tests, partly (the rest is a gap) | 11 | GH-002, GH-006, QUE-007, QUE-009, OVR-004, DIF-003, DIF-004, DIF-006, DIF-008, CMT-009, AGT-007 |
 | UI scenarios (no unit tests) | 9 | WIN-001, WIN-003, WIN-007, DIF-009, CNV-005, CNV-006, KEY-002, KEY-003, KEY-004 |
 | Live GitHub tests only | 5 | DIF-007, CMT-002, CMT-005, CMT-006, AGT-012 |
 | A one-off scripted run or use (not repeatable) | 3 | WIN-006, DIF-005, DIF-010 |
