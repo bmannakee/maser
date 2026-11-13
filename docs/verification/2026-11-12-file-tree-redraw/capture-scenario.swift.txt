@@ -6,12 +6,17 @@
         /// shell loop (`capture-loop.sh` in the record) captures the window into the user temp folder.
         static let fileTreeCaptures = UIScenario("file-tree-captures", "REQ-DIF-010: captures for checking by eye") { app in
             let shots = NSTemporaryDirectory() + "maser-captures"
-            @MainActor func shot(_ name: String) async {
+            try FileManager.default.createDirectory(atPath: shots, withIntermediateDirectories: true)
+            // Fails the run when nothing captured the frame, so a run without the loop can't pass with no images.
+            @MainActor func shot(_ name: String) async throws {
                 await app.pause(.milliseconds(800))
                 let request = "\(shots)/request"
-                try? "\(app.window.windowNumber) \(name)".write(toFile: request, atomically: true, encoding: .utf8)
+                try "\(app.window.windowNumber) \(name)".write(toFile: request, atomically: true, encoding: .utf8)
                 for _ in 0..<100 where FileManager.default.fileExists(atPath: request) {
                     await app.pause(.milliseconds(100))
+                }
+                guard !FileManager.default.fileExists(atPath: request) else {
+                    throw UIScenarioFailure(description: "nothing captured \(name); is capture-loop.sh running?")
                 }
             }
             try await app.openFromQueue(mainPR)
@@ -39,6 +44,8 @@
             }
             try await app.press("g f")
             for _ in 0..<20 where review.selectedPath != "Sources/MaserCore/Keymap.swift" { try await app.press("]") }
+            try app.expect(
+                review.selectedPath == "Sources/MaserCore/Keymap.swift", "] reaches Keymap.swift", review.selectedPath ?? "none")
             try await app.press("g a")
             // The comments arrive while the tree is hidden, as when the agent posts them.
             try app.overrideGH([
@@ -47,9 +54,9 @@
             try await app.press("r")
             try await app.waitUntil("the agent comments load") { review.unopenedAgentComments.count == 2 }
             try await app.press("g f")
-            await shot("m00-start")
+            try await shot("m00-start")
             for step in 1...12 {
                 try await app.press(step <= 6 ? "[" : "]")
-                await shot(String(format: "m%02d", step))
+                try await shot(String(format: "m%02d", step))
             }
         }

@@ -167,18 +167,18 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
   yet to be evaluated with the user.
 - **HAZ-11:** Medium. A "loaded at" indicator on the Overview would reduce it further. It's recorded as a candidate
   control, not yet a requirement.
-
+- **HAZ-12:** Low. RC-31 stops a `gh` call that runs past `[github] timeout` and says so, with Try Again
+  (UI:gh-times-out). A write stopped by the timeout may still have reached GitHub, so its message says to check before
+  posting again: a second post would be a visible duplicate, not a hidden one.
 - **HAZ-26:** Medium. Seen in the first real review with the agent (#44): after the selection moved on, a row kept its
   selected (bold) text, overprinted with its plain text. Captures of 12 moves before and after RC-32
   (V-2026-11-12/V18, V-2026-11-12/V19) show the stale row in 11 frames before and none after. It stays at P2 because
   the drawing is the framework's, the check is by eye, and only one sequence of moves was captured. Naming the shown
   file above the diff would make the tree no longer the only sign of which file is shown; it's recorded as a
   candidate control, not yet a requirement.
-- **HAZ-12:** Low. RC-31 stops a `gh` call that runs past `[github] timeout` and says so, with Try Again
-  (UI:gh-times-out). A write stopped by the timeout may still have reached GitHub, so its message says to check before
-  posting again: a second post would be a visible duplicate, not a hidden one.
 
-Of the risks above, none is waiting on a further control. The review agent's are below.
+None of the risks above needs a further control before Maser is used for review; HAZ-11 and HAZ-26 have candidate
+controls recorded. The review agent's are below.
 
 **The review agent (#32)** was built in increments on 2026-11-12. The conversation came first, with RC-22 to RC-25 and
 RC-27:
@@ -217,7 +217,8 @@ Three hazards started High:
   evaluated with the user. Its first real review (V-2026-11-12/V15, V-2026-11-12/V16) found three real defects it
   wasn't asked to look for, and missed a planted one beside them, in a function it had cited. Its findings don't say
   what it didn't check, so a user who takes them as a review of the PR would approve what it missed. That is this
-  hazard's foreseeable misuse, and HRUS-9 should cover it.
+  hazard's foreseeable misuse, and HRUS-9 should cover it. Asked explicitly to review #45, it found four real
+  problems in the docs and test record and said what it hadn't checked (V-2026-11-12/V20).
 - **HAZ-20** and **HAZ-23** (a PR written to attack its reviewer): Medium. The evaluation's injected instruction was
   resisted in 3 of 3 runs, and reported to the user each time (V-2026-11-12/V13), as in the spike (V-2026-11-12/V7).
   RC-22 removes the agent's means to act on the Mac or the network, and settings from the PR are never loaded. What's left is the agent's words, which RC-26, RC-27 and

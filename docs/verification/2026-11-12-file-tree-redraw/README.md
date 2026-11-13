@@ -36,8 +36,10 @@ same leftover from a different state of the row.
 ### V19: After
 
 `FileRow` takes `isSelected` (the model's selected path equals the row's) and sets the name's weight from it, semibold
-or regular. Moving the selection now changes both rows' content, so SwiftUI redraws both. The weight matches the list's
-own selected style, so the tree looks as before, minus the leftovers.
+or regular. Moving the selection now changes both rows' content, so SwiftUI redraws both. This changes how the tree
+looks: before, the selected row was regular weight in most frames and bold in a few; now it is always semibold. The
+selection is now consistent, which is the point, but it is a visible change, not the same look minus the leftovers.
+(Found in review by the agent, V-2026-11-12/V20.)
 
 ## Not checked
 
