@@ -98,6 +98,7 @@ Each row lists:
 | HAZ-23 | Settings, hooks, agents or MCP servers from the PR's repository load into the agent and run code on the user's Mac. A PR can be written to attack its reviewer. | H4 | S4 P3 **High** | RC-22 | S4 P1 Medium |
 | HAZ-24 | A diagram from the agent runs script, or loads remote content, in Maser's canvas. | H4, H7 | S4 P2 Medium | RC-28 | S4 P1 Medium |
 | HAZ-25 | The agent's answers or diagrams describe an older commit than the one the user is now reviewing. | H1 | S4 P2 Medium | RC-25 | S4 P1 Medium |
+| HAZ-26 | The file tree draws a file as selected that isn't the one the diff shows, or draws a name unreadably. The diff pane doesn't name its file, so the user believes they're reading a different file than they are, and reasons about or approves the wrong code. | H1 | S4 P3 **High** | RC-32 | S4 P2 Medium |
 
 ## Risk controls
 
@@ -136,6 +137,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-29 | Diagrams are grounded: each element's citation is checked against the checkout, and each change mark against the diff. Mismatches and unsourced diagrams are flagged. | Protective measure | REQ-CNV-003, REQ-CNV-004 | Implemented |
 | RC-30 | Everything the agent produces is labeled as the agent's, with its commit, and none of it changes review state. | Information for safety | REQ-CNV-005 | Implemented |
 | RC-31 | Every `gh` call has a timeout. A call past it is stopped and reported with a way to try again; a timed-out write says it may have reached GitHub. | Protective measure | REQ-GH-007 | Implemented |
+| RC-32 | Each file row's look is set from whether it's the selected file, so moving the selection redraws the row it leaves as well as the one it reaches. Found in use on 2026-11-12 (#44), when a row kept its selected text after the selection moved on. | Inherent safety by design | REQ-DIF-010 | Implemented |
 
 ## Residual risk
 
@@ -166,6 +168,12 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
 - **HAZ-11:** Medium. A "loaded at" indicator on the Overview would reduce it further. It's recorded as a candidate
   control, not yet a requirement.
 
+- **HAZ-26:** Medium. Seen in the first real review with the agent (#44): after the selection moved on, a row kept its
+  selected (bold) text, overprinted with its plain text. Captures of 12 moves before and after RC-32
+  (V-2026-11-12/V18, V-2026-11-12/V19) show the stale row in 11 frames before and none after. It stays at P2 because
+  the drawing is the framework's, the check is by eye, and only one sequence of moves was captured. Naming the shown
+  file above the diff would make the tree no longer the only sign of which file is shown; it's recorded as a
+  candidate control, not yet a requirement.
 - **HAZ-12:** Low. RC-31 stops a `gh` call that runs past `[github] timeout` and says so, with Try Again
   (UI:gh-times-out). A write stopped by the timeout may still have reached GitHub, so its message says to check before
   posting again: a second post would be a visible duplicate, not a hidden one.

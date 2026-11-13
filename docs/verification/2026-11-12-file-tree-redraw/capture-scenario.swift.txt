@@ -1,0 +1,55 @@
+// The capture scenario used for this record (Swift). To repeat the check, paste it into UIScenario in
+// Sources/Maser/UIScenarios.swift and add it to `all`, start capture-loop.sh, and run scripts/check-ui file-tree-captures.
+
+        /// Captures the file tree after each of 12 moves between files, for checking by eye that only the selected row
+        /// looks selected (#44). The test app can't capture the screen, so it writes a request file and waits while a
+        /// shell loop (`capture-loop.sh` in the record) captures the window into the user temp folder.
+        static let fileTreeCaptures = UIScenario("file-tree-captures", "REQ-DIF-010: captures for checking by eye") { app in
+            let shots = NSTemporaryDirectory() + "maser-captures"
+            @MainActor func shot(_ name: String) async {
+                await app.pause(.milliseconds(800))
+                let request = "\(shots)/request"
+                try? "\(app.window.windowNumber) \(name)".write(toFile: request, atomically: true, encoding: .utf8)
+                for _ in 0..<100 where FileManager.default.fileExists(atPath: request) {
+                    await app.pause(.milliseconds(100))
+                }
+            }
+            try await app.openFromQueue(mainPR)
+            guard let review = app.review else { throw UIScenarioFailure(description: "no review") }
+            try await app.waitUntil("the diff loads") { review.diffCommitID != nil }
+            try await app.waitUntil("the account is shown") { review.postingAccount != nil }
+            let account = review.postingAccount ?? ""
+            // Two pending agent comments on Keymap.swift, as in the review where #44 was seen.
+            var lines: [String] = []
+            for (n, line) in [71, 72].enumerated() {
+                let thread: [String: Any] = [
+                    "id": "PRRT_agent\(n)", "path": "Sources/MaserCore/Keymap.swift", "line": line, "startLine": NSNull(),
+                    "originalLine": line, "diffSide": "RIGHT", "isOutdated": false, "isResolved": false,
+                    "comments": [
+                        "nodes": [
+                            [
+                                "id": "PRRC_agent\(n)", "author": ["login": account],
+                                "body": AgentComment.body("Agent comment \(n)", model: "claude-opus-5-5"),
+                                "createdAt": "2026-11-12T12:00:00Z", "url": NSNull(), "state": "PENDING",
+                            ]
+                        ]
+                    ],
+                ]
+                lines.append(String(decoding: try JSONSerialization.data(withJSONObject: thread), as: UTF8.self))
+            }
+            try await app.press("g f")
+            for _ in 0..<20 where review.selectedPath != "Sources/MaserCore/Keymap.swift" { try await app.press("]") }
+            try await app.press("g a")
+            // The comments arrive while the tree is hidden, as when the agent posts them.
+            try app.overrideGH([
+                .init(match: ["reviewThreads(first"], status: 0, stdout: lines.joined(separator: "\n") + "\n", stderr: nil)
+            ])
+            try await app.press("r")
+            try await app.waitUntil("the agent comments load") { review.unopenedAgentComments.count == 2 }
+            try await app.press("g f")
+            await shot("m00-start")
+            for step in 1...12 {
+                try await app.press(step <= 6 ? "[" : "]")
+                await shot(String(format: "m%02d", step))
+            }
+        }

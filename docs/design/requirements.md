@@ -75,6 +75,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-DIF-007 | Show Full File doesn't fetch files over 4 MB, and says why. | UN-10 | — | L:LiveFullFileTests.expandsRealFile (limit). | Implemented |
 | REQ-DIF-008 | Review threads on the selected file, including outdated ones and pending drafts, are listed in the comments pane in line order with outdated threads last, and marked at their lines in the diff. Selecting a thread scrolls the diff to its line. | UN-2, UN-4 | — | T:ReviewThreadTests.decodesThreads; L:LiveGitHubTests.loadsRealPullRequest (every current thread maps to a line). **Gap:** UI:thread-markers. | Implemented |
 | REQ-DIF-009 | A diff line too long for the pane wraps inside its own row: the row grows to fit, and no line's text is drawn over another's or hidden under it. | UN-3 | RC-21 | UI:long-lines-wrap | Implemented |
+| REQ-DIF-010 | The file tree shows only the selected file as selected. A row drops the selected style as soon as the selection leaves it, however the selection moved (keys, clicks, or Maser moving it). | UN-3 | RC-32 | V-2026-11-12/V18, V-2026-11-12/V19 (captures by eye; the test app can't capture its own window). **Gap:** no automated check. | Implemented |
 
 ## Commenting and reviewing (CMT)
 

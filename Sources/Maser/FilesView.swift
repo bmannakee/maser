@@ -94,7 +94,9 @@ private struct FileTreeNodeView: View {
                     .truncationMode(.middle)
             }
         } else {
-            FileRow(name: node.name, file: model.file(at: node.id), commentCount: model.commentCount(at: node.id))
+            FileRow(
+                name: node.name, file: model.file(at: node.id), commentCount: model.commentCount(at: node.id),
+                isSelected: model.selectedPath == node.id)
         }
     }
 
@@ -118,10 +120,14 @@ private struct FileRow: View {
     /// The file's diff; nil shows it as modified with no details.
     let file: FileDiff?
     let commentCount: Int
+    /// Whether it's the selected file.
+    let isSelected: Bool
 
     var body: some View {
         Label {
-            Text(name).lineLimit(1).truncationMode(.middle)
+            // The weight is set for both states so a row is redrawn when it's deselected; leaving it to the list's
+            // selection style left a row's selected (bold) text behind after the selection moved on (#44).
+            Text(name).lineLimit(1).truncationMode(.middle).fontWeight(isSelected ? .semibold : .regular)
         } icon: {
             Image(systemName: icon).foregroundStyle(color)
         }
