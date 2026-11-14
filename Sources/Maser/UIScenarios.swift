@@ -756,6 +756,17 @@
             try await app.waitUntil("the diff loads") { review.diffCommitID != nil }
             try await app.press("g a")
             try app.expect(review.tab == .agent, "g a shows the Agent tab", app.summary)
+            guard review.agent.allowRule != nil else {
+                try app.expect(!review.agent.focusRequest, "with the agent off, g a leaves no focus request", app.summary)
+                return review
+            }
+            try await app.waitUntil("g a focuses the message box") { app.responder == .editor }
+            await app.type("x")
+            try app.expect(review.agent.draft == "x", "typing goes into the box", review.agent.draft)
+            review.agent.draft = ""
+            // Leave the box, so the scenario's keys reach the tab.
+            try await app.press("esc")
+            try await app.waitUntil("Esc leaves the box") { app.responder != .editor }
             return review
         }
 
@@ -961,6 +972,8 @@
 
             // The first cites Sources/Door.swift:2, which isn't in the diff.
             try await app.press("g a")
+            try await app.waitUntil("g a focuses the message box") { app.responder == .editor }
+            try await app.press("esc")
             try await app.press("k")
             try await app.press("k")
             try app.expect(agent.selectedElement == 0, "k moves back", app.summary)

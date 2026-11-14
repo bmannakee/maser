@@ -66,8 +66,8 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   for reading.
 - **Agent** — a conversation about the PR with an agent: your own `claude`, run by maser. It reads the PR (description,
   commits, threads, the whole diff) and a read-only checkout of the PR's head commit, and nothing else: no shell, no web,
-  no writes. It's off until you allow the PR's owner in `[agent] allow` (below). `c` jumps to the message box, ⌘↩
-  sends. Every file it reads and every tool it calls is listed, with what was refused. The header shows what it can
+  no writes. It's off until you allow the PR's owner in `[agent] allow` (below). `g a` opens the tab with the message
+  box ready to type in; `c` jumps back to it, ⌘↩ sends. Every file it reads and every tool it calls is listed, with what was refused. The header shows what it can
   read, the model and effort (changeable for this PR), and what the conversation has cost. If someone pushes, the
   conversation is marked as about the older commit until your next message moves the agent on. Conversations survive
   quitting. Ask for a diagram, such as the state machine a PR changes, and it appears on the canvas beside the
