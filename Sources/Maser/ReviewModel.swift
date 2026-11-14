@@ -436,7 +436,11 @@ final class ReviewModel {
         switch command {
         case .showOverview: tab = .overview
         case .showFiles: tab = .files
-        case .showAgent: tab = .agent
+        case .showAgent:
+            tab = .agent
+            // Ready to type, as `c` would leave it. Only when the agent is on: otherwise there's no box, and a request
+            // left standing would focus it later, when the user isn't expecting it.
+            if agent.allowRule != nil { agent.focusRequest = true }
         case .toggleComments:
             if tab != .files {
                 tab = .files
