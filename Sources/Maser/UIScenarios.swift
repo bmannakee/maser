@@ -24,7 +24,8 @@
         /// Every scenario, in the order `scripts/check-ui` runs them.
         static let all: [UIScenario] = [
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
-            queueSearchFails, switchPRsKeepsState, longLinesWrap, diffNamesFile, headMovedBlocksPosting, namesPRAndAccount,
+            queueSearchFails, switchPRsKeepsState, longLinesWrap, diffNamesFile, overviewShowsAge, headMovedBlocksPosting,
+            namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
             canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut,
             reviewRequestedClear, reviewRequestedFails, reviewRequestedOff, focusNextReview,
@@ -506,6 +507,41 @@
             try app.expect(
                 others.isEmpty, "\(what): every row drawn is from \(path)", others.sorted().prefix(3).joined(separator: ", "))
             app.step("\(what): \(path)")
+        }
+
+        /// The Overview says how old its data is, and a failed refresh, which keeps the old data, keeps its old age too.
+        static let overviewShowsAge = UIScenario(
+            "overview-shows-age",
+            "REQ-OVR-005: The Overview shows when it loaded, ages with time, and is renewed by r but not by a failed refresh"
+        ) { app in
+            try await app.openFromQueue(smallPR)
+            guard let review = app.review else { return }
+            try await app.waitUntil("a fresh overview says so") { ShownText.values["overview-loaded"] == "Loaded just now" }
+
+            review.backdateOverviewForScenario(by: 180)
+            try await app.waitUntil("three minutes on, it says so") {
+                ShownText.values["overview-loaded"] == "Loaded 3 minutes ago"
+            }
+
+            let overviewQuery = "number title url state isDraft"
+            try app.overrideGH([
+                .init(match: [overviewQuery, "number=\(smallPR)"], status: 1, stdout: nil, stderr: "HTTP 502: Bad Gateway")
+            ])
+            let before = app.ghCalls.count
+            try await app.press("r")
+            try await app.waitUntil("the refresh asks for the overview and fails") {
+                app.ghCalls.dropFirst(before).contains { $0.source == "override" }
+            }
+            await app.pause(.seconds(1))
+            try app.expect(
+                review.overview != nil && ShownText.values["overview-loaded"] == "Loaded 3 minutes ago",
+                "the old overview stays, with its old age", ShownText.values["overview-loaded"] ?? "nothing shown")
+
+            try app.overrideGH([])
+            try await app.press("r")
+            try await app.waitUntil("a refresh that loads says it's fresh again") {
+                ShownText.values["overview-loaded"] == "Loaded just now"
+            }
         }
 
         /// A push after the diff loaded stops line comments and reviews from posting, until the diff is refreshed.
