@@ -129,30 +129,11 @@ private struct FileRow: View {
             // selection style left a row's selected (bold) text behind after the selection moved on (#44).
             Text(name).lineLimit(1).truncationMode(.middle).fontWeight(isSelected ? .semibold : .regular)
         } icon: {
-            Image(systemName: icon).foregroundStyle(color)
+            let status = file?.status ?? .modified
+            Image(systemName: status.symbol).foregroundStyle(status.ink)
         }
         .badge(commentCount)
         .help(help)
-    }
-
-    /// The SF Symbol for the file's status.
-    private var icon: String {
-        switch file?.status {
-        case .added: "plus.square"
-        case .deleted: "minus.square"
-        case .renamed: "arrow.right.square"
-        case .modified, nil: "doc"
-        }
-    }
-
-    /// The icon's color for the file's status.
-    private var color: Color {
-        switch file?.status {
-        case .added: Color.Brand.addInk
-        case .deleted: Color.Brand.delInk
-        case .renamed: .orange
-        case .modified, nil: .secondary
-        }
     }
 
     /// The tooltip: the full path, lines added and removed, and the old path of a renamed file.
@@ -161,6 +142,28 @@ private struct FileRow: View {
         var text = "\(file.path)\n+\(file.additions) −\(file.deletions)"
         if let old = file.oldPath { text += "\nrenamed from \(old)" }
         return text
+    }
+}
+
+extension FileDiff.Status {
+    /// The SF Symbol for a file with this status, in the file tree and above its diff.
+    fileprivate var symbol: String {
+        switch self {
+        case .added: "plus.square"
+        case .deleted: "minus.square"
+        case .renamed: "arrow.right.square"
+        case .modified: "doc"
+        }
+    }
+
+    /// The symbol's color.
+    fileprivate var ink: Color {
+        switch self {
+        case .added: Color.Brand.addInk
+        case .deleted: Color.Brand.delInk
+        case .renamed: .orange
+        case .modified: .secondary
+        }
     }
 }
 
@@ -185,6 +188,10 @@ private struct DiffPane: View {
         case .loaded:
             if let file = model.selectedFile {
                 VStack(spacing: 0) {
+                    // Named from the same value the diff is drawn from, so the two can't disagree, whatever the file
+                    // tree draws (HAZ-26).
+                    DiffFileHeader(file: file)
+                    Divider()
                     DiffView(model: model, file: file)
                         .id(file.id)  // fresh scroll position per file
                     if let status = model.diffNotice ?? model.fullFileStatus {
@@ -367,6 +374,54 @@ private struct DiffStatusLine: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
+    }
+}
+
+/// The path of the file the diff shows, above it: its directory, then its name, which is never truncated.
+///
+/// A long directory is truncated in the middle; the full path, and a renamed file's old path, are in the tooltip.
+private struct DiffFileHeader: View {
+    let file: FileDiff
+
+    var body: some View {
+        let path = file.path
+        let name = (path as NSString).lastPathComponent
+        let directory = String(path.dropLast(name.count))
+        HStack(spacing: 6) {
+            Image(systemName: file.status.symbol).foregroundStyle(file.status.ink)
+            HStack(spacing: 0) {
+                if !directory.isEmpty {
+                    Text(directory)
+                        .foregroundStyle(.secondary)
+                        .truncationMode(.middle)
+                }
+                Text(name)
+                    .fontWeight(.semibold)
+                    .layoutPriority(1)
+            }
+            .lineLimit(1)
+            .shownText("diff-path", path)
+            if let old = file.oldPath {
+                Text("renamed from \(old)")
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .layoutPriority(-1)
+            }
+            Spacer(minLength: 8)
+            if !file.isBinary {
+                Group {
+                    Text("+\(file.additions)").foregroundStyle(Color.Brand.addInk)
+                    Text("−\(file.deletions)").foregroundStyle(Color.Brand.delInk)
+                }
+                .fixedSize()
+            }
+        }
+        .font(.callout.monospaced())
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .help(file.oldPath.map { "\(path)\nrenamed from \($0)" } ?? path)
+        .textSelection(.enabled)
     }
 }
 
