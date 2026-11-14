@@ -24,7 +24,7 @@
         /// Every scenario, in the order `scripts/check-ui` runs them.
         static let all: [UIScenario] = [
             queueKeys, keyRouting, tabAndPaneStress, commentBoxKeepsFocus, typingPausesKeys, postComment,
-            queueSearchFails, switchPRsKeepsState, longLinesWrap, headMovedBlocksPosting, namesPRAndAccount,
+            queueSearchFails, switchPRsKeepsState, longLinesWrap, diffNamesFile, headMovedBlocksPosting, namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
             canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut,
             reviewRequestedClear, reviewRequestedFails, reviewRequestedOff, focusNextReview,
@@ -409,6 +409,103 @@
                     outside.isEmpty, "every line's text is inside its row in \(path)", outside.prefix(3).joined(separator: "; "))
                 try await app.press("]")
             }
+        }
+
+        /// The path above the diff names the file whose lines are drawn, however the selection moves.
+        static let diffNamesFile = UIScenario(
+            "diff-names-file",
+            "REQ-DIF-011: The path above the diff follows the file shown through ]/[, a tree selection, and n/N to a thread"
+        ) { app in
+            try await app.openFromQueue(mainPR)
+            try await app.press("g f")
+            try await app.waitUntil("the Files tab shows a file") { app.review?.selectedFile != nil }
+            guard let review = app.review else { return }
+            let paths = review.diffFiles.map(\.path)
+            try app.expect(paths.count >= 3, "a PR with 3+ files", "\(paths)")
+
+            try app.expect(
+                ShownText.values["diff-path"] == review.selectedPath, "the first file is named above its diff",
+                "\(ShownText.values["diff-path"] ?? "nothing") vs \(review.selectedPath ?? "nothing")")
+            try await moveShowsPath(app, review, "]", from: review.selectedPath) { try await app.press("]") }
+            try await moveShowsPath(app, review, "] again", from: review.selectedPath) { try await app.press("]") }
+            try await moveShowsPath(app, review, "[", from: review.selectedPath) { try await app.press("[") }
+            // Clicks and arrow keys in the tree set the selection through `select(path:)`.
+            let last = paths[paths.count - 1]
+            try await moveShowsPath(app, review, "selecting the last file in the tree", from: review.selectedPath) {
+                review.select(path: last)
+            }
+
+            // N and n move between threads across files: back from the last file twice, then forward. The recordings
+            // have no threads, so give the first and third files one each.
+            let threads = try [0, 2].map { index in
+                let file = review.diffFiles[index]
+                let line = file.hunks.flatMap(\.lines).first { $0.newLine != nil }?.newLine ?? 1
+                let thread: [String: Any] = [
+                    "id": "PRRT_\(index)", "path": file.path, "line": line, "startLine": NSNull(), "originalLine": line,
+                    "diffSide": "RIGHT", "isOutdated": false, "isResolved": false,
+                    "comments": [
+                        "nodes": [
+                            [
+                                "id": "PRRC_\(index)", "author": ["login": "octocat"], "body": "A thread",
+                                "createdAt": "2026-11-12T12:00:00Z", "url": NSNull(), "state": "SUBMITTED",
+                            ]
+                        ]
+                    ],
+                ]
+                return String(decoding: try JSONSerialization.data(withJSONObject: thread), as: UTF8.self)
+            }
+            try app.overrideGH([
+                .init(
+                    match: ["reviewThreads(first", "number=\(mainPR)"], status: 0, stdout: threads.joined(separator: "\n") + "\n",
+                    stderr: nil)
+            ])
+            try await app.press("r")
+            try await app.waitUntil("the threads load") {
+                review.commentCount(at: paths[0]) > 0 && review.commentCount(at: paths[2]) > 0
+            }
+            for key in ["N", "N", "n"] {
+                let start = review.selectedPath
+                var pressed = 0
+                try await moveShowsPath(app, review, "\(key) to a thread on another file", from: start) {
+                    while review.selectedPath == start && pressed < 20 {
+                        try await app.press(key)
+                        pressed += 1
+                    }
+                }
+            }
+        }
+
+        /// Moves the selection with `action`, then checks the path above the diff is the new file's and every row drawn
+        /// is that file's.
+        ///
+        /// - Parameters:
+        ///   - app: The scenario's driver.
+        ///   - review: The open review.
+        ///   - what: The move, for the log.
+        ///   - old: The path selected before the move.
+        ///   - action: Makes the move.
+        /// - Throws: `UIScenarioFailure` if the selection doesn't move or the path or rows don't follow it.
+        private static func moveShowsPath(
+            _ app: UIScenarioDriver, _ review: ReviewModel, _ what: String, from old: String?,
+            _ action: () async throws -> Void
+        ) async throws {
+            LayoutProbe.rowFrames = [:]
+            try await action()
+            try await app.waitUntil("\(what): the selection moves to another file") {
+                review.selectedPath != nil && review.selectedPath != old
+            }
+            let path = review.selectedPath ?? ""
+            let drawsLines = review.selectedFile.map { !$0.isBinary && !$0.hunks.isEmpty } ?? false
+            try await app.waitUntil("\(what): the path above the diff is \(path)") {
+                ShownText.values["diff-path"] == path
+                    && (!drawsLines || LayoutProbe.rowFrames.keys.contains { $0.hasPrefix("\(path)#") })
+            }
+            // Let any rows of the old file that were still on their way out report themselves.
+            await app.pause(.milliseconds(300))
+            let others = LayoutProbe.rowFrames.keys.filter { !$0.hasPrefix("\(path)#") }
+            try app.expect(
+                others.isEmpty, "\(what): every row drawn is from \(path)", others.sorted().prefix(3).joined(separator: ", "))
+            app.step("\(what): \(path)")
         }
 
         /// A push after the diff loaded stops line comments and reviews from posting, until the diff is refreshed.
