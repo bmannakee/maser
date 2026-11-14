@@ -63,6 +63,7 @@ Reference forms are explained in [README.md](README.md#identifiers).
 | REQ-OVR-002 | Rendered PR content runs no JavaScript of its own. A clicked link, including one marked `target="_blank"`, opens in the default browser. | UN-8 | RC-16 | I: `HTMLView` sets `allowsContentJavaScript = false`, and its `WKUIDelegate` sends new-window links to the browser. **Gap:** UI:link-opens-browser. | Implemented |
 | REQ-OVR-003 | Relative times ("5 minutes ago") are updated every minute. Anything older than 30 days shows its date. | UN-2 | RC-17 | **Gap:** no test. | Implemented |
 | REQ-OVR-004 | The user can post a comment to the conversation, and quote any comment into the draft. | UN-4 | — | T:PullRequestOverviewTests.quotingMarkdown; UI:post-comment. **Gap:** quoting in the UI. | Implemented |
+| REQ-OVR-005 | The Overview says when its data was loaded ("Loaded 3 minutes ago"), kept current each minute, with the date from a day on. It's the time of the data shown: a refresh that fails leaves both the old data and its old time. The text is never truncated. | UN-2 | RC-35 | T:LoadedAgeTests.wording, .edges; UI:overview-shows-age (fresh, three minutes on, unchanged by a failed refresh, fresh after `r`). **Gap:** that the text isn't truncated in a narrow window (visual). | Implemented |
 
 ## Diff and Files tab (DIF)
 
