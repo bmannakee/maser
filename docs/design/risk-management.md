@@ -112,7 +112,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-03 | A full file is merged only if its contents match the diff; otherwise maser shows an error. | Protective measure | REQ-DIF-002 | Implemented |
 | RC-04 | Comments and reviews are posted only for the head commit of the diff the user saw: reviews are pinned to it, and the head is checked just before each new line comment and submit, refusing with a refresh when it has moved. | Protective measure | REQ-CMT-007 | Implemented |
 | RC-05 | Expanded lines can't take comments, and say why. A comment GitHub doesn't create is shown as an error. | Protective measure | REQ-DIF-003, REQ-CMT-005 | Implemented |
-| RC-06 | Key ownership is explicit. The window tracks whether the queue or the review has the keys, the open PR is marked, vim keys pause while typing, and `/` acts only in the queue. The queue's selection moves by itself only while the queue has the keys or after a review is submitted, and never away from a review with unsent text. | Protective measure | REQ-WIN-002, REQ-WIN-003, REQ-KEY-002, REQ-KEY-003, REQ-QUE-009 | Implemented |
+| RC-06 | Key ownership is explicit. The window tracks whether the queue or the review has the keys, the open PR is marked, vim keys pause while typing, and `/` acts only in the queue. The queue's selection moves by itself only while the queue has the keys or after a review is submitted, and never away from a review with unsent text. The review-only keys (`g o`, `g f`, `g a`, `c`, `S`) pressed in the queue open the highlighted PR and hand it the keys first, so they act on the PR highlighted, never on one still showing. | Protective measure | REQ-WIN-002, REQ-WIN-003, REQ-KEY-002, REQ-KEY-003, REQ-QUE-009 | Implemented |
 | RC-07 | The verdict starts at Comment every time and must be chosen explicitly. Submitting takes a button or ⌘↩ in the sheet. | Protective measure | REQ-CMT-003 | Implemented |
 | RC-08 | Discarding a review asks for confirmation, naming the number of drafts it deletes. | Protective measure | REQ-CMT-004 | Implemented |
 | RC-09 | The UI avoids the layouts that loop AppKit's constraint updates (nested split views, an inspector beside the file tree), and a stress scenario checks for it. | Inherent safety by design | REQ-WIN-007 | Implemented; UI:tab-and-pane-stress |
@@ -162,6 +162,11 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
   before. The selection only moves while the queue has the keys or after a submit, never from a review with unsent text
   or while the review has the keys (UI:focus-next-review). The new selection is highlighted at once and its PR shown a
   quarter of a second later, so Return opens the highlighted PR, as it always has. The rating is unchanged.
+  The review-only keys used to pass from the queue to whichever review was showing, which is this hazard's own example:
+  `S` or `c` acting on the open PR while another is highlighted. They now open the highlighted PR first and hand it the
+  keys, so the next `j` moves in the review, not the queue (#65, UI:key-routing, which presses them straight after
+  `j`/`k`, before the selection settles). Opening the highlighted PR can hide a review with unsent text, as Return
+  already does; the text is kept (RC-10). The rating is unchanged; the change removes one way the hazard arose.
 - **HAZ-07:** Low. RC-10 writes each keystroke's text to disk before the next, so a crash loses at most the key being
   handled (UI:draft-survives-relaunch kills the app without warning). The control brings risks of its own, judged
   acceptable: unsent review text sits in a file under the user's Library, as readable as the rest of their home folder;

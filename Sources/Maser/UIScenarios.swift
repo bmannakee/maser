@@ -65,7 +65,7 @@
 
         /// Keys go to the queue or the review as REQ-WIN-003 and REQ-KEY-003 say; the V10 check from 2026-11-03.
         static let keyRouting = UIScenario(
-            "key-routing", "REQ-WIN-003, REQ-KEY-003: Who gets the keys after Return, ⌘0, g p, e and /"
+            "key-routing", "REQ-WIN-003, REQ-KEY-003: Who gets the keys after Return, g o/f/a, c, S, ⌘0, g p, e and /"
         ) { app in
             let prs = app.queuePRs
             try await app.openFromQueue(prs[1].number)
@@ -87,9 +87,59 @@
             }
             try await app.press("g f")
             try app.expect(
-                app.review?.tab == .files && app.state.queueHasKeys, "g f, which the queue doesn't use, reaches the review",
-                app.summary)
+                app.review?.tab == .files && !app.state.queueHasKeys && app.review?.pr.number == prs[0].number,
+                "g f opens the highlighted PR on Files and gives it the keys", app.summary)
+            try await app.press("j")
+            try app.expect(
+                app.selectedNumbers == [prs[0].number], "j after g f acts in the review, not the queue", app.summary)
 
+            // Pressed before the selection has settled, the key acts on the PR highlighted, not the one still showing.
+            try await app.press("cmd+0")
+            try await app.waitUntil("⌘0 gives the queue the keys") { app.state.queueHasKeys && app.responder == .list }
+            try await app.press("j")
+            try await app.press("g a")
+            try app.expect(
+                app.review?.pr.number == prs[1].number && app.review?.tab == .agent && !app.state.queueHasKeys,
+                "g a straight after j opens the highlighted PR on Agent with the keys", app.summary)
+            if app.review?.agent.allowRule != nil {
+                try await app.waitUntil("g a focuses the message box") { app.responder == .editor }
+                try await app.press("esc")
+            }
+
+            try await app.press("cmd+0")
+            try await app.waitUntil("⌘0 gives the queue the keys again") { app.state.queueHasKeys && app.responder == .list }
+            try await app.press("k")
+            try await app.press("g o")
+            try app.expect(
+                app.review?.pr.number == prs[0].number && app.review?.tab == .overview && !app.state.queueHasKeys
+                    && app.responder != .editor,
+                "g o opens the highlighted PR on Overview with the keys, and doesn't focus the comment box", app.summary)
+
+            try await app.press("cmd+0")
+            try await app.waitUntil("⌘0 gives the queue the keys a third time") {
+                app.state.queueHasKeys && app.responder == .list
+            }
+            try await app.press("j")
+            try await app.press("c")
+            try await app.waitUntil("c from the queue opens the highlighted PR and focuses its box") {
+                app.review?.pr.number == prs[1].number && !app.state.queueHasKeys && app.responder == .editor
+            }
+            try await app.press("esc")
+            try await app.press("cmd+0")
+            try await app.waitUntil("⌘0 gives the queue the keys a fourth time") {
+                app.state.queueHasKeys && app.responder == .list
+            }
+            try await app.press("k")
+            try await app.press("S")
+            try app.expect(
+                app.review?.pr.number == prs[0].number && app.review?.isFinishingReview == true && !app.state.queueHasKeys,
+                "S from the queue opens Finish Review for the highlighted PR", app.summary)
+            app.review?.isFinishingReview = false
+
+            try await app.press("cmd+0")
+            try await app.waitUntil("⌘0 gives the queue the keys a fifth time") {
+                app.state.queueHasKeys && app.responder == .list
+            }
             try await app.press("j")
             try await app.press("enter")
             try await app.waitUntil("Return opens the PR and gives it the keys") {
