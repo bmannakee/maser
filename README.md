@@ -41,8 +41,10 @@ in the queue instead.
 The queue sits in the main window's sidebar, with the selected PR's review beside it. Clicking a PR, or pressing Return
 on it, shows it and moves the keys to the review. The queue takes the keys back only when you press ⌘0 (or `g p`),
 which also brings the main window forward from anywhere, or `e`, which shows and hides it; Esc in the queue goes back to
-the review. `/` filters the queue only while it has the keys; ⌘F works from anywhere. While the queue has the keys, the ones it doesn't use (`c`,
-`g f`, `S`…) still reach the open review. Reviews you've opened stay loaded, so switching between PRs is
+the review. `/` filters the queue only while it has the keys; ⌘F works from anywhere. While the queue has the keys, the ones it doesn't use
+still reach the open review, and the ones that only mean something in a review (`g o`, `g f`, `g a`, `c`, `S`) first open
+the highlighted PR and give it the keys, so there's no need to press Return first: `g f` lands in the diff, `g a` in the
+message box, and `c` and `S` act on the PR you're looking at. Reviews you've opened stay loaded, so switching between PRs is
 instant. When a refresh drops the open PR from the queue (merged or closed, say), its review closes, unless it has text
 you haven't posted; then it stays, with a note. ⌥Return, or Open in New Window in the context menu, opens a PR in a window of its own, to compare two side by
 side. ⌘O opens any PR by URL. Each review has tabs:

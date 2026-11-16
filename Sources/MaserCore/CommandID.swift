@@ -89,6 +89,20 @@ public enum CommandID: String, CaseIterable, Sendable {
     }
 }
 
+extension CommandID {
+    /// Whether pressing this while the queue has the keys opens the highlighted PR and hands it the keys.
+    ///
+    /// These are the commands that only mean something in a review: switching its tab, writing a comment, finishing it.
+    /// Pressing one means the user is done choosing a PR, so the queue lets go rather than leave the next `j` to move
+    /// the selection. The commands the queue uses itself (`j`, `k`, `]`, `/`…) are not here.
+    public var opensReviewFromQueue: Bool {
+        switch self {
+        case .showOverview, .showFiles, .showAgent, .comment, .submitReview: true
+        default: false
+        }
+    }
+}
+
 extension CommandID: Identifiable {
     /// The command itself, so commands can drive SwiftUI lists directly.
     public var id: Self { self }

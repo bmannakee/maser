@@ -349,8 +349,16 @@ struct MainView: View {
         case .filter where !keysGoToQueue: return true
         default: break
         }
-        // Keys the queue doesn't use (c, g f, S…) go on to the open review.
-        if keysGoToQueue, performInQueue(command, in: sections) { return true }
+        if keysGoToQueue {
+            if performInQueue(command, in: sections) { return true }
+            // g o, g f, g a, c and S mean the user is done choosing: open the highlighted PR, which takes the keys,
+            // and run the command there. Otherwise the review shown might not be the PR highlighted (HAZ-04).
+            if command.opensReviewFromQueue {
+                let chosen = sections.lazy.compactMap(\.prs).joined().first { selection.contains($0.id) }
+                if let chosen { open([chosen], newWindow: false) } else if state.openReview != nil { handOverKeys() }
+            }
+        }
+        // Keys the queue doesn't use go on to the open review.
         return state.openReview?.perform(command) ?? false
     }
 
@@ -394,6 +402,12 @@ struct MainView: View {
         default: return false
         }
         return true
+    }
+
+    /// Gives the open review the keys, as Return does after it opens a PR.
+    private func handOverKeys() {
+        state.queueHasKeys = false
+        focus = nil
     }
 
     /// Selects one PR in the queue, clamped to the list, and gives the list focus.

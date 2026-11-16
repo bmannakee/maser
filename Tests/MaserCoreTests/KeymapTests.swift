@@ -220,4 +220,16 @@ import Testing
         #expect(explicit.problems.isEmpty)
         #expect(explicit.keymap == .defaults)
     }
+
+    /// The commands that hand the keys to the review are the review-only ones, and none the queue uses itself.
+    @Test("REQ-KEY-003: Tab, comment and finish-review commands open the highlighted PR from the queue")
+    func opensReviewFromQueue() {
+        let opening = Set(CommandID.allCases.filter(\.opensReviewFromQueue))
+        #expect(opening == [.showOverview, .showFiles, .showAgent, .comment, .submitReview])
+        let queueKeys: Set<CommandID> = [
+            .cursorDown, .cursorUp, .nextFile, .previousFile, .scrollToTop, .scrollToBottom, .filter, .refresh, .openSelected,
+            .cancel,
+        ]
+        #expect(opening.isDisjoint(with: queueKeys))
+    }
 }
