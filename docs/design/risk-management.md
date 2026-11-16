@@ -98,7 +98,7 @@ Each row lists:
 | HAZ-23 | Settings, hooks, agents or MCP servers from the PR's repository load into the agent and run code on the user's Mac. A PR can be written to attack its reviewer. | H4 | S4 P3 **High** | RC-22 | S4 P1 Medium |
 | HAZ-24 | A diagram from the agent runs script, or loads remote content, in maser's canvas. | H4, H7 | S4 P2 Medium | RC-28 | S4 P1 Medium |
 | HAZ-25 | The agent's answers or diagrams describe an older commit than the one the user is now reviewing. | H1 | S4 P2 Medium | RC-25 | S4 P1 Medium |
-| HAZ-26 | The file tree draws a file as selected that isn't the one the diff shows, or draws a name unreadably. The diff pane doesn't name its file, so the user believes they're reading a different file than they are, and reasons about or approves the wrong code. | H1 | S4 P3 **High** | RC-32 | S4 P2 Medium |
+| HAZ-26 | The file tree draws a file as selected that isn't the one the diff shows, or draws a name unreadably. If the user takes the tree's word for which file they're reading, they reason about or approve the wrong code. | H1 | S4 P3 **High** | RC-32, RC-34 | S4 P1 Medium |
 | HAZ-27 | maser says no reviews are requested when some are, or when it doesn't know: the Review requested search failed or is old, or the section looks empty only because an earlier section or the filter took its PRs. The user believes nothing is waiting and a requested review is late or never done. | H6 | S3 P2 Medium | RC-33 | S3 P1 Low |
 
 ## Risk controls
@@ -140,6 +140,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-31 | Every `gh` call has a timeout. A call past it is stopped and reported with a way to try again; a timed-out write says it may have reached GitHub. | Protective measure | REQ-GH-007 | Implemented |
 | RC-32 | Each file row's look is set from whether it's the selected file, so moving the selection redraws the row it leaves as well as the one it reaches. Found in use on 2026-11-12 (#44), when a row kept its selected text after the selection moved on. | Inherent safety by design | REQ-DIF-010 | Implemented |
 | RC-33 | The congratulation shows only when the Review requested search itself last succeeded and found nothing, judged from the sections as loaded, and it states when the queue was checked. Any other state shows the usual message; a failed search shows its error in the queue (RC-14). | Inherent safety by design | REQ-QUE-008 | Implemented |
+| RC-34 | The diff pane names the file it shows, from the same value the diff is drawn from, so the tree is no longer the only sign of which file is shown. A long path keeps the file's name whole. | Information for safety | REQ-DIF-011 | Implemented |
 
 ## Residual risk
 
@@ -177,18 +178,20 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
 - **HAZ-12:** Low. RC-31 stops a `gh` call that runs past `[github] timeout` and says so, with Try Again
   (UI:gh-times-out). A write stopped by the timeout may still have reached GitHub, so its message says to check before
   posting again: a second post would be a visible duplicate, not a hidden one.
-- **HAZ-26:** Medium. Seen in the first real review with the agent (#44): after the selection moved on, a row kept its
-  selected (bold) text, overprinted with its plain text. Captures of 12 moves before and after RC-32
-  (V-2026-11-12/V18, V-2026-11-12/V19) show the stale row in 11 frames before and none after. It stays at P2 because
-  the drawing is the framework's, the check is by eye, and only one sequence of moves was captured. Naming the shown
-  file above the diff would make the tree no longer the only sign of which file is shown; it's recorded as a
-  candidate control, not yet a requirement.
+- **HAZ-26:** Medium because the harm is Critical, even at Improbable. Seen in the first real review with the agent
+  (#44): after the selection moved on, a row kept its selected (bold) text, overprinted with its plain text. Captures of
+  12 moves before and after RC-32 (V-2026-11-12/V18, V-2026-11-12/V19) show the stale row in 11 frames before and none
+  after. That alone left it at P2, because the drawing is the framework's, the check is by eye, and only one sequence of
+  moves was captured. RC-34 (#53) names the shown file above the diff, from the same value the diff is drawn from, so a
+  misdrawn tree no longer misleads on its own: UI:diff-names-file checks the name follows `]`, `[`, the tree and
+  threads on other files, and that every row drawn is the named file's. It's information for safety, which relies on
+  the user reading the name. P1 is a first estimate, to be confirmed by the user.
 - **HAZ-27:** Low. Added with the congratulation (#47), which is a new claim that nothing is waiting. RC-33 makes the
   claim only from a successful, empty search, and the time shown lets an old result be told from a fresh one. The
   ratings are a first estimate, to be confirmed by the user.
 
-None of the risks above needs a further control before maser is used for review; HAZ-11 and HAZ-26 have candidate
-controls recorded. The review agent's are below.
+None of the risks above needs a further control before maser is used for review; HAZ-11 has a candidate control
+recorded. The review agent's are below.
 
 **The review agent (#32)** was built in increments on 2026-11-12. The conversation came first, with RC-22 to RC-25 and
 RC-27:
