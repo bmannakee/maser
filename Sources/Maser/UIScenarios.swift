@@ -369,9 +369,10 @@
                 if case let .failed(message) = app.review?.filesState { return message.contains("within 4 seconds") }
                 return false
             }
-            try app.expect(
-                ShownText.values["files-failed"]?.contains("Check your network, then try again") == true,
-                "the Files tab says to try again", ShownText.values["files-failed"] ?? "nothing shown")
+            // The model fails before the view draws the message, so wait for it.
+            try await app.waitUntil("the Files tab says to try again") {
+                ShownText.values["files-failed"]?.contains("Check your network, then try again") == true
+            }
 
             try app.overrideGH([])
             try await app.press("r")
