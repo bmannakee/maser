@@ -27,7 +27,7 @@ struct OverviewView: View {
             if let overview = model.overview {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
-                        OverviewHeader(overview: overview)
+                        OverviewHeader(overview: overview, loadedAt: model.overviewLoadedAt)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 14)
                         Divider()
@@ -152,6 +152,8 @@ private struct CommentComposer: View {
 /// The PR's title, state, branches and diff size.
 private struct OverviewHeader: View {
     let overview: PullRequestOverview
+    /// When the overview was loaded.
+    let loadedAt: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -168,9 +170,38 @@ private struct OverviewHeader: View {
                 Text("+\(overview.additions)").foregroundStyle(Color.Brand.addInk)
                 Text("−\(overview.deletions)").foregroundStyle(Color.Brand.delInk)
                 Text("\(overview.changedFiles) files").foregroundStyle(.secondary)
+                if let loadedAt {
+                    LoadedAgeLabel(loadedAt: loadedAt)
+                }
             }
             .font(.callout)
             .lineLimit(1)
+        }
+    }
+}
+
+/// How long ago the overview was loaded, kept current each minute after the load.
+///
+/// It's never truncated: the age of the checks, mergeability and conversation is a risk control (RC-35), so the rest of
+/// the line yields to it.
+private struct LoadedAgeLabel: View {
+    let loadedAt: Date
+
+    /// The tooltip, naming the refresh key as the keymap has it.
+    private var help: String {
+        let key = ConfigStore.shared.keymap.normal[.refresh]?.first.map(Keymap.format)
+        return "When this PR's details were loaded. " + (key.map { "Press \($0) to refresh." } ?? "Refresh to load them again.")
+    }
+
+    var body: some View {
+        // Ticks a minute after each load rather than on the clock's minutes, so "1 minute ago" turns over on time.
+        TimelineView(.periodic(from: loadedAt, by: 60)) { context in
+            let text = LoadedAge.text(loadedAt: loadedAt, now: context.date)
+            Text(text)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+                .help(help)
+                .shownText("overview-loaded", text)
         }
     }
 }
