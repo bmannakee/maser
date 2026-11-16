@@ -100,6 +100,7 @@ Each row lists:
 | HAZ-25 | The agent's answers or diagrams describe an older commit than the one the user is now reviewing. | H1 | S4 P2 Medium | RC-25 | S4 P1 Medium |
 | HAZ-26 | The file tree draws a file as selected that isn't the one the diff shows, or draws a name unreadably. If the user takes the tree's word for which file they're reading, they reason about or approve the wrong code. | H1 | S4 P3 **High** | RC-32, RC-34 | S4 P1 Medium |
 | HAZ-27 | maser says no reviews are requested when some are, or when it doesn't know: the Review requested search failed or is old, or the section looks empty only because an earlier section or the filter took its PRs. The user believes nothing is waiting and a requested review is late or never done. | H6 | S3 P2 Medium | RC-33 | S3 P1 Low |
+| HAZ-28 | The UI checks leave the test app (Maser UI Test, `dev.maser.Maser.uitests`) running, and the user takes the keyboard back and carries on reviewing in it, believing it's maser. It is a debug build with its own saved state. One left by the checks in #64 was a plain launch with no scenario, so it ran with the user's real config and `gh`: a review done there is posted for real, from a build and with settings the user didn't choose, and unsent text is saved under the test app's name where maser won't restore it. A test app still running a scenario uses the fake `gh`, so a review done there goes nowhere. | H2, H3, H6 | S3 P3 Medium | RC-36 | S3 P1 Low |
 
 ## Risk controls
 
@@ -142,6 +143,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-33 | The congratulation shows only when the Review requested search itself last succeeded and found nothing, judged from the sections as loaded, and it states when the queue was checked. Any other state shows the usual message; a failed search shows its error in the queue (RC-14). | Inherent safety by design | REQ-QUE-008 | Implemented |
 | RC-34 | The diff pane names the file it shows, from the same value the diff is drawn from, so the tree is no longer the only sign of which file is shown. A long path keeps the file's name whole. | Information for safety | REQ-DIF-011 | Implemented |
 | RC-35 | The Overview says how long ago its data was loaded, kept current, and a failed refresh leaves the old time with the old data. | Information for safety | REQ-OVR-005 | Implemented |
+| RC-36 | `scripts/check-ui` closes the test app: before each scenario, after it, and on every way out of the script (finishing, a failing command, Ctrl-C, termination); it asks the app to come forward only if it's running, because starting a closed app that way relaunched it as a plain launch; and it fails the run if one is still running at the end. It closes only processes inside `.build/MaserUITests.app`, never a maser the user is running. | Protective measure | REQ-PLT-005 | Implemented |
 
 ## Residual risk
 
@@ -198,6 +200,13 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
 - **HAZ-27:** Low. Added with the congratulation (#47), which is a new claim that nothing is waiting. RC-33 makes the
   claim only from a successful, empty search, and the time shown lets an old result be told from a fresh one. The
   ratings are a first estimate, to be confirmed by the user.
+- **HAZ-28:** Low. Found by the user after UI checks (#64). The cause was in `scripts/check-ui`: it waited 2 s after
+  starting the test app and then ran `tell application … to activate`, which starts an app that isn't running. A
+  scenario that finished inside those 2 s (queue-keys did) was started again as a plain launch, which nothing ever
+  closed (V-2026-11-15/V1, V2). RC-36 removes that cause and closes the test app on every way out, with a final check
+  (V-2026-11-15/V3). A `kill -9` of the script can't be caught; the next run closes the leftover as its first step. P1 is
+  a first estimate, to be confirmed by the user. A visible "UI test" marker in the test app would let the user tell it
+  from maser at a glance; it's recorded as a candidate control, not yet a requirement.
 
 None of the risks above needs a further control before maser is used for review. The review agent's are below.
 

@@ -22,7 +22,7 @@ bundle (`dev.maser.Maser.uitests`) with its own settings, so a maser you're usin
 | Fake `gh` | `Sources/fake-gh` | Answers each `gh` command from `recordings/`, or from overrides a scenario writes. It logs every command, so a scenario can check what maser sent. |
 | Fake `claude` | `Sources/fake-claude` | Answers the review agent's messages in `claude`'s stream-json shapes, without a model. It starts maser's real `maser-agent-tools` helper from the MCP config maser gives it, so tool calls go through the real bridge. It logs its arguments and messages to `claude.jsonl`, which scenarios read as `app.claudeLog`. |
 | Config | `config.toml` here | Points `[github] gh` and `[agent] claude` at the fakes, allows the agent for bmannakee, and sets the queue's searches to the recorded ones. |
-| Launcher | `scripts/check-ui` | Builds, wraps the debug binary in `.build/MaserUITests.app`, and launches it once per scenario with its own config, `gh` state and log. Before each scenario it clears what the test app saved: settings, window state, and unsent text. |
+| Launcher | `scripts/check-ui` | Builds, wraps the debug binary in `.build/MaserUITests.app`, and launches it once per scenario with its own config, `gh` state and log. Before each scenario it clears what the test app saved: settings, window state, and unsent text. It closes the test app before and after each scenario and on every way out of the script, and fails the run if one is left, so a test app is never mistaken for maser (REQ-PLT-005). |
 
 The runner refuses to start unless `[github] gh` and `[agent] claude` are the fakes, so a scenario can never post to real
 GitHub or spend money on a model. The agent reads a fixed folder (`MASER_AGENT_CHECKOUT`, debug builds only) instead of
