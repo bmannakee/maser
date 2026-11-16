@@ -48,6 +48,7 @@ you haven't posted; then it stays, with a note. ⌥Return, or Open in New Window
 side. ⌘O opens any PR by URL. Each review has tabs:
 
 - **Overview** — title, description, comments and reviews (rendered by GitHub), plus mergeability, review status, CI checks and labels.
+  The header says how long ago these were loaded ("Loaded 3 minutes ago"); `r` loads them again.
   Write a comment in the box at the bottom (`c` to jump there, ⌘↩ to post, Esc to leave it); **Quote reply** on any comment quotes it into your draft.
 - **Files** — changed files, diff, and inline review comments. The path of the file shown is above its diff, with the
   lines it adds and removes. Selecting a comment thread scrolls the diff to its line.

@@ -116,6 +116,10 @@ final class ReviewModel {
     private(set) var overviewState: LoadState = .loading
     /// The PR's description and conversation, once loaded.
     private(set) var overview: PullRequestOverview?
+    /// When `overview` was loaded, which the Overview shows (REQ-OVR-005).
+    ///
+    /// A failed refresh leaves the last good overview showing, and this with it, so the time shown is the data's.
+    private(set) var overviewLoadedAt: Date?
     /// The conversation as HTML for the Overview's web view.
     ///
     /// It's rendered once per load, and again when `refreshConversationTimes()` finds its relative times out of date,
@@ -365,6 +369,7 @@ final class ReviewModel {
         do {
             let overview = try await GitHubCLI().overview(for: pr)
             self.overview = overview
+            overviewLoadedAt = .now
             conversationHTML = ConversationHTML.render(overview)
             overviewState = .loaded
         } catch {
@@ -520,6 +525,15 @@ final class ReviewModel {
         await loadOverview()
         conversationScrollToEnd = UUID()
     }
+
+    #if DEBUG
+        /// Makes the overview look `seconds` older, so a UI scenario can see its age without waiting.
+        ///
+        /// - Parameter seconds: How much older to make it.
+        func backdateOverviewForScenario(by seconds: TimeInterval) {
+            overviewLoadedAt = overviewLoadedAt.map { $0 - seconds }
+        }
+    #endif
 
     /// Re-renders the conversation if its relative times ("5 minutes ago") have changed since it was rendered.
     ///
