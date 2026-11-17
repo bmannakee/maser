@@ -27,10 +27,11 @@ struct NoReviewOpenView: View {
             // little above the middle, where a centered block looks centered.
             VStack(spacing: 24) {
                 MaserMark(height: 40)
-                (Text(Self.clearStatement).foregroundStyle(Color.Brand.ink)
-                    + Text(" " + Self.clearPraise).foregroundStyle(Color.Brand.inkMuted))
-                    .font(.system(size: 28, weight: .regular))
-                    .shownText("no-review-open", Self.clearTitle)
+                Text(
+                    "\(Text(Self.clearStatement).foregroundStyle(Color.Brand.ink)) \(Text(Self.clearPraise).foregroundStyle(Color.Brand.inkMuted))"
+                )
+                .font(.system(size: 28, weight: .regular))
+                .shownText("no-review-open", Self.clearTitle)
             }
             .multilineTextAlignment(.center)
             .padding(24)
