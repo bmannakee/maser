@@ -310,7 +310,7 @@ struct MainView: View {
                         if focus == .list { focus = nil }
                     })
         } else {
-            NoReviewOpenView(status: QueueSection.reviewRequestStatus(in: queue.sections), loadedAt: queue.loadedAt)
+            NoReviewOpenView(status: QueueSection.reviewRequestStatus(in: queue.sections))
                 .navigationTitle("Pull Requests")
         }
     }

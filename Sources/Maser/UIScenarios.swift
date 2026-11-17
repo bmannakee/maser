@@ -332,9 +332,9 @@
             ReviewQueue.shared.sections?.first { $0.search == .reviewRequested }
         }
 
-        /// An empty Review requested search congratulates in the detail column, and says when it was checked.
+        /// An empty Review requested search congratulates in the detail column, with nothing else.
         static let reviewRequestedClear = UIScenario(
-            "review-requested-clear", "REQ-QUE-008: An empty Review requested search congratulates, with when it was checked"
+            "review-requested-clear", "REQ-QUE-008: An empty Review requested search congratulates, and only congratulates"
         ) { app in
             try app.expect(app.review == nil, "no review is open at launch", app.summary)
             try addReviewRequested(
@@ -345,9 +345,7 @@
             try await app.waitUntil("the congratulations shows") {
                 ShownText.values["no-review-open"] == NoReviewOpenView.clearTitle
             }
-            let checked = ShownText.values["no-review-checked"] ?? ""
-            try app.expect(checked.hasPrefix("Checked at "), "it says when the queue was checked", checked)
-            try app.expect(checked.contains("⌘O"), "it keeps the hint about ⌘O", checked)
+            try app.expect(ShownText.values["no-review-checked"] == nil, "it adds no small print", app.summary)
             try app.expect(!app.queuePRs.isEmpty, "the other sections still list their PRs", app.summary)
             app.snapshot("review-requested-clear")
         }
