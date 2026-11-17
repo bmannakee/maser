@@ -140,7 +140,7 @@ The verification for each control is the verification of its requirements, in [r
 | RC-30 | Everything the agent produces is labeled as the agent's, with its commit, and none of it changes review state. | Information for safety | REQ-CNV-005 | Implemented |
 | RC-31 | Every `gh` call has a timeout. A call past it is stopped and reported with a way to try again; a timed-out write says it may have reached GitHub. | Protective measure | REQ-GH-007 | Implemented |
 | RC-32 | Each file row's look is set from whether it's the selected file, so moving the selection redraws the row it leaves as well as the one it reaches. Found in use on 2026-11-12 (#44), when a row kept its selected text after the selection moved on. | Inherent safety by design | REQ-DIF-010 | Implemented |
-| RC-33 | The congratulation shows only when the Review requested search itself last succeeded and found nothing, judged from the sections as loaded, and it states when the queue was checked. Any other state shows the usual message; a failed search shows its error in the queue (RC-14). | Inherent safety by design | REQ-QUE-008 | Implemented |
+| RC-33 | The congratulation shows only when the Review requested search itself last succeeded and found nothing, judged from the sections as loaded, and it adds no other text. Any other state shows the usual message; a failed search shows its error in the queue (RC-14). | Inherent safety by design | REQ-QUE-008 | Implemented |
 | RC-34 | The diff pane names the file it shows, from the same value the diff is drawn from, so the tree is no longer the only sign of which file is shown. A long path keeps the file's name whole. | Information for safety | REQ-DIF-011 | Implemented |
 | RC-35 | The Overview says how long ago its data was loaded, kept current, and a failed refresh leaves the old time with the old data. | Information for safety | REQ-OVR-005 | Implemented |
 | RC-36 | `scripts/check-ui` closes the test app: before each scenario, after it, and on every way out of the script (finishing, a failing command, Ctrl-C, termination); it asks the app to come forward only if it's running, because starting a closed app that way relaunched it as a plain launch; and it fails the run if one is still running at the end. It closes only processes inside `.build/MaserUITests.app`, never a maser the user is running. | Protective measure | REQ-PLT-005 | Implemented |
@@ -198,8 +198,9 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
   threads on other files, and that every row drawn is the named file's. It's information for safety, which relies on
   the user reading the name. P1 is a first estimate, to be confirmed by the user.
 - **HAZ-27:** Low. Added with the congratulation (#47), which is a new claim that nothing is waiting. RC-33 makes the
-  claim only from a successful, empty search, and the time shown lets an old result be told from a fresh one. The
-  ratings are a first estimate, to be confirmed by the user.
+  claim only from a successful, empty search. The congratulation once showed when the queue was checked, so an old
+  result could be told from a fresh one; the user asked for that to go, and the queue's own refresh is what keeps the
+  result fresh now. The ratings are a first estimate, to be confirmed by the user (#55), who should weigh that change.
 - **HAZ-28:** Low. Found by the user after UI checks (#64). The cause was in `scripts/check-ui`: it waited 2 s after
   starting the test app and then ran `tell application … to activate`, which starts an app that isn't running. A
   scenario that finished inside those 2 s (queue-keys did) was started again as a plain launch, which nothing ever
