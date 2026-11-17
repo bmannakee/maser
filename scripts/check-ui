@@ -41,6 +41,28 @@ swift build
 bin="$(swift build --show-bin-path)"
 app=".build/MaserUITests.app"
 bundle_id="dev.maser.Maser.uitests"
+app_abs="$PWD/$app"
+
+# Closes every process of the test app, and only the test app: its executable is inside .build/MaserUITests.app, so a
+# Maser you're using (.build/Maser.app, /Applications) never matches. A test app left running looks like maser, but it
+# is a debug build with its own saved state, so closing every one is a requirement (REQ-PLT-005).
+close_test_app() {
+    pkill -f "$app_abs/Contents/MacOS/Maser" 2>/dev/null || true
+    n=0
+    while pgrep -f "$app_abs/Contents/MacOS/Maser" >/dev/null 2>&1; do
+        n=$((n + 1))
+        if [ "$n" -ge 20 ]; then
+            pkill -9 -f "$app_abs/Contents/MacOS/Maser" 2>/dev/null || true
+            break
+        fi
+        sleep 0.25
+    done
+}
+# On every way out, including Ctrl-C, a failed command under set -e, and a kill: leave no test app running.
+trap close_test_app EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+close_test_app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS"
 cp "$bin/Maser" "$app/Contents/MacOS/Maser"
@@ -66,7 +88,8 @@ codesign --force --sign - --timestamp=none "$app"
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/maser-ui.XXXXXX")"
 recordings="$PWD/Tests/UIScenarios/recordings"
-# Launches the test app for one scenario and waits for it to exit, killing it after 120 s.
+# Launches the test app for one scenario and waits for it to exit, killing it after 120 s. Whatever happens, no test
+# app is left running when it returns.
 # Arguments: the scenario's name, and 1 if this is a relaunch after the scenario crashed the app.
 launch() {
     open -n -W --stdout "$dir/log.txt" --stderr "$dir/log.txt" \
@@ -77,18 +100,23 @@ launch() {
         --env MASER_AGENT_CHECKOUT="$dir/checkout" --env FAKE_CLAUDE_LOG="$dir/claude.jsonl" \
         "$app" --args -ApplePersistenceIgnoreState YES &
     launcher=$!
-    # macOS won't let the app bring itself forward while another app is frontmost, so ask for it here.
+    # macOS won't let the app bring itself forward while another app is frontmost, so ask for it here. Only if it's
+    # running: `tell application` starts an app that isn't, and a scenario that finishes within these 2 s would be
+    # started again as a plain launch, with no scenario and the user's real config, and never close (#64).
     sleep 2
-    osascript -e "tell application id \"$bundle_id\" to activate" >/dev/null 2>&1 || true
+    osascript -e "if application id \"$bundle_id\" is running then tell application id \"$bundle_id\" to activate" \
+        >/dev/null 2>&1 || true
     seconds=2
     while kill -0 "$launcher" 2>/dev/null; do
         sleep 1
         seconds=$((seconds + 1))
         if [ "$seconds" -ge 120 ]; then
-            pkill -f "$app/Contents/MacOS/Maser" || true
             echo "timed out after 120 s" >> "$dir/result"
+            close_test_app
+            break
         fi
     done
+    close_test_app
 }
 
 passed=0
@@ -107,6 +135,7 @@ for scenario in $scenarios; do
     defaults delete "$bundle_id" >/dev/null 2>&1 || true
     rm -rf "$HOME/Library/Saved Application State/$bundle_id.savedState" "$HOME/Library/Application Support/$bundle_id"
 
+    close_test_app
     launch "$scenario" 0
     # A scenario that crashes the app on purpose asks to be launched again, keeping what was saved.
     if [ "$(cat "$dir/result" 2>/dev/null)" = "RELAUNCH" ]; then
@@ -124,5 +153,12 @@ for scenario in $scenarios; do
     fi
 done
 
-echo "$passed passed${failed:+, failed:$failed}. Logs and gh calls: $work"
+close_test_app
+# Check, rather than trust, that the test app is closed: a leftover could be mistaken for maser.
+if pgrep -f "$app_abs/Contents/MacOS/Maser" >/dev/null 2>&1; then
+    echo "The test app is still running after the run, and couldn't be closed (REQ-PLT-005):" >&2
+    pgrep -fl "$app_abs/Contents/MacOS/Maser" >&2
+    exit 1
+fi
+echo "$passed passed${failed:+, failed:$failed}. The test app is closed. Logs and gh calls: $work"
 [ -z "$failed" ]
