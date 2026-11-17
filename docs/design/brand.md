@@ -39,7 +39,9 @@ Everything else is quiet, so the beam is the brightest thing on screen.
 - The beam always points right and always leaves the rod. Don't rotate, mirror, outline or recolor the mark.
 - Clear space is half the mark's height on every side. Below 64 px, use the small icon.
 - In the app, the mark is drawn by `MaserMark` (`Sources/Maser/MaserMark.swift`) from the color tokens. It appears in
-  one place: above the congratulation when no reviews are requested.
+  one place: above the congratulation when no reviews are requested. There the rod is 40 pt high, and the line under
+  it is 28 pt in regular weight: the statement in `ink`, "Nice work!" in `inkMuted`. That view is meant to be calm, so
+  it carries nothing else.
 - To rebuild the icon after changing an SVG, render each size to PNG and pack them into `Assets/AppIcon.icns`
   (`iconutil -c icns` on an `.iconset` folder).
 
