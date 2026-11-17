@@ -77,11 +77,11 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | --- | --- | --- |
 | Unit tests, fully | 34 | GH-003, GH-004, GH-007, QUE-001, QUE-002, QUE-003, QUE-004, QUE-008, WIN-008, OVR-001, DIF-001, DIF-002, CMT-001, CMT-007, CMT-008, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-008, AGT-009, AGT-010, AGT-011, CNV-001, CNV-002, CNV-003, CNV-004, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
 | Unit tests, partly (the rest is a gap) | 13 | GH-002, GH-006, QUE-007, QUE-009, OVR-004, OVR-005, DIF-003, DIF-004, DIF-006, DIF-008, CMT-009, AGT-007, KEY-003 |
-| UI scenarios (no unit tests) | 9 | WIN-001, WIN-003, WIN-007, DIF-009, DIF-011, CNV-005, CNV-006, KEY-002, KEY-004 |
+| UI scenarios (no unit tests) | 10 | QUE-006, WIN-001, WIN-003, WIN-007, DIF-009, DIF-011, CNV-005, CNV-006, KEY-002, KEY-004 |
 | Live GitHub tests only | 5 | DIF-007, CMT-002, CMT-005, CMT-006, AGT-012 |
 | A one-off scripted run or use (not repeatable) | 4 | WIN-006, DIF-005, DIF-010, PLT-005 |
 | Inspection only | 7 | GH-001, GH-005, OVR-002, CMT-004, PLT-001, PLT-002, PLT-004 |
-| None yet | 10 | QUE-005, QUE-006, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
+| None yet | 9 | QUE-005, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
 | Proposed (not built) | 0 | — |
 
 82 requirements: 82 implemented and 0 proposed.

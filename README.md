@@ -35,8 +35,8 @@ first PR in Review requested and shows it beside the queue. A PR you've just rev
 it. It leaves you alone while you're working in a review, and never moves away from one with text you haven't posted.
 
 When Review requested finds nothing and no review is open, the right pane says so ("No reviews requested. Nice
-work!"), large, with nothing else. It says so only after that search succeeds: a failed search shows its error
-in the queue instead.
+work!") under the mark, with nothing else. It says so only after that search succeeds: a failed search shows its error
+in the queue instead. When every search finds nothing, the queue lists the searches with a count of 0.
 
 The queue sits in the main window's sidebar, with the selected PR's review beside it. Clicking a PR, or pressing Return
 on it, shows it and moves the keys to the review. The queue takes the keys back only when you press ⌘0 (or `g p`),

@@ -164,21 +164,45 @@ struct QueueSidebar: View {
         if let sections, !sections.isEmpty {
             list(sections)
         } else if sections != nil, !filter.isEmpty {
-            ContentUnavailableView.search(text: filter)
+            ContentUnavailableView.search(text: filter).frame(maxHeight: .infinity)
         } else if sections != nil {
-            ContentUnavailableView(
-                "Nothing to review", systemImage: "checkmark.circle", description: Text(emptyDescription))
+            emptyQueue
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    /// What the queue searched, for the empty state.
-    private var emptyDescription: String {
-        let names = (queue.sections ?? []).map { $0.search.name.lowercased() }
-        guard !names.isEmpty else { return "The queue has no searches. Add some under [queue] in config.toml." }
-        return "No open pull requests in: \(names.joined(separator: ", ")). Add searches under [queue] in config.toml."
+    /// What the queue shows when every search found nothing: the searches it ran, each with a count of 0.
+    ///
+    /// The headings sit where the sections would, so the sidebar stays quiet and the detail column does the talking.
+    /// A queue with no searches at all says how to add some.
+    @ViewBuilder
+    private var emptyQueue: some View {
+        let searched = queue.sections ?? []
+        if searched.isEmpty {
+            Text(Self.noSearchesHint)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .shownText("queue-empty", Self.noSearchesHint)
+        } else {
+            let names = searched.map(\.search.name).joined(separator: ", ")
+            List {
+                ForEach(searched) { section in
+                    Section {
+                    } header: {
+                        SectionHeader(search: section.search, count: 0)
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .shownText("queue-empty", names)
+        }
     }
+
+    /// What an empty queue with no searches says.
+    static let noSearchesHint = "The queue has no searches. Add some under [queue] in config.toml."
 
     /// The sections as a selectable list.
     ///

@@ -28,7 +28,7 @@
             namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
             canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut,
-            reviewRequestedClear, reviewRequestedFails, reviewRequestedOff, focusNextReview,
+            reviewRequestedClear, queueEmpty, reviewRequestedFails, reviewRequestedOff, focusNextReview,
         ]
 
         /// The queue's keys move the selection and open PRs.
@@ -348,6 +348,32 @@
             try app.expect(ShownText.values["no-review-checked"] == nil, "it adds no small print", app.summary)
             try app.expect(!app.queuePRs.isEmpty, "the other sections still list their PRs", app.summary)
             app.snapshot("review-requested-clear")
+        }
+
+        /// An empty queue lists the searches it ran, each with 0, and a queue with no searches says how to add some.
+        static let queueEmpty = UIScenario(
+            "queue-empty", "REQ-QUE-006: An empty queue lists its searches, or says how to add some"
+        ) { app in
+            // Every search finds nothing.
+            try addReviewRequested(app, answer: .init(match: ["search"], status: 0, stdout: "[]", stderr: nil))
+            try await app.waitUntil("every section is empty") {
+                app.queuePRs.isEmpty && reviewRequestedSection(app)?.prs == []
+            }
+            try await app.waitUntil("the queue lists the searches it ran") {
+                ShownText.values["queue-empty"] == "Review requested, Merged, Closed"
+            }
+            try await app.waitUntil("the congratulations shows beside it") {
+                ShownText.values["no-review-open"] == NoReviewOpenView.clearTitle
+            }
+            app.snapshot("queue-empty")
+
+            ConfigStore.shared.overrideQueueSearches { $0.removeAll() }
+            try await app.waitUntil("a queue with no searches says how to add some") {
+                ShownText.values["queue-empty"] == QueueSidebar.noSearchesHint
+            }
+            try await app.waitUntil("and doesn't congratulate") {
+                ShownText.values["no-review-open"] == NoReviewOpenView.noneOpenTitle
+            }
         }
 
         /// A failed Review requested search never congratulates, even when its last result was empty.
