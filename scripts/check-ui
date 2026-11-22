@@ -83,8 +83,13 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
-codesign --force --sign - --timestamp=none "$app/Contents/MacOS/maser-agent-tools"
-codesign --force --sign - --timestamp=none "$app"
+# MASER_UI_HARDENED=1 signs with the hardened runtime, as a release is, to check that nothing maser does needs more.
+harden=""
+[ -z "${MASER_UI_HARDENED:-}" ] || harden="--options runtime"
+# shellcheck disable=SC2086 # $harden is one flag, or nothing
+codesign --force --sign - $harden --timestamp=none "$app/Contents/MacOS/maser-agent-tools"
+# shellcheck disable=SC2086
+codesign --force --sign - $harden --timestamp=none "$app"
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/maser-ui.XXXXXX")"
 recordings="$PWD/Tests/UIScenarios/recordings"

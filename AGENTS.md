@@ -15,6 +15,8 @@ swift run Maser [PR URL…]          # run; the first URL opens in the main wind
 scripts/check                      # format lint + build + tests + traceability; run before every commit
 scripts/check-ui                   # UI scenarios against a fake gh; before merging app changes (needs an unlocked Mac)
 scripts/bundle                     # release build wrapped in .build/Maser.app, signed ad hoc
+scripts/release 0.1.0              # signed, notarized GitHub release; needs your Developer ID (docs/releasing.md)
+Tests/Install/run.sh               # tests scripts/install.sh against stand-in releases; run after changing it
 swift run maser-trace --write      # regenerate docs/design/traceability.md after editing docs/design/
 swift format --in-place --recursive Sources Tests Package.swift   # apply formatting
 ```

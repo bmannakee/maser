@@ -5,17 +5,26 @@
 #
 # The bundle is signed ad hoc ("-"), which needs no developer account. An app built and signed on the Mac that runs it
 # isn't quarantined, so Gatekeeper doesn't ask about it. Copying it to another Mac needs a Developer ID signature and
-# notarization instead.
+# notarization instead, which scripts/release does.
+#
+# Environment:
+#   MASER_SIGN_IDENTITY  A Developer ID Application identity (name or hash from `security find-identity -v -p codesigning`).
+#                        Signs with the hardened runtime and a secure timestamp, as notarization requires.
+#   MASER_VERSION        The version to put in Info.plist, such as 0.1.0. Default: `git describe`.
+#   MASER_UNIVERSAL=1    Build for both Apple silicon and Intel, so one build runs on any Mac maser supports.
 set -eu
 cd "$(dirname "$0")/.."
 
 destination="${1:-.build}"
 app="$destination/Maser.app"
-version="$(git describe --tags --always 2>/dev/null || echo 0)"
+version="${MASER_VERSION:-$(git describe --tags --always 2>/dev/null || echo 0)}"
+archs=""
+[ -z "${MASER_UNIVERSAL:-}" ] || archs="--arch arm64 --arch x86_64"
 
 echo "==> swift build -c release"
-swift build -c release
-bin="$(swift build -c release --show-bin-path)"
+# shellcheck disable=SC2086 # $archs is two flags, or nothing
+swift build -c release $archs
+bin="$(swift build -c release $archs --show-bin-path)"
 
 echo "==> $app"
 rm -rf "$app"
@@ -49,9 +58,16 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-echo "==> codesign (ad hoc)"
 # The helper is signed first: a nested executable must be signed before the bundle around it.
-codesign --force --sign - --timestamp=none "$app/Contents/MacOS/maser-agent-tools"
-codesign --force --sign - --timestamp=none "$app"
-codesign --verify --strict "$app"
+if [ -n "${MASER_SIGN_IDENTITY:-}" ]; then
+    echo "==> codesign (Developer ID, hardened runtime)"
+    for target in "$app/Contents/MacOS/maser-agent-tools" "$app"; do
+        codesign --force --sign "$MASER_SIGN_IDENTITY" --options runtime --timestamp "$target"
+    done
+else
+    echo "==> codesign (ad hoc)"
+    codesign --force --sign - --timestamp=none "$app/Contents/MacOS/maser-agent-tools"
+    codesign --force --sign - --timestamp=none "$app"
+fi
+codesign --verify --strict --deep "$app"
 echo "Built $app. Run it with: open \"$app\""

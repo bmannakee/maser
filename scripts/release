@@ -1,0 +1,93 @@
+#!/bin/sh
+# Builds, signs, notarizes and uploads a maser release to GitHub.
+#
+# Usage: scripts/release <version> [--publish]      (version such as 0.1.0)
+#
+# Run it on the Mac that holds your Developer ID certificate, from a clean, up-to-date main. It makes a universal
+# build, signs it with the hardened runtime, has Apple notarize it, staples the ticket, checks that Gatekeeper accepts
+# it, and creates a GitHub release v<version> holding Maser.zip and its checksum. The release is a draft unless you
+# pass --publish, so you can look at it first. docs/releasing.md has the one-time setup.
+#
+# Environment:
+#   MASER_SIGN_IDENTITY   The Developer ID Application identity to sign with. Default: the only one in your keychain.
+#   MASER_NOTARY_PROFILE  The notarytool keychain profile. Default: maser-notary.
+set -eu
+cd "$(dirname "$0")/.."
+
+fail() {
+    echo "release: $*" >&2
+    exit 1
+}
+
+version="${1:-}"
+publish="no"
+[ "${2:-}" != "--publish" ] || publish="yes"
+case "$version" in
+[0-9]*.[0-9]*.[0-9]*) ;;
+*) fail "usage: scripts/release <version> [--publish], with a version such as 0.1.0" ;;
+esac
+tag="v$version"
+profile="${MASER_NOTARY_PROFILE:-maser-notary}"
+
+# The release is what's on main, and nothing else.
+[ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || fail "run this from main."
+[ -z "$(git status --porcelain)" ] || fail "the working tree isn't clean."
+git fetch --quiet origin main --tags
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || fail "main isn't the same as origin/main."
+git rev-parse -q --verify "refs/tags/$tag" >/dev/null && fail "$tag already exists."
+command -v gh >/dev/null 2>&1 || fail "gh isn't installed."
+gh auth status >/dev/null 2>&1 || fail "gh isn't logged in."
+
+identity="${MASER_SIGN_IDENTITY:-}"
+if [ -z "$identity" ]; then
+    found="$(security find-identity -v -p codesigning | grep "Developer ID Application" || true)"
+    count="$(printf '%s' "$found" | grep -c . || true)"
+    [ "$count" -eq 1 ] || fail "found $count Developer ID Application identities; set MASER_SIGN_IDENTITY (see docs/releasing.md)."
+    identity="$(printf '%s' "$found" | sed -n 's/.*"\(.*\)"/\1/p')"
+fi
+echo "==> Signing as: $identity"
+xcrun notarytool history --keychain-profile "$profile" >/dev/null 2>&1 \
+    || fail "no working notarytool profile '$profile' (see docs/releasing.md)."
+
+echo "==> scripts/check"
+scripts/check
+
+out=".build/release"
+rm -rf "$out"
+mkdir -p "$out"
+MASER_SIGN_IDENTITY="$identity" MASER_VERSION="$version" MASER_UNIVERSAL=1 scripts/bundle "$out"
+app="$out/Maser.app"
+
+echo "==> Notarizing (this takes a few minutes)"
+ditto -c -k --keepParent "$app" "$out/submit.zip"
+if ! xcrun notarytool submit "$out/submit.zip" --keychain-profile "$profile" --wait | tee "$out/notary.txt" | grep -q "status: Accepted"; then
+    id="$(sed -n 's/^  id: //p' "$out/notary.txt" | head -1)"
+    [ -z "$id" ] || xcrun notarytool log "$id" --keychain-profile "$profile" >&2 || true
+    fail "Apple didn't accept the build; nothing was released."
+fi
+xcrun stapler staple "$app"
+xcrun stapler validate "$app"
+
+echo "==> Checking what a user's Mac will check"
+codesign --verify --deep --strict "$app"
+verdict="$(spctl --assess --type execute --verbose=2 "$app" 2>&1)" || fail "Gatekeeper rejects the build: $verdict"
+case "$verdict" in
+*"Notarized Developer ID"*) ;;
+*) fail "Gatekeeper accepts the build but not as notarized: $verdict" ;;
+esac
+team="$(codesign -dv --verbose=2 "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+grep -q "maser_team_id=\"$team\"" scripts/install.sh || fail "scripts/install.sh doesn't name team $team; set maser_team_id and merge that first."
+
+# The same asset names every release, so .../releases/latest/download/Maser.zip is always the newest.
+ditto -c -k --keepParent "$app" "$out/Maser.zip"
+(cd "$out" && shasum -a 256 Maser.zip > Maser.zip.sha256)
+
+notes="Install: \`curl -fsSL https://raw.githubusercontent.com/bmannakee/maser/$tag/scripts/install.sh | sh\`
+
+Signed by Developer ID team $team and notarized by Apple. SHA-256: \`$(cut -d' ' -f1 "$out/Maser.zip.sha256")\`"
+draft="--draft"
+[ "$publish" = "no" ] || draft=""
+# shellcheck disable=SC2086 # $draft is one flag, or nothing
+gh release create "$tag" "$out/Maser.zip" "$out/Maser.zip.sha256" --target "$(git rev-parse HEAD)" \
+    --title "maser $version" --notes "$notes" --generate-notes $draft
+echo "Created release $tag$([ "$publish" = "yes" ] || echo " as a draft. Publish it from the Releases page, or: gh release edit $tag --draft=false")"

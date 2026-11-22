@@ -18,7 +18,7 @@ Every user need must have at least one implemented requirement.
 | UN-4 | REQ-WIN-004, REQ-OVR-004, REQ-DIF-003, REQ-DIF-008, REQ-CMT-001, REQ-CMT-002, REQ-CMT-003, REQ-CMT-005, REQ-CMT-006 | — |
 | UN-5 | REQ-QUE-007, REQ-QUE-009, REQ-WIN-002, REQ-WIN-003, REQ-DIF-006, REQ-CNV-006, REQ-KEY-001, REQ-KEY-002, REQ-KEY-003, REQ-KEY-004, REQ-KEY-005, REQ-PLT-005 | — |
 | UN-6 | REQ-KEY-005, REQ-CFG-001, REQ-CFG-002, REQ-CFG-003, REQ-CFG-004, REQ-CFG-005 | — |
-| UN-7 | REQ-GH-002, REQ-GH-006, REQ-CFG-005, REQ-PLT-001, REQ-PLT-002 | — |
+| UN-7 | REQ-GH-002, REQ-GH-006, REQ-CFG-005, REQ-PLT-001, REQ-PLT-002 | REQ-PLT-006, REQ-PLT-007 |
 | UN-8 | REQ-GH-001, REQ-WIN-002, REQ-OVR-002, REQ-CMT-005, REQ-CMT-007, REQ-CMT-009, REQ-AGT-008 | — |
 | UN-9 | REQ-WIN-007, REQ-WIN-008, REQ-CMT-004, REQ-CMT-008, REQ-PLT-005 | — |
 | UN-10 | REQ-GH-005, REQ-GH-007, REQ-QUE-005, REQ-WIN-001, REQ-DIF-005, REQ-DIF-007, REQ-PLT-003 | — |
@@ -65,6 +65,7 @@ The requirements listed are those that implement each hazard's controls, as the 
 | HAZ-26 | H1 | RC-32, RC-34 | REQ-DIF-010, REQ-DIF-011 | S4 P1 Medium |
 | HAZ-27 | H6 | RC-33 | REQ-QUE-008 | S3 P1 Low |
 | HAZ-28 | H2, H3, H6 | RC-36 | REQ-PLT-005 | S3 P1 Low |
+| HAZ-29 | H4, H2 | RC-37, RC-38 | REQ-PLT-006 (proposed), REQ-PLT-007 (proposed) | S4 P1 Medium |
 <!-- trace:end hazards-to-controls -->
 
 ## Verification coverage
@@ -82,9 +83,9 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | A one-off scripted run or use (not repeatable) | 4 | WIN-006, DIF-005, DIF-010, PLT-005 |
 | Inspection only | 7 | GH-001, GH-005, OVR-002, CMT-004, PLT-001, PLT-002, PLT-004 |
 | None yet | 9 | QUE-005, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
-| Proposed (not built) | 0 | — |
+| Proposed (not built) | 2 | PLT-006, PLT-007 |
 
-82 requirements: 82 implemented and 0 proposed.
+84 requirements: 82 implemented and 2 proposed.
 <!-- trace:end coverage -->
 
 Most of the "one-off", "inspection only" and "none yet" rows have UI scenarios planned (`UI:…` after `Gap` in
