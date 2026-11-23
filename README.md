@@ -23,7 +23,16 @@ scripts/bundle                    # builds .build/Maser.app, signed for this Mac
 cp -R .build/Maser.app /Applications/
 ```
 
-The bundle is signed ad hoc, with no developer account. Built on the Mac that runs it, it isn't quarantined, so Gatekeeper doesn't ask about it. To run it on another Mac, build it there, or sign it with a Developer ID and notarize it.
+The bundle is signed ad hoc, with no developer account. Built on the Mac that runs it, it isn't quarantined, so Gatekeeper doesn't ask about it.
+
+To install a signed, notarized release without building anything (macOS 26 or later, no admin rights). No release exists yet (#71), so this does nothing until the first is made:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/bmannakee/maser/main/scripts/install.sh | sh
+```
+
+[docs/install.md](docs/install.md) says what it checks and how to update or remove maser, and is written so a coding
+agent can follow it. [docs/releasing.md](docs/releasing.md) is how a release is made.
 
 The queue lists open PRs in sections: **Review requested**, **Yours** and **Involving you** (you commented, were
 mentioned or are assigned), plus any searches you add to `config.toml`. A PR shows only in the first section that finds
