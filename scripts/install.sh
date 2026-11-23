@@ -16,13 +16,13 @@
 #
 # The whole script is one function called on the last line, so a download cut short runs nothing.
 
-# The Apple Developer ID team that signs maser's releases. Printed by `codesign -dv Maser.app` as TeamIdentifier.
-maser_team_id="__TEAM_ID__"
+# The Apple Developer ID team that signs maser's releases. It isn't a secret: every signed copy shows it.
+maser_team_id="5TF9N64U4P"
 
 main() {
     set -eu
 
-    team_id="${MASER_TEAM_ID:-$maser_team_id}"
+    team_id="${MASER_TEAM_ID-$maser_team_id}"
     base="${MASER_RELEASE_BASE:-https://github.com/bmannakee/maser/releases}"
     install_dir="${MASER_INSTALL_DIR:-$HOME/Applications}"
 
@@ -31,7 +31,7 @@ main() {
         exit 1
     }
 
-    [ "$team_id" != "__TEAM_ID__" ] || fail "this copy of the installer has no Developer ID team set, so it can't check who signed the app."
+    [ -n "$team_id" ] || fail "this copy of the installer has no Developer ID team set, so it can't check who signed the app."
     [ "$(uname -s)" = "Darwin" ] || fail "maser runs on macOS only."
     [ "$(id -u)" -ne 0 ] || fail "don't run this as root or with sudo; it installs into your own folder."
     major="$(sw_vers -productVersion | cut -d. -f1)"

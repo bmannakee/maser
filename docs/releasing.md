@@ -19,7 +19,7 @@ You need a paid Apple Developer Program membership.
    ```
 
    It asks for the app-specific password. Check it with `xcrun notarytool history --keychain-profile maser-notary`.
-3. **The team ID in the installer.** `scripts/install.sh` refuses any app not signed by the team named in `maser_team_id`.
+3. **The team ID in the installer.** `scripts/install.sh` refuses any app not signed by the team named in `maser_team_id` (now `5TF9N64U4P`).
    Set it to your `TEAMID` (also the `TeamIdentifier` that `codesign -dv` prints for a signed app), and merge that
    through a PR.
 

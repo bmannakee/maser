@@ -85,7 +85,7 @@ release "$work/r-adhoc" 1.0.0 adhoc
 if run "$work/r-adhoc" "$work/d2" "ABCDE12345" PATH="$work/bin:$PATH"; then bad "an ad hoc signed app is refused"
 elif ! installed "$work/d2" && grep -q "not 'ABCDE12345'" "$work/out"; then ok "an ad hoc signed app is refused"; else bad "an ad hoc signed app is refused"; fi
 
-if MASER_RELEASE_BASE="file://$work/r-adhoc" MASER_INSTALL_DIR="$work/d3" sh "$installer" > "$work/out" 2>&1; then bad "an installer with no team set refuses"
+if MASER_TEAM_ID="" MASER_RELEASE_BASE="file://$work/r-adhoc" MASER_INSTALL_DIR="$work/d3" sh "$installer" > "$work/out" 2>&1; then bad "an installer with no team set refuses"
 elif ! installed "$work/d3" && grep -q "no Developer ID team" "$work/out"; then ok "an installer with no team set refuses"; else bad "an installer with no team set refuses"; fi
 
 release "$work/r-sum" 1.0.0 adhoc
