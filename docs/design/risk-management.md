@@ -145,8 +145,8 @@ The verification for each control is the verification of its requirements, in [r
 | RC-34 | The diff pane names the file it shows, from the same value the diff is drawn from, so the tree is no longer the only sign of which file is shown. A long path keeps the file's name whole. | Information for safety | REQ-DIF-011 | Implemented |
 | RC-35 | The Overview says how long ago its data was loaded, kept current, and a failed refresh leaves the old time with the old data. | Information for safety | REQ-OVR-005 | Implemented |
 | RC-36 | `scripts/check-ui` closes the test app: before each scenario, after it, and on every way out of the script (finishing, a failing command, Ctrl-C, termination); it asks the app to come forward only if it's running, because starting a closed app that way relaunched it as a plain launch; and it fails the run if one is still running at the end. It closes only processes inside `.build/MaserUITests.app`, never a maser the user is running. | Protective measure | REQ-PLT-005 | Implemented |
-| RC-37 | Releases are signed with a Developer ID, built with the hardened runtime, and notarized by Apple, so macOS itself refuses a copy that was altered or isn't from that team, and the user is never asked to override Gatekeeper. `scripts/release` stops unless each step succeeds and Gatekeeper accepts the result. Releases are built on the user's Mac, so no signing key or password is held by a service. | Protective measure | REQ-PLT-006 | Proposed |
-| RC-38 | The installer checks before it installs: the checksum, the signature, the signing team (named in the script, which is read from `main` or from the release's own tag) and the notarized verdict. It installs into the user's own folder without `sudo`, never opens the app, never removes the quarantine flag, and docs/install.md tells an agent never to work around a refusal. The checksum comes from the same place as the download, so it guards damage; the signature, team and notarization are what guard against alteration. | Protective measure | REQ-PLT-007 | Proposed |
+| RC-37 | Releases are signed with a Developer ID, built with the hardened runtime, and notarized by Apple, so macOS itself refuses a copy that was altered or isn't from that team, and the user is never asked to override Gatekeeper. `scripts/release` stops unless each step succeeds and Gatekeeper accepts the result. Releases are built on the user's Mac, so no signing key or password is held by a service. | Protective measure | REQ-PLT-006 | Implemented |
+| RC-38 | The installer checks before it installs: the checksum, the signature, the signing team (named in the script, which is read from `main` or from the release's own tag) and the notarized verdict. It installs into the user's own folder without `sudo`, never opens the app, never removes the quarantine flag, and docs/install.md tells an agent never to work around a refusal. The checksum comes from the same place as the download, so it guards damage; the signature, team and notarization are what guard against alteration. | Protective measure | REQ-PLT-007 | Implemented |
 
 ## Residual risk
 
@@ -211,11 +211,10 @@ The residual risks that are Medium are acceptable only with a reason, recorded h
   (V-2026-11-15/V3). A `kill -9` of the script can't be caught; the next run closes the leftover as its first step. P1 is
   a first estimate, to be confirmed by the user. A visible "UI test" marker in the test app would let the user tell it
   from maser at a glance; it's recorded as a candidate control, not yet a requirement.
-- **HAZ-29:** Medium, after the controls are built. Added with the signed release and installer, which put an
-  executable from the internet on the user's work Mac. RC-37 and RC-38 are Proposed until the first release is made and
-  installed (REQ-PLT-006, REQ-PLT-007). The installer's refusals are tested against stand-in releases
-  (V-2026-11-22/V1, V2). Whether the notarization and Gatekeeper checks accept a real release is not yet verified. The
-  remaining risk is the user's Apple account and certificate: whoever holds them can sign a build that passes every
+- **HAZ-29:** Medium. Added with the signed release and installer, which put an executable from the internet on the
+  user's work Mac. RC-37 and RC-38 are built: the installer's refusals are tested against stand-in releases
+  (V-2026-11-22/V1, V2), and the first release, v0.1.0, was accepted by Apple, assessed by Gatekeeper as notarized and
+  installed over the network (V-2026-11-23/V1, V2, V4). It hasn't yet been installed on macOS 26. The remaining risk is the user's Apple account and certificate: whoever holds them can sign a build that passes every
   check, so the account needs two-factor authentication and the certificate stays in the user's keychain. P1 is a first
   estimate, to be confirmed by the user.
 

@@ -57,7 +57,7 @@ requires:
 | Integration verification | Live tests against GitHub (`MASER_LIVE_TESTS=1`; `MASER_LIVE_WRITE_TESTS=1`, limited to bmannakee/maser#1). |
 | System verification | Scripted UI scenarios against a fake `gh` (`scripts/check-ui`); verification records in `docs/verification/` |
 | Validation | Use by the intended user against [user-needs.md](user-needs.md), recorded per release |
-| Release | `scripts/release` builds a universal `Maser.app`, signs it with a Developer ID and the hardened runtime, has Apple notarize it, and publishes `Maser.zip` with its checksum to a tagged GitHub release ([releasing.md](../releasing.md)); `scripts/install.sh` installs it. Planned: a release record listing what was verified, with known anomalies. |
+| Release | `scripts/release` builds a universal `Maser.app`, signs it with a Developer ID and the hardened runtime, has Apple notarize it, and publishes `Maser.zip` with its checksum to a tagged GitHub release ([releasing.md](../releasing.md)); `scripts/install.sh` installs it. Each release gets a record in `docs/verification/` listing what was verified, with known anomalies (the first: 2026-11-23). |
 
 Every change goes through a branch and a PR. Nothing is committed to `main` directly. Review usually happens in maser
 itself. PR descriptions follow `AGENTS.md`:

@@ -25,7 +25,7 @@ cp -R .build/Maser.app /Applications/
 
 The bundle is signed ad hoc, with no developer account. Built on the Mac that runs it, it isn't quarantined, so Gatekeeper doesn't ask about it.
 
-To install a signed, notarized release without building anything (macOS 26 or later, no admin rights). No release exists yet (#71), so this does nothing until the first is made:
+To install a signed, notarized release without building anything (macOS 26 or later, no admin rights).:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/bmannakee/maser/main/scripts/install.sh | sh
