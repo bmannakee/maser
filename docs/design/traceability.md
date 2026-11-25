@@ -81,8 +81,8 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | Unit tests, partly (the rest is a gap) | 14 | GH-002, GH-006, QUE-007, QUE-009, OVR-004, OVR-005, DIF-003, DIF-004, DIF-006, DIF-008, DIF-012, CMT-009, AGT-007, KEY-003 |
 | UI scenarios (no unit tests) | 10 | QUE-006, WIN-001, WIN-003, WIN-007, DIF-009, DIF-011, CNV-005, CNV-006, KEY-002, KEY-004 |
 | Live GitHub tests only | 5 | DIF-007, CMT-002, CMT-005, CMT-006, AGT-012 |
-| A one-off scripted run or use (not repeatable) | 6 | WIN-006, DIF-005, DIF-010, PLT-005, PLT-006, PLT-007 |
-| Inspection only | 7 | GH-001, GH-005, OVR-002, CMT-004, PLT-001, PLT-002, PLT-004 |
+| A one-off scripted run or use (not repeatable) | 7 | WIN-006, DIF-005, DIF-010, PLT-001, PLT-005, PLT-006, PLT-007 |
+| Inspection only | 6 | GH-001, GH-005, OVR-002, CMT-004, PLT-002, PLT-004 |
 | None yet | 9 | QUE-005, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
 | Proposed (not built) | 0 | — |
 
