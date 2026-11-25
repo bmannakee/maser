@@ -28,6 +28,7 @@
             namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
             canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut, largePRNeedsClone,
+            fileFilter,
             reviewRequestedClear, queueEmpty, reviewRequestedFails, reviewRequestedOff, focusNextReview,
         ]
 
@@ -455,6 +456,54 @@
                 if case .loaded = app.review?.filesState { return app.review?.selectedFile != nil }
                 return false
             }
+        }
+
+        /// `/` on the Files tab narrows the file tree to the paths that match, and says how many it hides.
+        static let fileFilter = UIScenario(
+            "file-filter", "REQ-DIF-014: / narrows the file tree by path and shows the count; Return keeps it, Esc clears it"
+        ) { app in
+            try await app.openFromQueue(mainPR)
+            try await app.press("g f")
+            try await app.waitUntil("the Files tab shows a file") { app.review?.selectedFile != nil }
+            guard let review = app.review else { return }
+            let paths = review.diffFiles.map(\.path)
+            try app.expect(paths.count >= 3, "a PR with 3+ files", "\(paths)")
+            // A word from some path that matches some of the files but not all.
+            let words = paths.flatMap { $0.split(whereSeparator: { "/.".contains($0) }).map(String.init) }
+            // Its matches must stop short of the PR's last file, so walking past them is something a bug could do.
+            let word = words.first { word in
+                let matching = FileTree.matching(paths, filter: word)
+                return matching.count >= 2 && matching.count < paths.count && matching.last != paths.last
+            }
+            guard let word else { throw UIScenarioFailure(description: "no word narrows \(paths)") }
+            let matching = FileTree.matching(paths, filter: word)
+            try app.expect(!review.showFileFilter, "the filter box is hidden at first", "\(review.showFileFilter)")
+
+            try await app.press("/")
+            try await app.waitUntil("the filter box shows") { review.showFileFilter }
+            await app.type(word)
+            try await app.waitUntil("the tree narrows") { review.shownFileCount == matching.count }
+            let count = "\(matching.count) of \(paths.count)"
+            try await app.waitUntil("the count is shown") { ShownText.values["file-filter-count"] == count }
+            try app.expect(
+                review.selectedPath.map(matching.contains) == true, "the selected file is one that matches",
+                review.selectedPath ?? "nothing")
+            try app.expect(review.diffFiles.count == paths.count, "the agent still sees every file", "\(review.diffFiles.count)")
+
+            // Return hands the keys back and keeps the filter: ] and [ walk the files that match, and stop at the ends
+            // of them, not of the whole PR.
+            await app.type("\n")
+            for _ in 0..<(matching.count + 2) { try await app.press("]") }
+            try app.expect(review.selectedPath == matching.last, "] stops at the last match", review.selectedPath ?? "nothing")
+            for _ in 0..<(matching.count + 2) { try await app.press("[") }
+            try app.expect(review.selectedPath == matching.first, "[ stops at the first match", review.selectedPath ?? "nothing")
+            try app.expect(review.fileFilter == word, "Return keeps the filter", review.fileFilter)
+
+            // Esc in the box clears the filter and hides it.
+            try await app.press("/")
+            try await app.press("esc")
+            try await app.waitUntil("the filter clears") { review.fileFilter.isEmpty && !review.showFileFilter }
+            try app.expect(review.shownFileCount == paths.count, "every file shows again", "\(review.shownFileCount)")
         }
 
         /// A PR whose diff GitHub refuses as too large, with no clone to read it from, says why and what fixes it.

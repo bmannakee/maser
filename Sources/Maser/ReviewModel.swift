@@ -145,8 +145,26 @@ final class ReviewModel {
     private(set) var filesState: LoadState = .loading
     /// The changed files as a directory tree, for the file list.
     private(set) var tree: [FileNode] = []
-    /// The changed files' paths in the order the tree shows them, for next/previous navigation.
+    /// The paths the tree shows, which the file filter has narrowed, in tree order, for next/previous navigation.
     private var filePaths: [String] = []
+    /// Every changed file's path in tree order, whatever the file filter says: threads and the agent cover all of them.
+    private var allFilePaths: [String] = []
+    /// Every changed file's path in the diff's order, the filter's input.
+    private var loadedPaths: [String] = []
+    /// The file filter's text.
+    ///
+    /// Words that narrow the file tree: a path must contain each one (`FileTree.matching`). Empty shows every file.
+    var fileFilter = "" {
+        didSet { if fileFilter != oldValue { applyFileFilter() } }
+    }
+    /// Whether the file filter's box is showing; it also shows while the filter has text.
+    var showFileFilter = false
+    /// Set to ask the file tree to focus the filter box; it clears this once it has.
+    var fileFilterFocusRequest = false
+    /// How many files the PR changes.
+    var changedFileCount: Int { allFilePaths.count }
+    /// How many of them the file tree shows.
+    var shownFileCount: Int { filePaths.count }
     private var filesByPath: [String: FileDiff] = [:]
     /// All review threads, current and outdated, grouped by file path.
     private var threadsByPath: [String: [ReviewThread]] = [:]
@@ -281,7 +299,7 @@ final class ReviewModel {
     }
 
     /// The changed files' diffs, in the order the file tree shows them.
-    var diffFiles: [FileDiff] { filePaths.compactMap { filesByPath[$0] } }
+    var diffFiles: [FileDiff] { allFilePaths.compactMap { filesByPath[$0] } }
     /// Every review thread, by file path.
     var allThreads: [ReviewThread] { threadsByPath.keys.sorted().flatMap { threadsByPath[$0] ?? [] } }
 
@@ -396,8 +414,9 @@ final class ReviewModel {
 
             preservingCursor {
                 filesByPath = Dictionary(files.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
-                tree = FileTree.build(paths: files.map(\.path))
-                filePaths = FileTree.filePaths(in: tree)
+                loadedPaths = files.map(\.path)
+                allFilePaths = FileTree.filePaths(in: FileTree.build(paths: loadedPaths))
+                rebuildTree()
                 threadsByPath = Dictionary(grouping: allThreads, by: \.path)
                 self.reviewContext = reviewContext
                 diffCommitID = reviewContext.headCommitID
@@ -479,6 +498,13 @@ final class ReviewModel {
             }
         case .refresh: Task { await load() }
         case .openOnGitHub: NSWorkspace.shared.open(pr.url)
+        case .filter:
+            // `/` on the Files tab narrows the file tree; elsewhere in a review it does nothing.
+            return inFilesTab {
+                showFileFilter = true
+                fileFilterFocusRequest = true
+                return true
+            }
         case .nextFile: selectAdjacentFile(offset: 1)
         case .previousFile: selectAdjacentFile(offset: -1)
         case .nextThread: focusAdjacentThread(offset: 1)
@@ -527,6 +553,28 @@ final class ReviewModel {
     /// - Returns: The action's result, or false without running it elsewhere, so the key falls through.
     private func inFiles(_ action: () -> Bool) -> Bool {
         tab == .files && selectedFile != nil && action()
+    }
+
+    /// Runs a file-tree action only on the Files tab, with at least one changed file.
+    ///
+    /// - Parameter action: The action; it returns whether it applied.
+    /// - Returns: The action's result, or false without running it elsewhere, so the key falls through.
+    private func inFilesTab(_ action: () -> Bool) -> Bool {
+        tab == .files && !loadedPaths.isEmpty && action()
+    }
+
+    /// Rebuilds the file tree and the navigation order from the changed files and the file filter.
+    private func rebuildTree() {
+        tree = FileTree.build(paths: FileTree.matching(loadedPaths, filter: fileFilter))
+        filePaths = FileTree.filePaths(in: tree)
+    }
+
+    /// Applies a new file filter, and moves the selection to the first file shown if the selected one is now hidden.
+    private func applyFileFilter() {
+        rebuildTree()
+        if let selected = selectedPath, !filePaths.contains(selected), let first = filePaths.first {
+            select(path: first)
+        }
     }
 
     // MARK: Commenting on the conversation
@@ -1034,7 +1082,7 @@ final class ReviewModel {
     ///
     /// - Parameter offset: How many threads to move; negative moves back.
     func focusAdjacentThread(offset: Int) {
-        let threads = filePaths.flatMap { threadsByPath[$0]?.filter { !$0.isOutdated } ?? [] }
+        let threads = allFilePaths.flatMap { threadsByPath[$0]?.filter { !$0.isOutdated } ?? [] }
         guard !threads.isEmpty else { return }
 
         let next: Int
@@ -1042,8 +1090,8 @@ final class ReviewModel {
             next = min(max(current + offset, 0), threads.count - 1)
         } else {
             // Start from the selected file: its first thread, or the nearest file in that direction.
-            let fileIndex = selectedPath.flatMap(filePaths.firstIndex(of:)) ?? -1
-            let position = { (thread: ReviewThread) in self.filePaths.firstIndex(of: thread.path) ?? 0 }
+            let fileIndex = selectedPath.flatMap(allFilePaths.firstIndex(of:)) ?? -1
+            let position = { (thread: ReviewThread) in self.allFilePaths.firstIndex(of: thread.path) ?? 0 }
             next =
                 offset > 0
                 ? threads.firstIndex { position($0) >= fileIndex } ?? 0

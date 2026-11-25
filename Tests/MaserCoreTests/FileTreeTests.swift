@@ -42,3 +42,23 @@ import Testing
         #expect(FileTree.firstFilePath(in: []) == nil)
     }
 }
+
+/// Tests for narrowing the file tree with the filter.
+@Suite struct FileFilterTests {
+    /// A path matches when it holds every word of the filter, in any order, ignoring case and accents.
+    @Test("REQ-DIF-014: Filters paths by every word, ignoring case") func filtersPaths() {
+        let paths = [
+            "Sources/Maser/FilesView.swift", "Sources/MaserCore/FileTree.swift", "Tests/FileTreeTests.swift", "café/Menu.md",
+        ]
+        #expect(FileTree.matching(paths, filter: "") == paths)
+        #expect(FileTree.matching(paths, filter: "   ") == paths)
+        #expect(FileTree.matching(paths, filter: "tree") == ["Sources/MaserCore/FileTree.swift", "Tests/FileTreeTests.swift"])
+        #expect(FileTree.matching(paths, filter: "tests tree") == ["Tests/FileTreeTests.swift"])
+        #expect(FileTree.matching(paths, filter: "tree tests") == ["Tests/FileTreeTests.swift"])
+        #expect(FileTree.matching(paths, filter: "SOURCES/maser/") == ["Sources/Maser/FilesView.swift"])
+        #expect(FileTree.matching(paths, filter: "cafe") == ["café/Menu.md"])
+        #expect(FileTree.matching(paths, filter: "nothing like this").isEmpty)
+        // The order given is kept, so the tree built from the result lists files the way the whole tree does.
+        #expect(FileTree.matching(paths, filter: "swift") == Array(paths.prefix(3)))
+    }
+}
