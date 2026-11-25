@@ -38,7 +38,11 @@ and REQ-PLT-007, and leaves out one of them (see Not checked).
 Run from `main` at `7535cfa`, clean and equal to `origin/main`, with no tag `v0.1.1` before. The script stops at the first
 failed check, so the draft existing means each passed, as for v0.1.0. The release's checksum file begins `08040a58…`.
 
-### V2 and V3
+### V2: the draft's files
 
-Same method as v0.1.0's V2 and V4: the installer's own checks (checksum, signature, team, notarized verdict) all passed
-before it installed, and `spctl` and `codesign` were run on the result.
+The installer's own checks (checksum, signature, team, notarized verdict) all passed before it installed, and `spctl` and
+`codesign` were run on the result, as in v0.1.0's V2.
+
+### V3: the published release
+
+Run as in v0.1.0's V4: the same installer checks passed against the files GitHub serves, and `spctl` was run on the result.
