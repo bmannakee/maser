@@ -21,7 +21,7 @@ Every user need must have at least one implemented requirement.
 | UN-7 | REQ-GH-002, REQ-GH-006, REQ-CFG-005, REQ-PLT-001, REQ-PLT-002, REQ-PLT-006, REQ-PLT-007 | — |
 | UN-8 | REQ-GH-001, REQ-WIN-002, REQ-OVR-002, REQ-CMT-005, REQ-CMT-007, REQ-CMT-009, REQ-AGT-008 | — |
 | UN-9 | REQ-WIN-007, REQ-WIN-008, REQ-CMT-004, REQ-CMT-008, REQ-PLT-005 | — |
-| UN-10 | REQ-GH-005, REQ-GH-007, REQ-QUE-005, REQ-WIN-001, REQ-DIF-005, REQ-DIF-007, REQ-PLT-003 | — |
+| UN-10 | REQ-GH-005, REQ-GH-007, REQ-QUE-005, REQ-WIN-001, REQ-DIF-005, REQ-DIF-007, REQ-DIF-013, REQ-PLT-003 | — |
 | UN-15 | REQ-PLT-004 | — |
 | UN-11 | REQ-AGT-001, REQ-AGT-002, REQ-AGT-004, REQ-AGT-006, REQ-AGT-009, REQ-AGT-010, REQ-AGT-011 | — |
 | UN-12 | REQ-AGT-012, REQ-CNV-001, REQ-CNV-002, REQ-CNV-003, REQ-CNV-004, REQ-CNV-005 | — |
@@ -37,7 +37,7 @@ The requirements listed are those that implement each hazard's controls, as the 
 <!-- trace:begin hazards-to-controls -->
 | Hazard | Harms | Controls | Requirements | Residual |
 | --- | --- | --- | --- | --- |
-| HAZ-01 | H1 | RC-01, RC-02, RC-03, RC-21 | REQ-DIF-001, REQ-GH-003, REQ-OVR-001, REQ-DIF-002, REQ-DIF-009 | S4 P1 Medium |
+| HAZ-01 | H1 | RC-01, RC-02, RC-03, RC-21 | REQ-DIF-001, REQ-GH-003, REQ-OVR-001, REQ-DIF-002, REQ-DIF-013, REQ-DIF-009 | S4 P1 Medium |
 | HAZ-02 | H1, H6 | RC-04, RC-17 | REQ-CMT-007, REQ-OVR-003, REQ-WIN-001 | S4 P1 Medium |
 | HAZ-03 | H6 | RC-05 | REQ-DIF-003, REQ-CMT-005 | S3 P1 Low |
 | HAZ-04 | H2, H6 | RC-06, RC-12 | REQ-WIN-002, REQ-WIN-003, REQ-KEY-002, REQ-KEY-003, REQ-QUE-009, REQ-CMT-009 | S3 P2 Medium |
@@ -58,7 +58,7 @@ The requirements listed are those that implement each hazard's controls, as the 
 | HAZ-19 | H2, H6 | RC-26, RC-04, RC-12 | REQ-AGT-007, REQ-CMT-007, REQ-CMT-009 | S3 P1 Low |
 | HAZ-20 | H1, H2, H7 | RC-22, RC-26, RC-27, RC-29 | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008, REQ-AGT-007, REQ-AGT-010, REQ-CNV-003, REQ-CNV-004 | S4 P2 Medium |
 | HAZ-21 | H7 | RC-24 | REQ-AGT-005 | S3 P1 Low |
-| HAZ-22 | H3, H2 | RC-23, RC-22 | REQ-AGT-004, REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | S3 P1 Low |
+| HAZ-22 | H3, H2 | RC-23, RC-22 | REQ-AGT-004, REQ-DIF-013, REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | S3 P1 Low |
 | HAZ-23 | H4 | RC-22 | REQ-AGT-002, REQ-AGT-003, REQ-AGT-008 | S4 P1 Medium |
 | HAZ-24 | H4, H7 | RC-28 | REQ-CNV-002 | S4 P1 Medium |
 | HAZ-25 | H1 | RC-25 | REQ-AGT-006 | S4 P1 Medium |
@@ -78,7 +78,7 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | Coverage | Count | Requirements (REQ-…) |
 | --- | --- | --- |
 | Unit tests, fully | 34 | GH-003, GH-004, GH-007, QUE-001, QUE-002, QUE-003, QUE-004, QUE-008, WIN-008, OVR-001, DIF-001, DIF-002, CMT-001, CMT-007, CMT-008, AGT-001, AGT-002, AGT-003, AGT-004, AGT-005, AGT-006, AGT-008, AGT-009, AGT-010, AGT-011, CNV-001, CNV-002, CNV-003, CNV-004, KEY-001, CFG-002, CFG-003, CFG-004, CFG-005 |
-| Unit tests, partly (the rest is a gap) | 14 | GH-002, GH-006, QUE-007, QUE-009, OVR-004, OVR-005, DIF-003, DIF-004, DIF-006, DIF-008, DIF-012, CMT-009, AGT-007, KEY-003 |
+| Unit tests, partly (the rest is a gap) | 15 | GH-002, GH-006, QUE-007, QUE-009, OVR-004, OVR-005, DIF-003, DIF-004, DIF-006, DIF-008, DIF-012, DIF-013, CMT-009, AGT-007, KEY-003 |
 | UI scenarios (no unit tests) | 10 | QUE-006, WIN-001, WIN-003, WIN-007, DIF-009, DIF-011, CNV-005, CNV-006, KEY-002, KEY-004 |
 | Live GitHub tests only | 5 | DIF-007, CMT-002, CMT-005, CMT-006, AGT-012 |
 | A one-off scripted run or use (not repeatable) | 7 | WIN-006, DIF-005, DIF-010, PLT-001, PLT-005, PLT-006, PLT-007 |
@@ -86,7 +86,7 @@ highest, then live GitHub tests, then a verification record or use, then inspect
 | None yet | 9 | QUE-005, WIN-002, WIN-004, WIN-005, OVR-003, CMT-003, KEY-005, CFG-001, PLT-003 |
 | Proposed (not built) | 0 | — |
 
-85 requirements: 85 implemented and 0 proposed.
+86 requirements: 86 implemented and 0 proposed.
 <!-- trace:end coverage -->
 
 Most of the "one-off", "inspection only" and "none yet" rows have UI scenarios planned (`UI:…` after `Gap` in
