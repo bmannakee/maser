@@ -4,10 +4,10 @@ What was checked on the first signed, notarized release and its installer (REQ-P
 [the stand-in checks of 2026-11-22](../2026-11-22-signed-release/README.md), which couldn't have a real release.
 
 - **Software:** release v0.1.0 at `a73d538` (main after PR #72), built by `scripts/release 0.1.0`.
-- **Environment:** a Mac with macOS 27.0.1 and Xcode 27.1. Not macOS 26.
+- **Environment:** a Mac with macOS 27.0.1 and Xcode 27.1 (V1–V4); the user's managed work Mac with macOS 26 (V5, added 2026-11-25).
 - **How:** the script's own checks, then the draft's files downloaded with `gh` and installed with the real installer,
   then `MASER_UI_HARDENED=1 scripts/check-ui`, then the public install command run over the network.
-- **Performed by:** Claude Code (agent), at the user's request, with the user's Developer ID and notarization login.
+- **Performed by:** Claude Code (agent), at the user's request, with the user's Developer ID and notarization login; V5 by the user.
 
 ## Summary
 
@@ -17,6 +17,7 @@ What was checked on the first signed, notarized release and its installer (REQ-P
 | V2 | The draft's files, installed with the real installer | `Maser.zip` downloaded from the draft matched its checksum. `scripts/install.sh` accepted it (against a local copy of the release folder, into a scratch folder): `codesign -dv` showed Authority Developer ID Application: BRIAN KENDALL MANNAKEE (5TF9N64U4P), Developer ID Certification Authority, Apple Root CA, flags `runtime`, TeamIdentifier 5TF9N64U4P; `spctl -a -vv` said `accepted`, `source=Notarized Developer ID`; `stapler validate` worked; both `x86_64` and `arm64` were present; the version was 0.1.0. | REQ-PLT-007 |
 | V3 | The hardened runtime against maser's behavior | `MASER_UI_HARDENED=1 scripts/check-ui`: all 28 scenarios passed with the test app signed ad hoc with the `runtime` flag (confirmed by `codesign -dv`): diagrams (JavaScriptCore with Pele), the agent's subprocesses, the web views, keys and focus. The test app was closed afterward. | REQ-PLT-006 |
 | V4 | The published release, installed over the network | After publishing, `curl -fsSL https://raw.githubusercontent.com/bmannakee/maser/v0.1.0/scripts/install.sh \| MASER_INSTALL_DIR=<scratch> sh` downloaded `…/releases/latest/download/Maser.zip` and installed 0.1.0; `spctl` said `accepted`, `source=Notarized Developer ID`. | REQ-PLT-007 |
+| V5 | The published release, installed on the work Mac | Added 2026-11-25, as the user reported it: v0.1.0 was installed on their managed Mac with macOS 26 using the install command from docs/install.md, opened, and ran cleanly. No Gatekeeper or policy prompt was reported. Using it there found #74 (a PR over GitHub's 20,000-line diff limit). Not captured: the installer's output, the exact macOS 26 version, whether the user or their agent ran the command. | REQ-PLT-001, REQ-PLT-006, REQ-PLT-007 |
 
 ## Details
 
@@ -50,9 +51,14 @@ answered 200.
 
 ## Not checked
 
-- macOS 26. The app has been built and run only on macOS 27 (REQ-PLT-001), and it's the work Mac that runs 26. The
-  installer's `sw_vers` check and the app's minimum of 26.0 are untested there.
+- macOS 26 beyond V5: it ran there, but the installer's output and the exact version weren't recorded.
 - The real notarized build under `scripts/check-ui`: V3 used the test app's ad hoc signature with the same hardened
   runtime, not the Developer ID build.
-- The install through a corporate proxy or an MDM policy that restricts which developers' apps may run.
+- A corporate proxy, and a policy that restricts which developers' apps may run: the work Mac installed and ran it (V5), but
+  nobody checked which policies it has.
 - The installer's refusals against a real release that was altered: those were tested on stand-ins (V-2026-11-22/V1).
+
+### V5: the work Mac
+
+Reported by the user in conversation on 2026-11-25: "It opened and ran cleanly." This record has no capture of it, so it
+rests on their word.
