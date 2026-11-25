@@ -227,6 +227,44 @@ public struct AgentCheckout: Sendable {
         return String(decoding: result.stdout, as: UTF8.self)
     }
 
+    /// Reads a file as of a commit from the user's clone, without fetching or changing anything.
+    ///
+    /// This is a shortcut for Show Full File: when the clone already has the commit, it saves a GitHub call. It returns
+    /// nil for anything that isn't certain, and the caller then asks GitHub. Git is told never to fetch a missing object
+    /// (a partial clone would otherwise reach the network and write into the clone).
+    ///
+    /// - Parameters:
+    ///   - clone: The user's clone.
+    ///   - commit: The commit's full ID, from GitHub.
+    ///   - path: The file's path, relative to the repository root.
+    ///   - maxBytes: The largest file to read.
+    /// - Returns: The file's text, or nil if the clone lacks the commit, the path isn't a regular file there, the file
+    ///   is over `maxBytes`, or git fails.
+    @concurrent
+    public func fileContents(inClone clone: URL, commit: String, path: String, maxBytes: Int) async -> String? {
+        guard !commit.isEmpty, commit.allSatisfy(\.isHexDigit), !path.isEmpty else { return nil }
+        let base = ["--no-optional-locks", "-C", clone.path(percentEncoded: false)]
+        let environment = ["GIT_TERMINAL_PROMPT": "0", "GIT_NO_LAZY_FETCH": "1"]
+        func output(_ arguments: [String]) async -> String? {
+            guard let result = try? await Subprocess.run(git, base + arguments, environment: environment), result.status == 0
+            else { return nil }
+            return String(decoding: result.stdout, as: UTF8.self)
+        }
+        // One entry, "<mode> blob <id>\t<path>\0", for exactly this path: a regular file's blob, not a symlink (mode
+        // 120000), submodule or folder, and not several entries because the path named a folder or pattern.
+        guard let entry = await output(["ls-tree", "-z", commit, "--", path]), entry.hasSuffix("\0"),
+            case let parts = entry.dropLast().split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false),
+            parts.count == 2, parts[1] == path
+        else { return nil }
+        let fields = parts[0].split(separator: " ")
+        guard fields.count == 3, fields[1] == "blob", ["100644", "100755"].contains(fields[0]) else { return nil }
+        let blob = String(fields[2])
+        guard blob.allSatisfy(\.isHexDigit), let size = await output(["cat-file", "-s", blob]),
+            let bytes = Int(size.trimmingCharacters(in: .whitespacesAndNewlines)), bytes <= maxBytes
+        else { return nil }
+        return await output(["cat-file", "blob", blob])
+    }
+
     /// Makes sure Maser's bare cache for a repository has a commit, fetching it if needed.
     ///
     /// - Parameters:

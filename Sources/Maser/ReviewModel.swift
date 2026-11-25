@@ -164,6 +164,10 @@ final class ReviewModel {
     private(set) var loadingFullFiles: Set<String> = []
     /// Why a file couldn't be shown in full, by path.
     private(set) var fullFileErrors: [String: String] = [:]
+    /// The search for the user's clone of this PR's repository, started the first time a file's contents are wanted.
+    private var cloneLookup: Task<URL?, Never>?
+    /// The largest file Show Full File reads, from GitHub or from the clone.
+    private static let maxFullFileBytes = 4_000_000
     /// A short note about the last key that couldn't do anything, shown under the diff until the cursor moves.
     private(set) var diffNotice: String?
 
@@ -1157,7 +1161,17 @@ final class ReviewModel {
         Task {
             defer { loadingFullFiles.remove(path) }
             do {
-                let text = try await GitHubCLI().fileContents(of: pr, path: path, commitID: commit)
+                var found: String?
+                if let clone = await cloneForFiles() {
+                    found = await AgentCheckout(root: AgentSession.checkoutRoot).fileContents(
+                        inClone: clone, commit: commit, path: path, maxBytes: Self.maxFullFileBytes)
+                }
+                let text: String
+                if let found {
+                    text = found
+                } else {
+                    text = try await GitHubCLI().fileContents(of: pr, path: path, commitID: commit)
+                }
                 headTexts[key] = text
                 // A refresh may have replaced the diff while this loaded; build against the current one.
                 if let current = filesByPath[path], diffCommitID == commit {
@@ -1167,6 +1181,23 @@ final class ReviewModel {
                 fullFileErrors[path] = "Couldn't load the full file: \(error.localizedDescription)"
             }
         }
+    }
+
+    /// The user's clone of this PR's repository, looked for once per review and remembered.
+    ///
+    /// Finding it runs `git config` in each candidate folder, which is too slow to repeat for every file.
+    ///
+    /// - Returns: The clone's folder, or nil if there is none.
+    private func cloneForFiles() async -> URL? {
+        if let lookup = cloneLookup { return await lookup.value }
+        let pr = pr
+        let folders = ConfigStore.shared.settings.agent.repositories
+        let root = AgentSession.checkoutRoot
+        let lookup = Task {
+            await AgentCheckout(root: root).findLocalClone(of: AgentCheckout.Repository(pr), in: folders)
+        }
+        cloneLookup = lookup
+        return await lookup.value
     }
 
     /// Stores a file's whole-file view built from its contents, or records why it couldn't be built.
