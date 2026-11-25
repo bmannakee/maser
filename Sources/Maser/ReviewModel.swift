@@ -386,7 +386,7 @@ final class ReviewModel {
         if filesByPath.isEmpty { filesState = .loading }
         do {
             let cli = GitHubCLI()
-            async let diff = cli.diffAtHead(for: pr)
+            async let diff = cli.diffAtHead(for: pr, diffFromClone: diffFromClone())
             async let threads = cli.reviewThreads(for: pr)
             let ((files, reviewContext), allThreads) = try await (diff, threads)
 
@@ -411,6 +411,26 @@ final class ReviewModel {
             filesState = .loaded
         } catch {
             filesState = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Makes the function that reads this PR's diff from the user's clone, for a PR GitHub won't serve the diff of.
+    ///
+    /// It finds the clone when called, so nothing is searched for unless GitHub refuses the diff.
+    ///
+    /// - Returns: A function from the base and head commits to the diff, which returns nil when no clone is found.
+    private func diffFromClone() -> @Sendable (String, String) async throws -> String? {
+        let pr = pr
+        let folders = ConfigStore.shared.settings.agent.repositories
+        let root = AgentSession.checkoutRoot
+        return { base, head in
+            let repository = AgentCheckout.Repository(pr)
+            let checkout = AgentCheckout(root: root)
+            guard let clone = await checkout.findLocalClone(of: repository, in: folders) else { return nil }
+            let gh = try await GitHubCLI.executablePath()
+            return try await checkout.diff(
+                repository, base: base, head: head, pullNumber: pr.number, localClone: clone, remote: repository.httpsURL,
+                credentialHelper: "!\"\(gh)\" auth git-credential")
         }
     }
 

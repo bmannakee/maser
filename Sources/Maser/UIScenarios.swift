@@ -27,7 +27,7 @@
             queueSearchFails, switchPRsKeepsState, longLinesWrap, diffNamesFile, overviewShowsAge, headMovedBlocksPosting,
             namesPRAndAccount,
             draftSurvivesRelaunch, closedPRLeavesPane, agentConversation, agentOffUntilAllowed, agentFollowsHead,
-            canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut,
+            canvasShowsDiagram, canvasRejectsScript, canvasFollowsCitation, agentCommentsMarked, ghTimesOut, largePRNeedsClone,
             reviewRequestedClear, queueEmpty, reviewRequestedFails, reviewRequestedOff, focusNextReview,
         ]
 
@@ -452,6 +452,35 @@
             try app.overrideGH([])
             try await app.press("r")
             try await app.waitUntil("trying again loads the diff") {
+                if case .loaded = app.review?.filesState { return app.review?.selectedFile != nil }
+                return false
+            }
+        }
+
+        /// A PR whose diff GitHub refuses as too large, with no clone to read it from, says why and what fixes it.
+        static let largePRNeedsClone = UIScenario(
+            "large-pr-needs-clone",
+            "REQ-DIF-012: A diff GitHub won't serve says why and how to fix it, and loads once GitHub serves it"
+        ) { app in
+            let refusal =
+                "non-200 OK status code: 406 Not Acceptable body: \"Sorry, the diff exceeded the maximum number of lines (20000)\""
+            try app.overrideGH([
+                .init(match: ["pr", "diff"], status: 1, stdout: nil, stderr: refusal),
+                .init(match: ["baseRefOid"], status: 0, stdout: "0123456789abcdef0123456789abcdef01234567\n", stderr: nil),
+            ])
+            try await app.openFromQueue(smallPR)
+            try await app.press("g f")
+            try await app.waitUntil("the Files tab says the diff is too large") {
+                ShownText.values["files-failed"]?.contains("20,000 lines") == true
+            }
+            let shown = ShownText.values["files-failed"] ?? ""
+            try app.expect(shown.contains("`repositories` under `[agent]`"), "it says what fixes it", shown)
+            try app.expect(shown.contains("bmannakee/maser"), "it names the repository", shown)
+            try app.expect(!shown.contains("HTTP 406") && !shown.contains("gh exited"), "it isn't gh's raw error", shown)
+
+            try app.overrideGH([])
+            try await app.press("r")
+            try await app.waitUntil("the diff loads once GitHub serves it") {
                 if case .loaded = app.review?.filesState { return app.review?.selectedFile != nil }
                 return false
             }
