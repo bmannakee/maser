@@ -345,8 +345,11 @@ struct MainView: View {
                 focus = nil
             }
             return true
-        // `/` only filters while the queue has the keys, so a stray press in the diff does nothing.
-        case .filter where !keysGoToQueue: return true
+        // `/` filters the queue while it has the keys. When the review has them it narrows the Files tab's tree, or
+        // does nothing, so a stray press never reaches the queue's filter.
+        case .filter where !keysGoToQueue:
+            _ = state.openReview?.perform(command)
+            return true
         default: break
         }
         if keysGoToQueue {

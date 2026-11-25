@@ -76,6 +76,24 @@ public enum FileTree {
         return nodes(in: root, prefix: "")
     }
 
+    /// The paths that match a filter, in their given order.
+    ///
+    /// The filter is words separated by spaces. A path matches when it contains every word, ignoring case and accents.
+    /// An empty filter matches every path.
+    ///
+    /// - Parameters:
+    ///   - paths: Repo-relative file paths.
+    ///   - filter: What the user typed.
+    /// - Returns: The paths that match.
+    public static func matching(_ paths: [String], filter: String) -> [String] {
+        let words = filter.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !words.isEmpty else { return paths }
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        return paths.filter { path in
+            words.allSatisfy { path.range(of: $0, options: options) != nil }
+        }
+    }
+
     /// Path of the first file in display order.
     ///
     /// - Parameter nodes: The tree's top-level nodes.

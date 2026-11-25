@@ -20,7 +20,7 @@ struct FilesView: View {
         HStack(spacing: 0) {
             FileTreeView(model: model)
                 .listStyle(.sidebar)
-                .frame(width: Self.treeWidth(for: model.tree))
+                .frame(width: max(Self.treeWidth(for: model.tree), model.showFileFilter || !model.fileFilter.isEmpty ? 220 : 0))
             Divider()
             DiffPane(model: model)
                 .frame(maxWidth: .infinity)
@@ -57,9 +57,53 @@ struct FilesView: View {
 
 /// The changed files as a tree of collapsible directories, with the selected file highlighted.
 private struct FileTreeView: View {
-    let model: ReviewModel
+    @Bindable var model: ReviewModel
+    /// Whether the filter box has the keyboard.
+    @FocusState private var filterFocused: Bool
 
     var body: some View {
+        VStack(spacing: 0) {
+            if model.showFileFilter || !model.fileFilter.isEmpty {
+                filterBar
+            }
+            tree
+        }
+        .task(id: model.fileFilterFocusRequest) {
+            guard model.fileFilterFocusRequest else { return }
+            model.fileFilterFocusRequest = false
+            filterFocused = true
+        }
+    }
+
+    /// The filter box, with how many files it leaves showing.
+    ///
+    /// Return goes back to the tree and keeps the filter; Esc clears the filter, hides the box and goes back.
+    private var filterBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.secondary)
+            TextField("Filter files", text: $model.fileFilter)
+                .textFieldStyle(.plain)
+                .focused($filterFocused)
+                .onSubmit { filterFocused = false }
+                .onExitCommand {
+                    model.fileFilter = ""
+                    model.showFileFilter = false
+                    filterFocused = false
+                }
+            if !model.fileFilter.isEmpty {
+                let text = "\(model.shownFileCount) of \(model.changedFileCount)"
+                // Filtering hides files, so say so in the one color the tree otherwise doesn't use (RC-40).
+                Text(text).font(.caption).monospacedDigit().foregroundStyle(Color.Brand.ruby)
+                    .shownText("file-filter-count", text)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .help("Filter files by path: every word must match. Esc clears it.")
+    }
+
+    /// The tree of changed files that match the filter.
+    @ViewBuilder private var tree: some View {
         // Route clicks and arrow keys through the model so the line cursor resets per file.
         let selection = Binding<String?> {
             model.selectedPath
@@ -73,7 +117,11 @@ private struct FileTreeView: View {
         }
         .overlay {
             if case .loaded = model.filesState, model.tree.isEmpty {
-                ContentUnavailableView("No changed files", systemImage: "doc")
+                if model.fileFilter.isEmpty {
+                    ContentUnavailableView("No changed files", systemImage: "doc")
+                } else {
+                    ContentUnavailableView.search(text: model.fileFilter)
+                }
             }
         }
     }
@@ -563,6 +611,7 @@ private struct KeyHintBar: View {
     private static let hints: [(label: String, commands: [CommandID])] = [
         ("line", [.cursorDown, .cursorUp]),
         ("file", [.previousFile, .nextFile]),
+        ("filter files", [.filter]),
         ("hunk", [.previousHunk, .nextHunk]),
         ("full file", [.toggleFullFile]),
         ("select", [.selectLines]),

@@ -62,7 +62,9 @@ side. ⌘O opens any PR by URL. Each review has tabs:
   The header says how long ago these were loaded ("Loaded 3 minutes ago"); `r` loads them again.
   Write a comment in the box at the bottom (`c` to jump there, ⌘↩ to post, Esc to leave it); **Quote reply** on any comment quotes it into your draft.
 - **Files** — changed files, diff, and inline review comments. The path of the file shown is above its diff, with the
-  lines it adds and removes. Selecting a comment thread scrolls the diff to its line.
+  lines it adds and removes. Selecting a comment thread scrolls the diff to its line. `/` filters the file tree by path
+  (every word must match, so `tests tree` finds `Tests/FileTreeTests.swift`), which helps with a PR of a hundred files;
+  the box says how many files it leaves, `]`/`[` move among those, Return keeps the filter and Esc clears it.
   Move the line cursor with `j`/`k` (or click the line numbers), select a range with `V` (or shift-click), and press `c` to comment;
   `R` replies to the selected thread. Line comments collect in a pending review, visible only to you, until you
   **Finish Review** (`S`, toolbar) as Comment, Approve or Request changes. Replies join the pending review if you have one;
@@ -103,6 +105,7 @@ Every action is a command you can trigger two ways:
 | Open pull request | ⌘O | |
 | Refresh | ⌘R | `r` |
 | Filter the queue | ⌘F | `/` |
+| Filter the Files tab's tree by path (while the review has the keys) | | `/` |
 | Show the queue and give it the keys (from anywhere) | ⌘0 | `g p` |
 | Show/hide the queue | | `e` |
 | Open the selected PR (queue) / in a new window | | `enter` / `opt+enter` |
