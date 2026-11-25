@@ -1,7 +1,5 @@
 # Installing maser
 
-**No release exists yet (#71): until the first is made, the install below stops with an error.**
-
 Instructions for a person or a coding agent installing maser on a Mac. They need no source code, no Xcode and no admin
 rights.
 
