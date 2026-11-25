@@ -28,6 +28,8 @@ public enum GitHubCLIError: Error, LocalizedError, Equatable {
     /// `gh` didn't finish within the timeout and was stopped. `mayHaveWritten` is true for a call that changes
     /// something on GitHub, which may have happened before it was stopped.
     case timedOut(seconds: Int, mayHaveWritten: Bool)
+    /// GitHub won't serve the PR's diff because it's too long, and it couldn't be read from a local clone either.
+    case diffTooLarge(repository: String)
 
     /// A user-facing message; for `failed`, it includes the error output from `gh`.
     public var errorDescription: String? {
@@ -59,6 +61,12 @@ public enum GitHubCLIError: Error, LocalizedError, Equatable {
             """
         case .accountChanged(_, nil):
             "GitHub didn't say which account gh is signed in to, so nothing was posted. Your text is kept."
+        case let .diffTooLarge(repository):
+            """
+            GitHub won't serve the diff of a PR this large (over 20,000 lines). maser can read it from your own clone of \
+            \(repository) instead: add the folder holding the clone to `repositories` under `[agent]` in config.toml, \
+            then refresh.
+            """
         case let .timedOut(seconds, false):
             "gh didn't answer within \(seconds) seconds, so Maser stopped waiting. Check your network, then try again."
         case let .timedOut(seconds, true):
@@ -306,13 +314,28 @@ public struct GitHubCLI: Sendable {
     /// - Throws: `GitHubCLIError.failed` if `gh` fails, for example when the diff is too large for GitHub to serve.
     @concurrent
     public func fileDiffs(for pr: PullRequest) async throws -> [FileDiff] {
-        let data = try await run(
-            [
-                "pr", "diff", String(pr.number),
-                "--repo", "\(pr.host)/\(pr.repository.nameWithOwner)",
-                "--color", "never",
-            ], slow: true)
-        return DiffParser.parse(String(decoding: data, as: UTF8.self))
+        do {
+            let data = try await run(
+                [
+                    "pr", "diff", String(pr.number),
+                    "--repo", "\(pr.host)/\(pr.repository.nameWithOwner)",
+                    "--color", "never",
+                ], slow: true)
+            return DiffParser.parse(String(decoding: data, as: UTF8.self))
+        } catch GitHubCLIError.failed(_, let stderr) where Self.isDiffTooLarge(stderr) {
+            throw GitHubCLIError.diffTooLarge(repository: pr.repository.nameWithOwner)
+        }
+    }
+
+    /// Whether the error output of `gh pr diff` says GitHub refused the diff for its length.
+    ///
+    /// GitHub answers `HTTP 406: Sorry, the diff exceeded the maximum number of lines (20000)` with
+    /// `PullRequest.diff too_large`.
+    ///
+    /// - Parameter stderr: What `gh` wrote to standard error.
+    /// - Returns: True if the diff was refused as too large.
+    static func isDiffTooLarge(_ stderr: String) -> Bool {
+        stderr.contains("too_large") || stderr.contains("exceeded the maximum number of lines")
     }
 
     /// Fetches a file's contents as of a commit.

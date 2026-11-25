@@ -50,21 +50,76 @@ extension GitHubCLI {
     /// `gh pr diff` always serves the current head and doesn't say which commit that is, so the head is read before
     /// and after the diff. If a push lands in between, the load is retried.
     ///
+    /// GitHub refuses to serve a diff over 20,000 lines. Then `diffFromClone` is asked for it, with the PR's base and
+    /// head commits as GitHub reports them (never a local ref, which may be stale). That diff covers the same range
+    /// GitHub's would, so a comment placed on it lands where the user saw it, and the same head check guards it.
+    ///
     /// - Parameters:
     ///   - pr: The pull request to load.
     ///   - attempts: How many times to try before giving up.
+    ///   - diffFromClone: Computes the unified diff from the user's clone for a base and head commit, or returns nil if
+    ///     there is no clone. Not called unless GitHub refuses the diff.
     /// - Returns: The diff, and the context whose `headCommitID` is the commit the diff shows.
-    /// - Throws: `GitHubCLIError.rejected` if the head keeps moving, or the errors from `fileDiffs(for:)` and
+    /// - Throws: `GitHubCLIError.diffTooLarge` if GitHub refuses and there is no clone to read it from,
+    ///   `GitHubCLIError.rejected` if the head keeps moving or the clone fails, or the errors from `fileDiffs(for:)` and
     ///   `reviewContext(for:)`.
     @concurrent
-    public func diffAtHead(for pr: PullRequest, attempts: Int = 3) async throws -> (files: [FileDiff], context: ReviewContext) {
+    public func diffAtHead(
+        for pr: PullRequest, attempts: Int = 3,
+        diffFromClone: (@Sendable (_ base: String, _ head: String) async throws -> String?)? = nil
+    ) async throws -> (files: [FileDiff], context: ReviewContext) {
         for _ in 0..<attempts {
             let before = try await reviewContext(for: pr)
-            let files = try await fileDiffs(for: pr)
+            var cloneBase: String?
+            let files: [FileDiff]
+            do {
+                files = try await fileDiffs(for: pr)
+            } catch let tooLarge as GitHubCLIError {
+                guard case .diffTooLarge = tooLarge, let diffFromClone, let base = try? await baseCommitID(for: pr) else {
+                    throw tooLarge
+                }
+                let text: String?
+                do {
+                    text = try await diffFromClone(base, before.headCommitID)
+                } catch {
+                    throw GitHubCLIError.rejected(
+                        "GitHub won't serve the diff of a PR this large, and reading it from your clone failed: "
+                            + error.localizedDescription)
+                }
+                guard let text else { throw tooLarge }
+                files = DiffParser.parse(text)
+                cloneBase = base
+            }
             let after = try await reviewContext(for: pr)
-            if before.headCommitID == after.headCommitID { return (files, after) }
+            // A diff from the clone is for a base and a head; GitHub's own diff is only for the head.
+            var baseHeld = true
+            if let cloneBase { baseHeld = (try? await baseCommitID(for: pr)) == cloneBase }
+            if before.headCommitID == after.headCommitID && baseHeld { return (files, after) }
         }
         throw GitHubCLIError.rejected("The PR kept changing while its diff loaded. Refresh to try again.")
+    }
+
+    /// The query for the commit at the tip of the branch the PR merges into.
+    static let baseCommitQuery = """
+        query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) { pullRequest(number: $number) { baseRefOid } }
+        }
+        """
+
+    /// Fetches the commit at the tip of the branch the PR merges into, which the PR's diff starts from.
+    ///
+    /// Only needed when a diff is computed from a local clone, so it isn't part of `reviewContext(for:)`.
+    ///
+    /// - Parameter pr: The pull request.
+    /// - Returns: The commit's full ID, or nil if GitHub didn't give one.
+    /// - Throws: `GitHubCLIError.failed` if `gh` fails.
+    @concurrent
+    public func baseCommitID(for pr: PullRequest) async throws -> String? {
+        let data = try await graphQL(
+            Self.baseCommitQuery, host: pr.host, jq: ".data.repository.pullRequest.baseRefOid",
+            strings: try repoVariables(pr), ints: ["number": pr.number])
+        let id = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return id.isEmpty || id == "null" ? nil : id
     }
 
     /// The mutation that starts a pending review, pinned to a commit.

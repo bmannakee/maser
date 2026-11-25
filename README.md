@@ -167,7 +167,7 @@ until `allow` names the PR's owner (`"my-name"`, on github.com), a host (`"githu
 and owner (`"github.example.com/my-org"`). Allow only code whose owner lets you send it to the model provider. The other
 settings are `claude` (its path), `model`, `effort` (`low` to `max`), `max_budget_usd` (per turn; default 2) and
 `repositories` (folders holding your clones: the agent's checkout is fetched from your clone when one is found, which
-only reads it, and otherwise from GitHub through `gh`). See [docs/design/review-agent.md](docs/design/review-agent.md).
+only reads it, and otherwise from GitHub through `gh`; and a PR whose diff GitHub won't serve, over 20,000 lines, is read from your clone). See [docs/design/review-agent.md](docs/design/review-agent.md).
 
 Keys are characters (`j`, `J` for shift+j, `?`), named keys (`up`, `down`, `left`, `right`, `enter`, `tab`, `space`, `esc`, `backspace`, `delete`, `pageup`, `pagedown`, `home`, `end`), optionally with `ctrl+`, `opt+`, `shift+`, `cmd+` (menu shortcuts only). Binding keys to a command takes them away from whatever had them by default. Esc cancels a half-typed sequence.
 

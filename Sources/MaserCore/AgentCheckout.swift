@@ -3,7 +3,8 @@
 // Maser keeps a bare cache per repository under its own folder. To get a commit into it, it first fetches from the
 // user's own clone, if one is found, which only reads that clone, and otherwise from GitHub, with `gh` as git's
 // credential helper so Maser never sees a token. It then checks the commit out as a detached worktree with symlinks off
-// and hooks off, and makes every file read-only. Nothing here writes to the user's clone (RC-23).
+// and hooks off, and makes every file read-only. It also computes a diff from the same cache for PRs GitHub won't serve
+// one of (REQ-DIF-012). Nothing here writes to the user's clone (RC-23).
 
 import Foundation
 
@@ -171,6 +172,76 @@ public struct AgentCheckout: Sendable {
         {
             return checkout
         }
+        let cachePath = try await ensureCommit(
+            commit, in: repository, pullNumber: pullNumber, localClone: localClone, remote: remote,
+            credentialHelper: credentialHelper)
+
+        if FileManager.default.fileExists(atPath: checkout.path(percentEncoded: false)) {
+            try Self.makeWritable(checkout)
+            try FileManager.default.removeItem(at: checkout)
+            _ = try? await git(["-C", cachePath, "worktree", "prune"])
+        }
+        // No hooks: a global post-checkout hook would otherwise run with the PR's code as its working directory.
+        _ = try await git([
+            "-c", "core.hooksPath=/dev/null", "-c", "core.symlinks=false", "-C", cachePath, "worktree", "add", "--quiet",
+            "--detach", checkout.path(percentEncoded: false), commit,
+        ])
+        try Self.makeReadOnly(checkout)
+        return checkout
+    }
+
+    /// Reads a PR's diff from the user's clone, for a PR GitHub won't serve the diff of.
+    ///
+    /// Gets the base and head commits into Maser's own cache the way `prepare` does, so the clone is only read, and
+    /// runs `git diff base...head` there: the changes since the merge base, which is what GitHub's PR diff shows.
+    ///
+    /// - Parameters:
+    ///   - repository: The PR's repository.
+    ///   - base: The full ID of the tip of the branch the PR merges into, as GitHub reports it.
+    ///   - head: The full ID of the PR's head commit, as GitHub reports it.
+    ///   - pullNumber: The PR's number, to fetch its head ref when the commit isn't otherwise reachable.
+    ///   - localClone: The user's own clone, to fetch from first.
+    ///   - remote: Where to fetch from when the clone doesn't have the commits; GitHub's HTTPS URL normally.
+    ///   - credentialHelper: A git credential helper for the remote.
+    /// - Returns: The unified diff, in git's usual form with `a/` and `b/` prefixes and no color.
+    /// - Throws: `Failure.commitNotFound` if a commit is in neither place, or `Failure.git` if a git command fails.
+    @concurrent
+    public func diff(
+        _ repository: Repository, base: String, head: String, pullNumber: Int, localClone: URL?, remote: String,
+        credentialHelper: String?
+    ) async throws -> String {
+        var cachePath = ""
+        for commit in [base, head] {
+            cachePath = try await ensureCommit(
+                commit, in: repository, pullNumber: pullNumber, localClone: localClone, remote: remote,
+                credentialHelper: credentialHelper)
+        }
+        // Everything the user's git config could change about the output is set here, and drivers that run programs are off.
+        let result = try await run([
+            "-C", cachePath, "diff", "--no-color", "--no-ext-diff", "--no-textconv", "-M", "--src-prefix=a/", "--dst-prefix=b/",
+            "\(base)...\(head)",
+        ])
+        guard result.status == 0 else {
+            throw Failure.git(command: "diff", message: String(decoding: result.stderr, as: UTF8.self))
+        }
+        return String(decoding: result.stdout, as: UTF8.self)
+    }
+
+    /// Makes sure Maser's bare cache for a repository has a commit, fetching it if needed.
+    ///
+    /// - Parameters:
+    ///   - commit: The commit's full ID.
+    ///   - repository: The repository.
+    ///   - pullNumber: The PR's number, to fetch its head ref when the commit isn't otherwise reachable.
+    ///   - localClone: The user's own clone, to fetch from first, if one was found.
+    ///   - remote: Where to fetch from when the clone doesn't have the commit.
+    ///   - credentialHelper: A git credential helper for the remote.
+    /// - Returns: The cache's path.
+    /// - Throws: `Failure.commitNotFound` if neither source has the commit, or `Failure.git` if a git command fails.
+    private func ensureCommit(
+        _ commit: String, in repository: Repository, pullNumber: Int, localClone: URL?, remote: String,
+        credentialHelper: String?
+    ) async throws -> String {
         let cache = cacheURL(for: repository)
         let cachePath = cache.path(percentEncoded: false)
         if !FileManager.default.fileExists(atPath: cachePath) {
@@ -197,19 +268,7 @@ public struct AgentCheckout: Sendable {
             }
         }
         guard await hasCommit(commit, in: cachePath) else { throw Failure.commitNotFound(commit) }
-
-        if FileManager.default.fileExists(atPath: checkout.path(percentEncoded: false)) {
-            try Self.makeWritable(checkout)
-            try FileManager.default.removeItem(at: checkout)
-            _ = try? await git(["-C", cachePath, "worktree", "prune"])
-        }
-        // No hooks: a global post-checkout hook would otherwise run with the PR's code as its working directory.
-        _ = try await git([
-            "-c", "core.hooksPath=/dev/null", "-c", "core.symlinks=false", "-C", cachePath, "worktree", "add", "--quiet",
-            "--detach", checkout.path(percentEncoded: false), commit,
-        ])
-        try Self.makeReadOnly(checkout)
-        return checkout
+        return cachePath
     }
 
     /// Whether a bare repository has a commit.
